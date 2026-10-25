@@ -1,0 +1,2 @@
+name=Default (placeholder)
+description=Generated placeholder art, sounds and music. Replace any file.

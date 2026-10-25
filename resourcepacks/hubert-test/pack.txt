@@ -1,0 +1,2 @@
+name=Hubert test pack
+description=Test of resource packs (Claude, 2026-10-25): pictures + a model for the own champion Sky Monk Tenzo, and a "comet" skin (pictures + model) for Ember Monk. Anything missing comes from the default pack.

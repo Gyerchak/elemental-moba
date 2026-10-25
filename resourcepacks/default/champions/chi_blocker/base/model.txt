@@ -1,0 +1,4 @@
+# [U-198] placeholder model: body circles from the hitbox, height in game units
+body=slim
+height=70
+colour=8a5030

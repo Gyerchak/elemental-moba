@@ -1,0 +1,13 @@
+# [U-95] Own game version: a copy of official-0.1 with a few small balance changes (Claude, for Hubert's test).
+# Pick it in Menu → Version. Practice / hosting then run it; joining players with this folder switch to it.
+description = Small balance test: Ember Monk tougher and faster, Fire Bolt weaker, Frost Hunter hits harder, Rock Throw quicker
+base = official-0.1
+
+champion.Ember Monk.hp = 570            # official 540
+champion.Ember Monk.move_speed = 345    # official 335
+champion.Frost Hunter.attack = 68       # official 64
+
+skill.Fire Bolt.damage = 70             # official 80
+skill.Fire Bolt.cooldown_ms = 6000      # official 5000
+skill.Rock Throw.cooldown_ms = 8000     # official 9000
+skill.Air Blade.range = 950             # official 900

@@ -1,0 +1,17 @@
+#pragma once
+// Umbrella header for the whole core.
+#include "core/abilities.hpp"
+#include "core/cell.hpp"
+#include "core/combos.hpp"
+#include "core/elements.hpp"
+#include "core/grid.hpp"
+#include "core/hitbox.hpp"
+#include "core/items.hpp"
+#include "core/light.hpp"
+#include "core/progression.hpp"
+#include "core/senses.hpp"
+#include "core/sky_effects.hpp"
+#include "core/stat_rules.hpp"
+#include "core/stats.hpp"
+#include "core/status.hpp"
+#include "core/world_clock.hpp"

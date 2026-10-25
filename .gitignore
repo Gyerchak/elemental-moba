@@ -1,0 +1,9 @@
+# build output
+build/
+# personal / local files (never public)
+settings.cfg
+server_data/
+zrodla/
+# raw generated pictures (the resource pack has the finished ones; tools/art/gen_art.py makes them again)
+art/raw/
+*.log

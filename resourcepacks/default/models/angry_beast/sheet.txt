@@ -1,0 +1,9 @@
+# [U-258] placeholder model sprite sheet (made by tools/art/make_models.py from a Blender model)
+frame_px 128
+dirs 8
+ortho_m 3.2
+anchor 0.5 0.8
+anim idle 0 2 2
+anim walk 2 6 10
+anim attack 8 3 10
+anim death 11 3 5

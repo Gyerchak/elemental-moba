@@ -1,0 +1,14 @@
+# [U-210] Test own champion (made by Claude for Hubert's test, 2026-10-25).
+# An air monk: Wind Nomad's body, Mist Dancer's mobility, a bit slower, a bit more damage.
+base = Wind Nomad
+name = Sky Monk Tenzo
+hp = 545
+attack = 60
+move_speed = 345
+attack_range = 50
+colour = 7fc8ff
+p = Mist Form
+w = Cloud Hop
+e = Air Step
+r = Pressure Wave
+y = Monsoon                # the ultimate (Y)
