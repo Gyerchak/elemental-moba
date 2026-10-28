@@ -2,6 +2,8 @@
 #include <algorithm>
 #include "game/match/layout.hpp"
 #include "game/world.hpp"
+#include "game/mobs/monsters.hpp"
+#include "game/mechanics/element_rules.hpp"
 
 namespace em {
 
@@ -31,8 +33,16 @@ void World::regen(Unit& u) {
         --u.flask_revive;
         u.flask_next_ms = now_ms + 1'000;
     }
+    // [U-339] the Avatar's small water pool: refills slowly, fast next to water, full on pole ice
+    if (u.water_max > 0) {
+        const int big = big_water_near(u);
+        const Surface under = grid.at(u.ux() / kCellUnits, u.uy() / kCellUnits).surface();
+        const std::int64_t wr = under == Surface::Glacier ? u.water_max : elements::kAvatarWaterRegen * (big ? 6 : 1);
+        u.water = std::int32_t(std::min<std::int64_t>(u.water_max, u.water + per_tick(wr, tick, cfg.tick_hz)));
+    }
     // resources
     std::int64_t r = u.res_regen;
+    if (u.jbuff == std::uint8_t(JungleBuff::TuiBlessing) && u.jbuff_until > now_ms) r = r * kTuiRegenPct / 100;  // [U-366]
     switch (u.stats.resource) {
         case ResourceKind::Fuel:
             if (unlimited_fuel(sky)) {  // [U-138]

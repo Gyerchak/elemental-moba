@@ -39,6 +39,7 @@ void World::step_match() {
         if (u.kind == UnitKind::Inhibitor || u.kind == UnitKind::Monster || u.kind == UnitKind::Boss) {
             if (u.kind == UnitKind::Inhibitor) clearance_dirty = true;
             u.alive = true;
+            if (u.mob >= 0) apply_monster_growth(u);  // [U-365]
             u.hp = u.stats.health.total();
             u.x = u.home_x;
             u.y = u.home_y;

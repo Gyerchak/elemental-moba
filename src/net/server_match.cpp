@@ -309,6 +309,11 @@ void Server::send_snapshot(Player& p) {
         }
         w.put<std::uint16_t>(std::uint16_t(wh.size()));
         for (const NetWallHp& n : wh) w.put(n);
+        std::vector<NetWallBreak> wb;  // [U-341] pieces that fell in the last second, where the team sees
+        for (const WallBreak& b : W.wall_breaks)
+            if (vm.cell(b.x, b.y) && wb.size() < 200) wb.push_back({b.x, b.y, b.dx, b.dy, b.kind, {}, b.ms});
+        w.put<std::uint16_t>(std::uint16_t(wb.size()));
+        for (const NetWallBreak& n : wb) w.put(n);
     }
     // [U-246] pings of my team (the last 5 s; the client shows each once)
     std::vector<NetPing> pg;
@@ -352,6 +357,16 @@ void Server::send_snapshot(Player& p) {
         }
     w.put<std::uint8_t>(std::uint8_t(sc.size()));
     for (const NetScore& s : sc) w.put(s);
+    {  // [U-365] camp timers
+        std::vector<NetCamp> cp;
+        for (const Unit& u : W.units)
+            if ((u.kind == UnitKind::Monster || u.kind == UnitKind::Boss) && cp.size() < 250)
+                cp.push_back({std::int16_t(u.home_x / kSub / kCellUnits), std::int16_t(u.home_y / kSub / kCellUnits), World::mob_name_id(u),
+                              std::uint8_t(u.kind == UnitKind::Boss),
+                              std::uint16_t(u.alive ? 0 : std::clamp<std::int64_t>((u.respawn_ms - W.now_ms + 999) / 1000, 1, 65'000))});
+        w.put<std::uint8_t>(std::uint8_t(cp.size()));
+        for (const NetCamp& c : cp) w.put(c);
+    }
     // me
     NetMe m{};
     m.unit = me->id;
@@ -389,7 +404,11 @@ void Server::send_snapshot(Player& p) {
     m.cast_speed = me->stats.cast_speed;
     if (me->champ >= 0) {
         const SkyBoost sb = sky_boost(champions()[std::size_t(me->champ)].element, W.sky);
-        m.power_pct = sb.power_pct;
+        m.power_pct = sb.power_pm();  // [U-370] sent in per-mille (the moon adds 0.5 % steps)
+        m.jbuff = me->jbuff_until > W.now_ms ? me->jbuff : 0;  // [U-366]
+        m.jbuff_ms = std::int32_t(std::max<std::int64_t>(0, me->jbuff_until - W.now_ms));
+        m.water = me->water, m.water_max = me->water_max;  // [U-339]
+        m.lion_stacks[0] = std::int16_t(W.lion_stacks[0]), m.lion_stacks[1] = std::int16_t(W.lion_stacks[1]);
         m.size_pct = sb.size_pct;
     }
     for (int k = 0; k < me->st.size() && m.nstatus < 20; ++k) {

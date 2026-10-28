@@ -72,3 +72,7 @@ THERE SHOULD BE ANOTHER CHARACTER MAGE TYPES WHICH IS AVATAR, THOSE SHOULD BE RE
 | [?-41] | U-288 | Bending enemy / own walls: dividing (holes), destroying, using as a source are done. **Moving** a wall (shifting it as a whole) is not yet. | Planned. |
 | [?-42] | U-290 | Which small graphic glitches exactly (where, when)? | The fog edge stepping 10× a second was smoothed; other glitches need a description. |
 | ?-39 / ?-40 | U-291 | Answered: the ultimate is **Y**; the shop is on **I**. | Done (2026-10-25). |
+| [?-43] | U-361 | Ice Path already freezes deep AND shallow water (radius 160, 6 s). Where did it fail? | Assumed it works; tell me the place / champion if not. |
+| [?-44] | U-367 | "Unless they are spirits": read as spirits PASS through units by default. | Spirits pass; change `spirit` in monsters.hpp. |
+| [?-45] | U-364 | Which epic monsters? | Claude picks: Lion Turtle (stacking power), Sun Dragons (gold); Face Stealer stays. Names / numbers editable in monsters.hpp. |
+| [?-46] | U-356 | "Lava shouldn't create stones as much" — how much? | 12 % of lava cells become a rock (kLavaRockPct). |

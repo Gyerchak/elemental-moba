@@ -23,7 +23,7 @@ inline constexpr std::uint32_t kIntHardCC = kIntStun | kIntAirborne | kIntFrozen
 inline constexpr std::uint32_t kIntDefaultCast = kIntHardCC;                                                    // skills
 inline constexpr std::uint32_t kIntRecall = kIntHardCC | kIntRoot | kIntDamageHp | kIntMove | kIntLiftedAlly;  // recall
 inline constexpr std::uint32_t kIntPortal = kIntRecall;                                                         // spirit portal
-inline constexpr std::int64_t kRecallMs = 8'000;  // recall and the spirit portal take this long [U-350]
+inline constexpr std::int64_t kRecallMs = 6'000;  // recall and the spirit portal take this long [U-350][U-369]
 
 // the interrupt event of a crowd-control status (0 = none)
 [[nodiscard]] constexpr std::uint32_t interrupt_of(StatusKind k) {

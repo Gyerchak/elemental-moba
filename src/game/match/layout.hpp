@@ -15,7 +15,8 @@ using CellPt = std::pair<int, int>;
 inline constexpr CellPt kBaseCell{40, 471};      // [U-06] Fire Nation base centre (stone core) — shop zone
 inline constexpr CellPt kFountainCell{18, 493};  // spawn + heal [X-12]
 inline constexpr CellPt kNexusCell{46, 465};     // "Nation Shrine" [X-07]
-inline constexpr CellPt kNorthPoleCell{28, 28};  // [U-84] + spirit portal [X-54]
+inline constexpr CellPt kNorthPoleCell{28, 28};  // [U-84]
+inline constexpr CellPt kPortalCell{10, 10};     // [X-54][U-355] spirit portal: the far NW corner (~300 units in); SE = mirror
 inline constexpr CellPt kSpiritIsland{256, 256}; // [X-86] Face Stealer pit, centre of the mid bridge
 
 // Lane waypoints from the Fire base to the Earth base. 0 top, 1 mid, 2 bot.
@@ -44,5 +45,10 @@ inline constexpr std::array<CellPt, 2> kNexusTurrets{{{60, 458}, {53, 451}}};
 inline constexpr std::array<CellPt, 5> kCamps{{{110, 300}, {150, 410}, {230, 430}, {80, 360}, {190, 360}}};
 // [X-97] aggressive camps: cursed spirit, angry beast, bandits — attack whoever comes close
 inline constexpr std::array<CellPt, 3> kAggroCamps{{{130, 250}, {270, 400}, {60, 250}}};
+// [U-366] buff camps (Fire side; mirrored): Platypus Bear (Ember buff), Moon Koi (Tui's Blessing)
+inline constexpr std::array<CellPt, 2> kBuffCamps{{{205, 310}, {110, 440}}};
+// [U-364] epic monsters on islands in the sea (one each, not mirrored), reached by a shallow ford
+inline constexpr CellPt kLionTurtleCell{170, 170};
+inline constexpr CellPt kDragonsCell{341, 341};
 
 }  // namespace em

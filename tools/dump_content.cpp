@@ -1,9 +1,12 @@
 // Prints every champion, skill and item as TSV: kind \t id \t element \t name \t description.
 // Used by tools/art/gen_art.py to build the ComfyUI prompt list (one icon / splash / texture per line).
 #include <cctype>
+#include <format>
 #include <print>
+#include <utility>
 #include <string>
 
+#include "core/hitbox.hpp"
 #include "core/items.hpp"
 #include "game/content.hpp"
 #include "game/skills/specials.hpp"
@@ -35,4 +38,12 @@ int main() {
     for (int q = 0; q < int(q_options().size()); ++q) skill(q_options()[std::size_t(q)], q_option_element(q), "");
     for (const data::SpecialRow& r : data::kSpecialRows) skill(r.def, r.element, "");
     for (const ItemDef& i : kItems) std::println("item\t{}\tNone\t{}\t", slug(i.name), i.name);
+    // [U-304] hitbox circles (forward, side, radius in game units) → tools/art builds models that match them
+    for (const auto& [name, b] : {std::pair{"humanoid", &kHumanoidBody}, {"slim", &kSlimBody}, {"broad", &kBroadBody},
+                                  {"minion", &kMinionBody}, {"beast", &kBeastBody}}) {
+        std::string parts;
+        for (int i = 0; i < b->n; ++i)
+            parts += std::format("{}{},{},{}", i ? ";" : "", b->parts[std::size_t(i)].fwd, b->parts[std::size_t(i)].side, b->parts[std::size_t(i)].r);
+        std::println("body\t{}\t\t\t{}", name, parts);
+    }
 }

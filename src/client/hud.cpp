@@ -221,7 +221,7 @@ void GameView::draw_skill_tooltip(NetClient& net, int i, float x, float y, bool 
             if (d->ad) f += std::format(" + {}% ATK [{:.0f}]", d->ad, atk * d->ad / 100);
             if (d->bonus_ad) f += std::format(" + {}% bonus ATK [{:.0f}]", d->bonus_ad, bon * d->bonus_ad / 100);
             L.push_back(f);
-            L.push_back(std::format("   × sky power {}%{} = {}", me.power_pct, d->sub == SubElement::Ice || d->sub == SubElement::Steam ? " × 80% (state change)" : "", me.s_dmg[i]));
+            L.push_back(std::format("   × sky power {:.1f}%{} = {}", me.power_pct / 10.0, d->sub == SubElement::Ice || d->sub == SubElement::Steam ? " × 80% (state change)" : "", me.s_dmg[i]));
         }
         L.push_back(std::format("Cooldown = {} ms{} ÷ (1 + haste) = {} ms", d->cd_ms, d->cd_rank ? std::format(" + {}×(rank−1)", d->cd_rank) : "", me.cd_total_ms[i]));
         if (d->cast_ms) L.push_back(std::format("Cast time = {} ms ÷ (1 + cast speed {}) = {} ms", d->cast_ms, me.cast_speed / 100, me.s_cast_ms[i]));

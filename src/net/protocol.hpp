@@ -16,7 +16,7 @@
 
 namespace em::net {
 
-inline constexpr std::uint16_t kProtocol = 7;  // 7: ten item slots [U-322]
+inline constexpr std::uint16_t kProtocol = 9;  // 7: ten item slots [U-322]; 8: cast sources [U-340]; 9: camps, jungle buffs [U-364..U-366]
 inline constexpr std::string_view kVersion = "official-0.1";  // [U-95][X-14]
 inline constexpr std::uint16_t kDefaultPort = 7777;
 inline constexpr int kMaxPlayers = 32;  // [U-09]
@@ -151,6 +151,12 @@ struct FinalRow {
     std::int32_t lp_after;        //         LP now (−1 = not rated)
 };
 
+// [U-341] a wall piece that just fell (the client animates it once)
+struct NetWallBreak {
+    std::int16_t x, y, dx, dy;
+    std::uint8_t kind, pad[3];
+    std::int64_t ms;
+};
 // [U-288] a damaged wall piece (only damaged ones are sent): HP left in %
 struct NetWallHp {
     std::int16_t x, y;
@@ -210,7 +216,7 @@ struct NetUnit {
     std::uint8_t cc_kind, emote;         // strongest crowd control now [U-193] (255 = none); emote [U-246]
     std::uint16_t cc_left_cs;            // … time left in 1/100 s
 };
-inline constexpr const char* kMobNames[] = {"", "Spirit Wolf", "Wandering Spirit", "Cursed Spirit", "Angry Beast", "Bandit", "Face Stealer"};
+inline constexpr const char* kMobNames[] = {"", "Spirit Wolf", "Wandering Spirit", "Cursed Spirit", "Angry Beast", "Bandit", "Face Stealer", "Bandit Archer", "Platypus Bear", "Moon Koi", "Lion Turtle", "Sun Dragons"};
 
 struct NetFx {
     std::uint32_t id, seed;
@@ -234,7 +240,7 @@ struct NetWave {
 };
 
 struct NetAnnounce {  // [U-263]
-    std::uint8_t kind, team, pad[2];
+    std::uint8_t kind, team, a_kind, a_extra;  // [U-363] the killer's UnitKind (255 = none) + minion type / monster name / champion
     std::uint32_t a, b;  // killer / victim (or structure)
 };
 struct NetRecapHit {  // [U-262]
@@ -303,6 +309,17 @@ struct NetMe {
         std::int16_t value;
         std::int32_t left_ms;
     } status[20];  // my buffs / debuffs [U-167]; kind ≥ kModWireBase = a ModKind [U-255]
+    std::uint8_t jbuff, pad5[3];  // [U-366] my jungle buff (JungleBuff) …
+    std::int32_t jbuff_ms;        // … time left
+    std::int32_t water, water_max;  // [U-339] the Avatar's carried water
+    std::int16_t lion_stacks[2];    // [U-364] Lion Turtle stacks per team
+};
+
+// [U-365] every jungle camp: where, what, alive or the respawn time (public, like LoL timers)
+struct NetCamp {
+    std::int16_t x, y;            // home cell
+    std::uint8_t name_id, epic;   // kMobNames index; 1 = epic monster
+    std::uint16_t respawn_s;      // 0 = alive
 };
 
 }  // namespace em::net

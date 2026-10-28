@@ -74,6 +74,12 @@ void GameView::draw_terrain_models(NetClient& net) {
             } else if (c.bush() == Bush::Alive && ((x + y) % 2 == 0)) {
                 if (bush) Sprites::draw(r_, *bush, "idle", 0, 0, sx, gy, z * 0.7f);
                 else fill_ellipse(r_, sx, view_.sy_h(wy, 10), 18 * z, 12 * z, {54, 128, 44, 230}, 12);
+            } else if (c.walk() == Walk::Blocked && c.surface() == Surface::Stone && c.wall() == Wall::None) {
+                // [U-346] a natural rock wall in the jungle: a big rough rock, higher than player walls
+                const float top = view_.sy_h(wy, 85 + float((x * 7 + y * 3) % 20));
+                fill_rect(r_, sx - 17 * z, top, 34 * z, gy - top, {104, 98, 90, 255});
+                fill_rect(r_, sx - 17 * z, top - 7 * z * view_.gy, 34 * z, 14 * z * view_.gy, {146, 140, 128, 255});
+                line(r_, sx - 6 * z, top + 6 * z, sx + 4 * z, gy - 6 * z, {80, 76, 70, 200});
             } else if (c.wall() == Wall::Stone) {  // raised block
                 const float top = view_.sy_h(wy, 60);
                 fill_rect(r_, sx - 16 * z, top, 32 * z, gy - top, {84, 78, 70, 255});
@@ -118,6 +124,34 @@ void GameView::update_fog_fade(double now_s) {
 // ---------------------------------------------------------------- [U-288] cracks on damaged walls
 void GameView::draw_wall_damage(NetClient& net) {
     const float z = view_.zoom;
+    // [U-341] falling pieces: broken by a hit → chunks fly the hit's way and drop; by time → it crumbles down in place
+    for (const auto& a : net.wall_anims) {
+        const float t = float(last_frame_ - a.born);
+        if (t < 0 || t > 1.1f) continue;
+        const float wx = float(a.b.x * kCellUnits + 16), wy = float(a.b.y * kCellUnits + 16);
+        const Rgba col = a.b.kind == std::uint8_t(Wall::Ice) ? Rgba{200, 238, 255, 255} : a.b.kind == std::uint8_t(Wall::Metal) ? Rgba{170, 176, 188, 255}
+                                                                                       : Rgba{120, 110, 98, 255};
+        const std::uint8_t al = std::uint8_t(std::clamp(255.f * (1.1f - t), 0.f, 255.f));
+        const bool pushed = a.b.dx != 0 || a.b.dy != 0;
+        for (int k = 0; k < 6; ++k) {
+            const float spread = float((a.b.x * 13 + a.b.y * 7 + k * 29) % 40 - 20);
+            float px = wx, py = wy, h;
+            if (pushed) {  // thrown along the hit, a little apart, in an arc
+                const float dist = (60.f + float(k) * 12.f) * t;
+                px += float(a.b.dx) / 1000.f * dist + float(-a.b.dy) / 1000.f * spread * t;
+                py += float(a.b.dy) / 1000.f * dist + float(a.b.dx) / 1000.f * spread * t;
+                h = std::max(0.f, 50.f * t * (1.f - t) * 4.f + 30.f * (1.f - t));
+            } else {  // crumbling: pieces slide down the wall and spread a bit
+                px += spread * 0.6f * t;
+                py += float((k * 17) % 20 - 10) * 0.6f * t;
+                h = std::max(0.f, 55.f * (1.f - t * 1.4f));
+            }
+            const float sz = (5.f + float(k % 3) * 2.f) * z;
+            fill_rect(r_, view_.sx(px) - sz / 2, view_.sy_h(py, h) - sz / 2, sz, sz, with_alpha(col, al));
+        }
+        if (!pushed && t < 0.6f)  // dust at the foot
+            ground_fill(r_, view_, wx, wy, 20.f + 40.f * t, {150, 140, 125, std::uint8_t(120 * (1.f - t / 0.6f))}, 18);
+    }
     for (const auto& wh : net.cur.walls) {
         const float wx = float(wh.x * kCellUnits + 16), wy = float(wh.y * kCellUnits + 16);
         const float sx = view_.sx(wx), gy = view_.sy(wy), top = view_.sy_h(wy, 60);
@@ -135,7 +169,7 @@ void GameView::draw_wall_damage(NetClient& net) {
 // ---------------------------------------------------------------- clouds: steam, smoke, sand, snow [U-241]
 void GameView::draw_clouds(NetClient& net) {
     // [U-350] the spirit portals: a column of soft light at both poles, always (like the spirit portals in Korra)
-    for (const auto& p : {kNorthPoleCell, mirror(kNorthPoleCell)}) {
+    for (const auto& p : {kPortalCell, mirror(kPortalCell)}) {
         const float wx = float(p.first * kCellUnits), wy = float(p.second * kCellUnits);
         const float sx = view_.sx(wx), gy = view_.sy(wy), top = view_.sy_h(wy, 900);
         const float shimmer = 0.5f + 0.5f * float(std::sin(double(local_tick_) * 0.02));
@@ -200,7 +234,10 @@ std::string GameView::model_id(const net::NetUnit& u) const {
         case UnitKind::Inhibitor: return "inhibitor";
         case UnitKind::Nexus: return "nexus";
         case UnitKind::Monster:
-        case UnitKind::Boss: return Resources::slug(net::kMobNames[std::min<int>(u.name_id, int(std::size(net::kMobNames)) - 1)]);
+        case UnitKind::Boss: {
+            const std::string id = Resources::slug(net::kMobNames[std::min<int>(u.name_id, int(std::size(net::kMobNames)) - 1)]);
+            return id == "bandit_archer" ? std::string("bandit") : id;  // (shares the bandit model until it has its own)
+        }
     }
     return {};
 }
@@ -404,6 +441,10 @@ void GameView::draw_units(NetClient& net, double now_s) {
         const Rgba hc = u.team == net.my_team ? (u.id == net.my_unit ? Rgba{90, 220, 70} : Rgba{70, 160, 255})
                         : u.team == 2 ? Rgba{230, 170, 60} : Rgba{230, 60, 50};
         draw_health_bar(bx, by, bw, bh, u.hp / 100, u.hp_max / 100, u.shield, u.shield_sub, hc, kind == UnitKind::Champion || is_struct || kind == UnitKind::Boss);
+        if (kind == UnitKind::Boss || (kind == UnitKind::Monster && u.size_pct > 100)) {  // [U-364] big / epic monsters: the exact HP
+            const std::string hs = std::format("{} / {}", u.hp / 100, u.hp_max / 100);
+            text(r_, bx + (bw - text_w(hs, 0.8f)) / 2, by - 12, hs, {255, 255, 255}, 0.8f);
+        }
         float below = by + bh + 2;
         if (kind == UnitKind::Champion && u.res_max > 0 && u.champ >= 0) {  // resource bar for every champion
             const ResourceKind rk = champions()[std::size_t(u.champ)].resource;
@@ -477,6 +518,18 @@ void GameView::draw_paths(NetClient& net) {
 }
 
 // ---------------------------------------------------------------- pings [U-246]
+// [U-365] a dead camp shows its respawn time on the ground where it comes back
+void GameView::draw_camp_timers(NetClient& net) {
+    for (const auto& c : net.cur.camps) {
+        if (c.respawn_s == 0) continue;
+        const float wx = float(c.x * kCellUnits + 16), wy = float(c.y * kCellUnits + 16);
+        const float sx = view_.sx(wx), sy = view_.sy(wy);
+        if (sx < -50 || sy < -50 || sx > view_.sw + 50 || sy > view_.sh + 50) continue;
+        const std::string t = std::format("{}:{:02}", c.respawn_s / 60, c.respawn_s % 60);
+        text(r_, sx - text_w(t, 1.2f) / 2, sy - 8, t, c.epic ? Rgba{255, 210, 80} : Rgba{220, 220, 220}, 1.2f);
+    }
+}
+
 void GameView::draw_pings(NetClient& net) {
     const std::int64_t now_ms = net.cur.now_ms;
     for (const auto& p : net.cur.pings) {
@@ -635,6 +688,7 @@ void GameView::draw_world(NetClient& net, double now_s) {
     draw_ghosts(net);
     draw_units(net, now_s);
     draw_paths(net);
+    draw_camp_timers(net);
     draw_pings(net);
     draw_waves(net, now_s);
     draw_hits(net, now_s);

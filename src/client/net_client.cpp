@@ -55,6 +55,8 @@ bool NetClient::connect(const std::string& host, std::uint16_t port, const std::
     winner = -1;
     feed.clear();
     announces.clear();
+    wall_anims.clear();
+    last_break_ms = -1;
     recap = {};
     waves.clear();
     thread_ = std::jthread([this](std::stop_token st) { net_loop(st); });
@@ -251,6 +253,8 @@ void NetClient::handle(const std::uint8_t* data, std::size_t n, double now_s) {
             practice = r.get<std::uint8_t>() != 0;
             roster.clear();
             announces.clear();
+            wall_anims.clear();
+            last_break_ms = -1;
             recap = {};
             const std::uint8_t k = r.get<std::uint8_t>();
             for (int i = 0; i < k && !r.bad(); ++i) {
@@ -318,10 +322,21 @@ void NetClient::handle(const std::uint8_t* data, std::size_t n, double now_s) {
             for (auto& c : s.clouds) c = r.get<NetCloud>();
             s.walls.resize(r.get<std::uint16_t>());  // [U-288]
             for (auto& wh : s.walls) wh = r.get<NetWallHp>();
+            {  // [U-341] new falling wall pieces → local animations (each once)
+                const std::uint16_t nb = r.get<std::uint16_t>();
+                for (int i = 0; i < nb && !r.bad(); ++i) {
+                    const NetWallBreak b = r.get<NetWallBreak>();
+                    if (b.ms > last_break_ms) wall_anims.push_back({b, now_s});
+                }
+                for (const auto& a : wall_anims) last_break_ms = std::max(last_break_ms, a.b.ms);
+                std::erase_if(wall_anims, [&](const WallAnim& a) { return now_s - a.born > 1.2; });
+            }
             s.pings.resize(r.get<std::uint8_t>());
             for (auto& p : s.pings) p = r.get<NetPing>();
             s.scores.resize(r.get<std::uint8_t>());
             for (auto& sc : s.scores) sc = r.get<NetScore>();
+            s.camps.resize(r.get<std::uint8_t>());  // [U-365]
+            for (auto& c : s.camps) c = r.get<NetCamp>();
             s.me = r.get<NetMe>();
             const std::uint16_t nr = r.get<std::uint16_t>();
             for (int i = 0; i < nr && !r.bad(); ++i) rewards.push_back({r.get<NetReward>(), now_s});

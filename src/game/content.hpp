@@ -131,7 +131,23 @@ struct SkillDef {
     std::uint8_t rank_cap = 0;        // non-ultimates: highest rank before the first step (0 = default 2)
     std::string_view passive_desc{};  // [U-291] a skill's OWN passive (works while the skill is learned; PassiveId in .passive)
     std::uint32_t interrupt = 0;      // [U-337] what breaks its cast / channel (InterruptBit, core/channel_rules.hpp); 0 = default
+    // [U-312] a single-target projectile (not piercing): which unit categories stop it (bit per UnitCategory,
+    // 0 = every one) and on which it flies on when the hit KILLS the target (0 = never: it disappears, the default)
+    std::uint16_t stop_on = 0, pass_on_kill = 0;
+    std::uint16_t hits = 0;           // [U-311] which categories it can hit at all (0 = every one)
+    // [U-313] + % of the TARGET's current / max / missing health (100 = 1 %), added to the damage (or the heal)
+    std::int16_t pct_current_hp = 0, pct_max_hp = 0, pct_missing_hp = 0;
+    // [U-340] source first, then destination: first click picks the water (later: rock) source, second the target.
+    // −1 = default (water bolts / waves / cones / walls yes), 0 no, 1 yes
+    std::int8_t source_first = -1;
 };
+
+// [U-340] does this skill ask for a source first?
+[[nodiscard]] constexpr bool source_first(const SkillDef& d) {
+    if (d.source_first >= 0) return d.source_first == 1;
+    const bool water = d.sub == SubElement::Water || d.sub == SubElement::Ice;
+    return water && (d.kind == SkillKind::Bolt || d.kind == SkillKind::Wave || d.kind == SkillKind::Cone || d.kind == SkillKind::Wall);
+}
 
 // [U-291] the highest rank a skill may have at this champion level
 [[nodiscard]] constexpr int skill_max_rank(const SkillDef& d, int level) {

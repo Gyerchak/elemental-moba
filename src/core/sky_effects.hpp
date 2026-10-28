@@ -21,7 +21,19 @@ struct SkyBoost {
     int dot_pct = 100;    // [U-264] how long damage over time lasts (burns, burning fields)
     int xp_pct = 100;     // XP gain speed [U-122]
     bool muted = false;   // no bending abilities, no autoattacks [U-125]
+    int moon_pm = 0;      // [U-370] extra power in per-mille (water: 5 ‰ per 1 % moon phase)
+    int cd_pct = 100;     // [U-370] flat cooldown multiplier (NOT haste): full moon → 90
+    int auto_range_pct = 100;  // [U-370] autoattack range (water-based autos at full moon)
+    // power as per-mille: what damage is multiplied by (÷ 1000)
+    [[nodiscard]] constexpr int power_pm() const { return power_pct * 10 + moon_pm; }
 };
+
+// [U-370] waterbending follows the MOON (not the night), all month long:
+//   damage × (1 + 0.005 × moon_phase_pct)   → 0 % new moon = +0 %, 50 % = +25 %, 100 % full moon = +50 %
+//   full moon also: +25 % range / length / width / radius / speed (water autoattacks too), cooldowns × 0.90
+inline constexpr int kMoonPowerPmPerPct = 5;   // 0.5 % = 5 ‰ per 1 % of moon phase
+inline constexpr int kFullMoonSizePct = 25, kFullMoonCdPct = 90;
+[[nodiscard]] constexpr int moon_power_pm(int moon_phase_pct) { return kMoonPowerPmPerPct * moon_phase_pct; }
 
 // [U-124] 0 ms before/after the eclipse middle → 100 %, middle → 0 %, linear between.
 [[nodiscard]] constexpr std::int64_t eclipse_mid_ms(const SkyState& s) {
@@ -46,13 +58,13 @@ struct SkyBoost {
             }
             break;
         case Element::Water:
-            if (!s.is_day) b.power_pct += 5;  // [X-53]
-            if (s.full_moon) {                // [U-123] [X-67]
-                b.power_pct += 50;
-                b.size_pct += 25, b.width_pct += 25, b.radius_pct += 25, b.speed_pct += 25;
+            b.moon_pm += moon_power_pm(s.moon_light_pct);  // [U-370] replaces the old night +5 % / new moon −10 % / full moon +50 %
+            if (s.full_moon) {                // [U-123][X-67][U-370]
+                b.size_pct += kFullMoonSizePct, b.width_pct += kFullMoonSizePct, b.radius_pct += kFullMoonSizePct, b.speed_pct += kFullMoonSizePct;
+                b.auto_range_pct += kFullMoonSizePct;
+                b.cd_pct = kFullMoonCdPct;
                 b.xp_pct += 25;
             }
-            if (s.new_moon) b.power_pct -= 10;  // [X-51]
             break;
         case Element::Earth:
         case Element::Air:
@@ -104,8 +116,10 @@ static_assert(!sky_boost(Element::Water, sky_at_s(25 * 60)).muted);
 // 25:15: half eclipse × (100 + 5 day) = 52 %. 31:00 (day): 100 + 5 day + 75 comet = 180 %.
 static_assert(element_power_pct(Element::Fire, sky_at_s(25 * 60 + 15)) == 52);
 static_assert(sky_boost(Element::Fire, sky_at_s(31 * 60)).power_pct == 180 && sky_boost(Element::Fire, sky_at_s(31 * 60)).size_pct == 140);
-// Full moon night: 100 + 5 night + 50 = 155 %.
-static_assert(element_power_pct(Element::Water, sky_at_s(30 * 60)) == 155);
+// [U-370] full moon (100 % phase): 1000 + 5 × 100 = 1500 ‰ = +50 %, cooldowns × 0.90; new moon: +0 %
+static_assert(sky_boost(Element::Water, sky_at_s(30 * 60)).power_pm() == 1'500 && sky_boost(Element::Water, sky_at_s(30 * 60)).cd_pct == 90);
+static_assert(sky_boost(Element::Water, sky_at_s(0)).power_pm() == 1'000);
+static_assert(moon_power_pm(37) == 185);  // 37 % phase → +18.5 %
 static_assert(sky_boost(Element::Earth, sky_at_s(61 * 60)).power_pct == 125 && sky_boost(Element::Earth, sky_at_s(61 * 60)).dot_pct == 125);
 static_assert(sky_boost(Element::None, sky_at_s(61 * 60)).power_pct == 100);  // non-benders: no alignment
 static_assert(fuel_regen_pct(sky_at_s(60)) == 130 && fuel_regen_pct(sky_at_s(30)) == 100);  // noon / sunrise

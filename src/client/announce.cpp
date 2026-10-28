@@ -80,7 +80,14 @@ void GameView::announce_text(NetClient& net, const net::NetAnnounce& a, std::str
             return;
         default: break;
     }
-    if (a.a && a.b) line = std::format("{}  →  {}", unit_label(net, a.a), unit_label(net, a.b));
+    // [U-363] the killer by what it was, also when it is not on my screen (a jungle monster in the fog)
+    std::string killer = unit_label(net, a.a);
+    if (a.a_kind != 255 && !net.roster.contains(a.a)) {
+        net::NetRecapHit h{};
+        h.src = a.a, h.src_kind = a.a_kind, h.src_extra = a.a_extra;
+        killer = recap_who(net, h);
+    }
+    if (a.a && a.b) line = std::format("{}  →  {}", killer, unit_label(net, a.b));
     else if (a.b) line = unit_label(net, a.b);
     else line.clear();
 }
@@ -264,8 +271,10 @@ void GameView::draw_death_recap(NetClient& net, double now_s) {
     }
     const float span_s = float(rc.hits.front().before_ms) / 1000.f;
     std::string killer_name = unit_label(net, rc.killer);  // [U-302] from the hits when the killer is not known on screen
+    bool killer_hit = false;
     for (const auto& h : rc.hits)
-        if (h.src == rc.killer) killer_name = recap_who(net, h);
+        if (h.src == rc.killer) killer_name = recap_who(net, h), killer_hit = true;
+    if (!killer_hit && !net.roster.contains(rc.killer)) killer_name = recap_who(net, rc.hits.back());  // [U-363] never "unknown": the last hit's source
     // short line under "respawn in"
     const std::string line = std::format("{} {} — {} {} {:.1f} s ({} {}, {} {}, {} {})", tr("Killed by"), killer_name, total,
                                          tr("damage in"), span_s, phys, tr("physical"), total - phys, tr("elemental"), dot, tr("over time"));
@@ -287,7 +296,7 @@ void GameView::draw_death_recap(NetClient& net, double now_s) {
     std::vector<std::string> ccs;  // [U-343] crowd control lines
     for (const auto& h : rc.hits) {
         if (h.cc != 255) {
-            if (ccs.size() < 6) ccs.push_back(std::format("{} {:.1f} s — {}", tr(status_name(h.cc)), h.cc_cs / 100.0, recap_who(net, h)));
+            if (ccs.size() < 6) ccs.push_back(std::format("{} {:.1f} s — {}", tr(h.cc == 254 ? "displaced" : status_name(h.cc)), h.cc_cs / 100.0, recap_who(net, h)));
             continue;
         }
         const std::string what = recap_source(net, h);

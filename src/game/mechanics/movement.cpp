@@ -130,8 +130,11 @@ void World::path_to(Unit& u, std::int32_t tx, std::int32_t ty) {
         int used = 0;
         bool ok = find_path(grid, sx, sy, gx, gy, u.path, std::min(60'000, path_budget_), clearance.data(), k, &used);
         path_budget_ -= used;
+        // [U-357] the second try is only one size thinner (was: the thinnest, which led bodies into gaps they
+        // could not pass → units scraping along walls). The player still reaches the exact spot: the last step
+        // walks to the clicked point itself.
         if (!ok && k > 0 && path_budget_ > 2'000) {
-            ok = find_path(grid, sx, sy, gx, gy, u.path, std::min(30'000, path_budget_), clearance.data(), 0, &used);
+            ok = find_path(grid, sx, sy, gx, gy, u.path, std::min(30'000, path_budget_), clearance.data(), k - 1, &used);
             path_budget_ -= used;
         }
         // [U-188] the goal is in the sea: walk to the shore, then swim straight to it
@@ -150,6 +153,17 @@ void World::follow_path(Unit& u) {
     if (u.path_i >= u.path.size()) {
         if (u.order.kind == OrderKind::Move) u.order = {};
         return;
+    }
+    // [U-357] look ahead: skip waypoints while the straight line to a later one keeps the whole body clear
+    // (clearance ≥ the body's reach) → smooth paths, no zig-zag along walls; at most 6 checks per tick.
+    if (!u.flying() && u.path.size() > u.path_i + 1) {
+        const int k = std::min(3, int((body_reach(*u.body, size_pct(u)) + kCellUnits / 2) / kCellUnits));
+        const int ux_ = u.ux() / kCellUnits, uy_ = u.uy() / kCellUnits;
+        for (int n = 0; n < 6 && u.path_i + 1 < u.path.size(); ++n) {
+            const auto [nx, ny] = u.path[u.path_i + 1];
+            if (!line_walkable(grid, ux_, uy_, nx, ny, clearance.data(), k)) break;
+            ++u.path_i;
+        }
     }
     const auto [cx, cy] = u.path[u.path_i];
     const bool last = u.path_i + 1 == u.path.size();
@@ -268,7 +282,7 @@ void World::step_units() {
                     u.x = fx_ * kSub;
                     u.y = fy_ * kSub;
                 } else if (u.order.kind == OrderKind::Portal) {  // [X-54]
-                    const CellPt n = kNorthPoleCell, s = mirror(kNorthPoleCell);
+                    const CellPt n = kPortalCell, s = mirror(kPortalCell);
                     const bool at_north = dist2(u.ux(), u.uy(), n.first * kCellUnits, n.second * kCellUnits) <
                                           dist2(u.ux(), u.uy(), s.first * kCellUnits, s.second * kCellUnits);
                     const CellPt to = at_north ? s : n;

@@ -10,7 +10,7 @@ namespace em {
 
 void World::start_cast(Unit& u, const Order& o) {
     const Slot s = Slot(o.slot);
-    if (!can_cast_now(u, s)) return;
+    if (!can_cast_now(u, s, nullptr, o.sx, o.sy)) return;
     u.casting = true;
     u.cast = o;
     u.windup_end_ms = 0;
@@ -21,10 +21,14 @@ void World::start_cast(Unit& u, const Order& o) {
 void World::finish_cast(Unit& u) {
     u.casting = false;
     const Slot s = Slot(u.cast.slot);
-    if (!can_cast_now(u, s)) return;
+    if (!can_cast_now(u, s, nullptr, u.cast.sx, u.cast.sy)) return;
     const SkillDef& d = *u.skill[std::size_t(s)];
     AbilityRt& a = u.ab[std::size_t(s)];
-    const ResolvedAbility r = resolved(u, s);
+    ResolvedAbility r = resolved(u, s);
+    // [U-339] water as numbers: from a source = no carried water; the Avatar pays from its small pool
+    const bool water_free = water_skill(d) && water_sourced(u, d, u.cast.sx, u.cast.sy);
+    if (water_free && u.stats.resource == ResourceKind::Water) r.cost = 0;
+    if (water_skill(d) && u.water_max > 0 && !water_free) u.water = std::max(0, u.water - elements::kAvatarWaterCost);
     // pay [U-60..U-64]; comet = free fuel [U-138]
     const bool free_fuel = u.stats.resource == ResourceKind::Fuel && unlimited_fuel(sky);
     const std::int32_t cost = std::int32_t(r.cost * 100);
@@ -55,6 +59,7 @@ void World::finish_cast(Unit& u) {
     if (cycle_bonus) u.cycle_ready = false;
     u.cycle_boost = cycle_bonus;
     cast_skill(u, s, u.cast.x, u.cast.y, u.cast.target);
+    if (water_free && u.cast.sx >= 0) take_from_source(u, u.cast.sx, u.cast.sy);  // [U-339]
     u.cycle_boost = false;
     if (has_passive(u, PassiveId::ElementalCycle) && !cycle_bonus) {
         const Element el = base_element(d.sub);
@@ -77,24 +82,30 @@ void World::finish_cast(Unit& u) {
 
 void World::cast_skill(Unit& u, Slot slot, std::int32_t tx, std::int32_t ty, std::uint32_t target) {
     const SkillDef& d = *u.skill[std::size_t(slot)];
-    const ResolvedAbility r = resolved(u, slot);
+    ResolvedAbility r = resolved(u, slot);
+    // [U-340] source first: a water skill bent from a chosen source starts there, +25 % range
+    const bool from_source = water_skill(d) && u.cast.sx >= 0 && u.cast.slot == std::uint8_t(slot) &&
+                             water_source_at(u.cast.sx, u.cast.sy) != WaterSource::None && water_sourced(u, d, u.cast.sx, u.cast.sy);
+    const bool starts_at_source = from_source && (d.kind == SkillKind::Bolt || d.kind == SkillKind::Wave || d.kind == SkillKind::Cone);
+    if (from_source) r.range = r.range * elements::kSourceRangePct / 100;
+    const std::int32_t ox = starts_at_source ? u.cast.sx : u.ux(), oy = starts_at_source ? u.cast.sy : u.uy();
     // [U-264] sky events (planetary alignment) stretch durations; damage-over-time has its own %
     const bool dot_skill = d.kind == SkillKind::Field && d.dmg > 0;
     const std::int32_t dur_ms = std::int32_t(std::int64_t(d.dur_ms) * (dot_skill ? r.dot_pct : r.dur_pct) / 100);
     // [U-184] aim: at the cursor (normal) or where the champion faces (Cassiopeia-like)
     if (d.aim == Aim::Facing) {
-        const std::int64_t len = std::max<std::int64_t>(1, isqrt(dist2(tx, ty, u.ux(), u.uy())));
-        tx = u.ux() + std::int32_t(u.face.x * len / kOne);
-        ty = u.uy() + std::int32_t(u.face.y * len / kOne);
+        const std::int64_t len = std::max<std::int64_t>(1, isqrt(dist2(tx, ty, ox, oy)));
+        tx = ox + std::int32_t(u.face.x * len / kOne);
+        ty = oy + std::int32_t(u.face.y * len / kOne);
     }
-    const Dir dir = (tx == u.ux() && ty == u.uy()) ? u.face : dir_of(std::int64_t(tx) - u.ux(), std::int64_t(ty) - u.uy());
+    const Dir dir = (tx == ox && ty == oy) ? u.face : dir_of(std::int64_t(tx) - ox, std::int64_t(ty) - oy);
     if (d.turns_caster) u.face = dir;
-    const std::int64_t dist = isqrt(dist2(tx, ty, u.ux(), u.uy()));
+    const std::int64_t dist = isqrt(dist2(tx, ty, ox, oy));
     // point casts are clamped to range
     std::int32_t px = tx, py = ty;
     if (r.range > 0 && dist > r.range) {
-        px = u.ux() + std::int32_t(std::int64_t(dir.x) * r.range / kOne);
-        py = u.uy() + std::int32_t(std::int64_t(dir.y) * r.range / kOne);
+        px = ox + std::int32_t(std::int64_t(dir.x) * r.range / kOne);
+        py = oy + std::int32_t(std::int64_t(dir.y) * r.range / kOne);
     }
     if (r.range == 0) {
         px = u.ux();
@@ -106,12 +117,16 @@ void World::cast_skill(Unit& u, Slot slot, std::int32_t tx, std::int32_t ty, std
     e.def = &d;
     e.sub = skill_sub(u, d);  // [U-264]
     e.flow = flow_of(e.sub);
-    e.x = u.x;
-    e.y = u.y;
+    e.x = starts_at_source ? ox * kSub : u.x;
+    e.y = starts_at_source ? oy * kSub : u.y;
     e.dir = dir;
     e.damage = std::int32_t(r.damage * (u.rage_boost ? 100 + kRageBoostPct : 100) / 100 * (u.cycle_boost ? 140 : 100) / 100);  // [U-268][U-279]
     if (e.damage > 0) e.damage = e.damage * (100 + draw_from_wall(u, e.sub)) / 100;  // [U-288] a wall nearby as the source
-    if (const int wb = draw_from_water_source(u, e.sub); wb > 0) {  // [U-293] a puddle / ice patch as the source (form chosen)
+    if (from_source && champions()[std::size_t(u.champ)].element == Element::Water) {  // [U-340] the chosen source, form chosen
+        e.sub = u.source_ice ? SubElement::Ice : SubElement::Water;
+        e.flow = flow_of(e.sub);
+        e.damage = e.damage * (100 + elements::kWaterSourceBonusPct) / 100;
+    } else if (const int wb = draw_from_water_source(u, e.sub); wb > 0) {  // [U-293] a puddle / ice patch as the source (form chosen)
         e.flow = flow_of(e.sub);
         e.damage = e.damage * (100 + wb) / 100;
     }
@@ -185,8 +200,12 @@ void World::cast_skill(Unit& u, Slot slot, std::int32_t tx, std::int32_t ty, std
                 const Shape sh = shape_of(f);
                 for (Unit& o : units)
                     if (o.alive && o.team == u.team && o.kind == UnitKind::Champion && touches(sh, hitbox(o))) {
-                        u.stat_healing += std::min(amount, o.stats.health.total() - o.hp) / 100;
-                        heal(o, amount);
+                        // [U-313] + % of the ally's current / max / missing health
+                        const std::int64_t mx = o.stats.health.total(), cur = std::max(0, o.hp);
+                        const std::int32_t heal_here = amount + std::int32_t((cur * d.pct_current_hp + mx * d.pct_max_hp +
+                                                                              (mx - cur) * d.pct_missing_hp) / 10'000);
+                        u.stat_healing += std::min(heal_here, o.stats.health.total() - o.hp) / 100;
+                        heal(o, heal_here);
                     }
             }
             break;
@@ -202,7 +221,7 @@ void World::cast_skill(Unit& u, Slot slot, std::int32_t tx, std::int32_t ty, std
             break;
         }
         case SkillKind::Wall: {
-            if (d.sub == SubElement::Ice) use_water_source(u);  // [U-294] a puddle / ice patch used as the source is gone
+            if (d.sub == SubElement::Ice && !from_source) use_water_source(u);  // [U-294] a puddle / ice patch used as the source is gone
             if (d.radius > 0) {  // ring [Iron Prison]
                 raise_ring(px, py, std::int32_t(r.radius), wall_kind_of(d.sub) == Wall::Metal ? dur_ms * kMetalWallLifePct / 100 : dur_ms, u.team,
                            wall_kind_of(d.sub));

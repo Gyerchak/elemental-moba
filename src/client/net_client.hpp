@@ -31,6 +31,7 @@ struct Snapshot {
     std::vector<net::NetPing> pings;  // [U-246]
     std::vector<net::NetCloud> clouds;  // [U-241]
     std::vector<net::NetWallHp> walls;  // [U-288] damaged wall pieces
+    std::vector<net::NetCamp> camps;    // [U-365] jungle camps + respawn timers
     std::vector<net::NetFalcon> falcons;  // [U-235]
     std::vector<net::NetGhost> ghosts;
     std::vector<net::NetScore> scores;
@@ -130,6 +131,12 @@ public:
     std::unordered_map<std::uint32_t, std::vector<std::uint8_t>> skins;  // unit id → BMP [U-200]
     std::vector<net::FinalRow> final_stats;  // [U-179]
     std::vector<LocalAnnounce> announces;    // [U-263] newest last (the whole match: the announcements window)
+    struct WallAnim {  // [U-341]
+        net::NetWallBreak b;
+        double born = 0;
+    };
+    std::vector<WallAnim> wall_anims;
+    std::int64_t last_break_ms = -1;
     DeathRecapView recap;                    // [U-262] the last death
     int custom_from_server = -1;             // [U-277] own champions taken from the server (−1 = none sent)
     bool back_in_lobby = false;              // server returned to the lobby after the match

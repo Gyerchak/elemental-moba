@@ -11,9 +11,9 @@ namespace em {
 
 [[nodiscard]] constexpr std::int32_t wall_max_hp(Wall w) {
     switch (w) {
-        case Wall::Ice: return 160;
-        case Wall::Stone: return 240;
-        case Wall::Metal: return 480;
+        case Wall::Ice: return 90;     // [U-359] much easier to break than before (160 / 240 / 480)
+        case Wall::Stone: return 140;
+        case Wall::Metal: return 300;
         default: return 0;
     }
 }

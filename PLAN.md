@@ -185,6 +185,33 @@ clang 22 and GCC 16 (`README.md` → Build / Play).
 - [x] Heat Draw turns steam into puddles; wet while standing on ground water [U-292].
 - [x] Ice through steam condenses it; source form water / ice (K); ice patches; ice walls need a big water source [U-293][U-294].
 
+## M18 — Rounds 6 + 7 (2026-10-25 … 10-28)
+
+- [x] Bugs: ult level up, deep water paths (250 % cost), minion spacing, kill credit, recap names + icons + CC, unit picking, attack-move, own champions live reload + origin filter [U-297..U-310][U-335][U-343][U-353].
+- [x] Monster table, turret rules, unit categories, projectile stop / pass rules, % HP formulas [U-307..U-313].
+- [x] Ten item slots (special + 8 + boots), movable shop, channel rules (6 s recall / portal), wet → no burn [U-322][U-337][U-342][U-344][U-369].
+- [x] Wall HP + break / crumble animations, structure collapse, rock outcrops, water fountains, portals as light beams [U-341][U-346][U-349][U-350].
+- [x] Water as numbers + source first, then destination [U-339][U-340][U-348].
+- [ ] Classic runes, masteries 30/30/30, many items / mythics / potions, build creator + auto-buy, auto-levelling [U-317..U-324].
+- [ ] Champion folders + full custom champions, pixel-map editing, Windows / macOS builds, LAN / public test [U-326..U-331].
+- [ ] Quiet assassins, skill lockouts, elevation rework (raised rocks / dents), Air Nomad temples [U-345][U-347][U-350][U-352].
+- [ ] More champions (last) [U-328].
+
+## M19 — Round 8 (2026-10-28)
+
+- [x] XP range ring in the range view [U-354]; portals in the far corners [U-355].
+- [x] Lava: few rocks, melts walls (ice fast, halves the lava time) [U-356]; softer walls, breakable natural rocks (2 × HP, grow back) [U-359][U-360].
+- [x] Varied rock shapes (mostly single rocks); thrown rocks / magma rocks stay [U-359]; map rocks are real walls → lava / rock bolts stop at them [U-362].
+- [x] Odd blocked spots around bases removed (rock cores left without trees) [U-358].
+- [x] Paths: body-size look-ahead smoothing, cliffs block, second try only one size thinner [U-357].
+- [x] Recap / kill feed never "unknown" (killer kind sent) [U-363]; displacement = timed CC [U-368].
+- [x] Moon: +0.5 % water power per 1 % phase all month; full moon +25 % ranges (water autos too), cooldowns × 0.90 [U-370].
+- [x] Everybody collides (allies, minions, monsters); spirits, ghost items and the Mist Dancer pass [U-367].
+- [x] Jungle: growth per respawn, respawn timers per monster, buff camps (Ember, Tui's Blessing), epic Lion Turtle (team stacks) + Sun Dragons (team gold), timers on minimap / map / Tab, HP numbers on big monsters [U-364..U-366].
+- [ ] Jungle / support items [U-366]; buff passes to the killer.
+- [ ] Post-game chat + graphs [U-371]; ping + emote wheels, own emotes / sounds [U-372].
+- [ ] Everything in resource packs [U-373]; server download of versions / packs, server password [U-374]; named versions + file hash ID [U-375].
+
 ## M9 — Extras
 
 - [x] Text chat (Enter) [X-23].

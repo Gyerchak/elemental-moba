@@ -3,6 +3,8 @@
 #include <format>
 #include "game/match/layout.hpp"
 #include "game/mechanics/element_rules.hpp"
+#include "game/mobs/monsters.hpp"
+#include "game/mobs/turrets.hpp"
 #include "game/world.hpp"
 
 namespace em {
@@ -59,15 +61,28 @@ void World::interrupt(Unit& u, std::uint32_t event) {
     }
 }
 
-void World::knock(Unit& dst, std::int32_t from_x, std::int32_t from_y, std::int32_t dist) {
+void World::knock(Unit& dst, std::int32_t from_x, std::int32_t from_y, std::int32_t dist, std::uint32_t src_id) {
     if (dist <= 0 || dst.is_structure() || dst.kind == UnitKind::Boss) return;
     interrupt(dst, kIntKnock);  // [U-337] displacement
     const Dir d = dir_of(std::int64_t(dst.ux()) - from_x, std::int64_t(dst.uy()) - from_y);
-    for (std::int32_t moved = 0; moved < dist; moved += 8) {
+    std::int32_t moved = 0;
+    for (; moved < dist; moved += 8) {
         const std::int32_t nx = dst.x + d.x * 8 / kOne * kSub, ny = dst.y + d.y * 8 / kOne * kSub;
         if (!walkable_at(dst, nx, ny)) break;
         dst.x = nx;
         dst.y = ny;
+    }
+    // [U-368] a displacement is crowd control too: it holds the unit (distance / knock speed); tenacity does not shorten it
+    const std::int32_t ms = std::max<std::int32_t>(100, std::max(moved, 8) * 1000 / kKnockSpeed);
+    dst.st.add(StatusKind::Stun, now_ms + ms, 0, src_id);
+    if (dst.kind == UnitKind::Champion) {
+        const Unit* src = find(src_id);
+        TakenHit h{now_ms, src_id, dmg_tag_, 0, 0, 0, false};
+        h.src_kind = std::uint8_t(src ? int(src->kind) : 255);
+        h.src_extra = std::uint8_t(!src ? 0 : src->kind == UnitKind::Minion ? int(src->mtype) : src->kind == UnitKind::Champion ? src->champ : mob_name_id(*src));
+        h.cc = kCcDisplaced;
+        h.cc_ms = ms;
+        if (dst.taken.size() < 400) dst.taken.push_back(h);
     }
 }
 
@@ -147,9 +162,9 @@ void World::apply_hit(Unit* src, Unit& dst, std::int32_t hund, SubElement sub, b
         if (src->kind == UnitKind::Champion && dst.kind == UnitKind::Champion)
             for (Unit& o : units)
                 if (o.alive && o.team == dst.team && (o.kind == UnitKind::Minion || o.kind == UnitKind::Turret) &&
-                    dist2(o.ux(), o.uy(), src->ux(), src->uy()) < 900LL * 900) {
+                    dist2(o.ux(), o.uy(), src->ux(), src->uy()) < std::int64_t(turrets::kCallForHelpRange) * turrets::kCallForHelpRange) {
                     o.aggro = src->id;
-                    o.aggro_until = now_ms + 2'500;  // [X-108]
+                    o.aggro_until = now_ms + turrets::kCallForHelpMs;  // [X-108][U-309]
                 }
         if (dst.kind == UnitKind::Monster || dst.kind == UnitKind::Boss) dst.aggro = src->id;
         if (src->kind == UnitKind::Champion && has_passive(*src, PassiveId::ChiFlow)) src->res = std::min(src->res_max, src->res + 2'000);
@@ -281,6 +296,15 @@ void World::fire_auto(Unit& u, Unit& target) {
     // damage: physical attack, or elemental auto [U-56]
     std::int32_t dmg = (elemental ? elemental_auto_damage(u.stats) : u.stats.attack.total()) / 100;
     if (u.kind == UnitKind::Minion && t->kind == UnitKind::Champion) dmg = dmg * rules::kMinion.damage_to_champions_pct / 100;  // [U-156]
+    if (u.kind == UnitKind::Turret) {  // [U-309] turret rules (game/mobs/turrets.hpp)
+        if (t->kind == UnitKind::Minion) {
+            dmg = t->stats.health.total() / 100 * turrets::kMinionHitPct[std::min<std::size_t>(std::size_t(t->mtype), 3)] / 100;
+        } else if (t->kind == UnitKind::Champion) {
+            u.turret_streak = u.turret_last == t->id ? u.turret_streak + 1 : 0;
+            u.turret_last = t->id;
+            dmg = dmg * (100 + std::min(turrets::kChampionRampMaxPct, turrets::kChampionRampPct * u.turret_streak)) / 100;
+        }
+    }
     if (u.chirush_until > now_ms) {  // keystone Chi Rush: first auto after a skill +30 % [U-177]
         u.chirush_until = 0;
         u.stat_keystone += dmg * 30 / 100;
@@ -289,10 +313,10 @@ void World::fire_auto(Unit& u, Unit& target) {
     SubElement sub = SubElement::Physical;
     if (elemental) {
         sub = champions()[std::size_t(u.champ)].sub;
-        dmg = dmg * sky_boost(base_element(sub), sky).power_pct / 100;
+        dmg = dmg * sky_boost(base_element(sub), sky).power_pm() / 1000;  // [U-370]
     } else if (u.magic_until > now_ms) {  // [U-264] a non-bender in a magic stance: the auto becomes magic
         sub = SubElement(u.magic_sub);
-        dmg = dmg * sky_boost(base_element(sub), sky).power_pct / 100;
+        dmg = dmg * sky_boost(base_element(sub), sky).power_pm() / 1000;  // [U-370]
     }
     const bool ranged = u.stats.range == Range::Ranged || u.kind == UnitKind::Turret || u.kind == UnitKind::Nexus ||
                         (u.kind == UnitKind::Minion && u.mtype != MinionType::Melee && u.mtype != MinionType::Super);
@@ -327,6 +351,10 @@ void World::fire_auto(Unit& u, Unit& target) {
 // or chain jumps. Champions use their AutoAttackDef; plain single hits do nothing here.
 void World::auto_extras(Unit& u, Unit& primary, std::int32_t dmg, SubElement sub, bool physical) {
     if (u.kind != UnitKind::Champion) return;
+    if (u.jbuff == std::uint8_t(JungleBuff::Ember) && u.jbuff_until > now_ms && primary.alive) {  // [U-366]
+        apply_cc(u.stats, u.id, primary, StatusKind::Burn, 2'000, primary.stats.health.total() / 200);  // per second: 1 % over 2 s
+        apply_cc(u.stats, u.id, primary, StatusKind::Slow, 1'000, kEmberSlowPct);
+    }
     const AutoAttackDef& a = champions()[std::size_t(u.champ)].autos;
     switch (a.shape) {
         case AutoShape::Single: return;
@@ -384,7 +412,12 @@ void World::attack_on_the_move(Unit& u) {
 }
 
 void World::announce(AnnounceKind kind, std::uint32_t a, std::uint32_t b, Team t) {
-    announces.push_back({kind, a, b, t, now_ms});
+    Announce an{kind, a, b, t, now_ms};
+    if (const Unit* src = a ? find(a) : nullptr) {  // [U-363]
+        an.a_kind = std::uint8_t(src->kind);
+        an.a_extra = std::uint8_t(src->kind == UnitKind::Minion ? int(src->mtype) : src->kind == UnitKind::Champion ? src->champ : mob_name_id(*src));
+    }
+    announces.push_back(an);
 }
 
 void World::on_kill(Unit* killer, Unit& dead) {
@@ -485,8 +518,10 @@ void World::on_kill(Unit* killer, Unit& dead) {
         case UnitKind::Monster:
         case UnitKind::Boss: {
             const bool boss = dead.kind == UnitKind::Boss;
-            const std::int32_t gold = boss ? 300 : 70;
-            const std::int64_t xp = boss ? 600 : 140;
+            const MonsterDef* md = dead.mob >= 0 ? &kMonsters[std::size_t(dead.mob)] : nullptr;  // [U-308] its own reward
+            // [U-365] worth more after every respawn
+            const std::int32_t gold = md ? md->gold + md->gold_growth * dead.deaths : boss ? 300 : 70;
+            const std::int64_t xp = md ? md->xp + std::int64_t(md->xp_growth) * dead.deaths : boss ? 600 : 140;
             // [U-195] sharers: the killer (no range needed) + champions of the killer's team who hit it in the
             // last 3 s and are within the XP range. Killer counts as N people, every helper as 1.
             std::vector<Unit*> near;
@@ -502,9 +537,22 @@ void World::on_kill(Unit* killer, Unit& dead) {
                 reward(*c, dead, c == kc || !kc ? gold : gold / 2,
                        c == kc ? rules::jungle_killer_xp(xp, n) : kc ? rules::jungle_helper_xp(xp, n) : xp / std::max(1, n));
             if (k && k->kind == UnitKind::Champion) ++k->cs;
-            dead.respawn_ms = now_ms + (boss ? 300'000 : 120'000);
+            dead.respawn_ms = now_ms + (md ? md->respawn_ms : boss ? 300'000 : 120'000);
+            ++dead.deaths;  // [U-365] the next one grows
             if (boss) announce(AnnounceKind::BossSlain, kc ? kc->id : 0, dead.id, kt);  // [U-263] objective taken
-            if (boss && !near.empty()) {  // [X-55] the Face Stealer steals a skill of a random killer for 2 min
+            if (md && md->buff != JungleBuff::None && kc) {  // [U-366] the killer carries the buff
+                kc->jbuff = std::uint8_t(md->buff);
+                kc->jbuff_until = now_ms + md->buff_ms;
+            }
+            if (md && kt != Team::Neutral && md->team_reward == TeamReward::LionTurtleStack) {  // [U-364] permanent team stack
+                ++lion_stacks[std::size_t(kt) & 1];
+                add_feed(std::format("The Lion Turtle blesses the {} (stack {})", kt == Team::FireNation ? "Fire Nation" : "Earth Nation",
+                                     lion_stacks[std::size_t(kt) & 1]));
+            }
+            if (md && md->team_reward == TeamReward::DragonGold)  // [U-364] gold for the whole team
+                for (Unit& c : units)
+                    if (c.kind == UnitKind::Champion && c.team == kt) reward(c, dead, md->team_value + md->gold_growth * (dead.deaths - 1), 0);
+            if (boss && !near.empty() && md && md->team_reward == TeamReward::FaceSteal) {  // [X-55] the Face Stealer steals a skill of a random killer for 2 min
                 Unit* victim = near[random() % near.size()];
                 victim->stolen_slot = std::uint8_t(1 + random() % 4);  // Q W E R
                 victim->stolen_until = now_ms + 120'000;

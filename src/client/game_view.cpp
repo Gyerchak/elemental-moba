@@ -7,6 +7,9 @@
 
 #include "client/locale.hpp"
 #include "client/modifiers.hpp"
+#include "game/mobs/monsters.hpp"
+#include "game/mobs/rules.hpp"
+#include "game/mechanics/element_rules.hpp"
 #include "game/match/layout.hpp"
 
 namespace em {
@@ -279,7 +282,8 @@ void GameView::rebuild_textures(NetClient& net, std::int64_t now_ms, bool force)
 // ------------------------------------------------------------------ input
 void GameView::cast_at_cursor(NetClient& net, int slot) {
     const float wx = view_.wx(ui_ ? ui_->mx : 0), wy = view_.wy(ui_ ? ui_->my : 0);
-    Cmd c{.kind = CmdKind::Cast, .slot = std::uint8_t(slot), .x = std::int32_t(wx), .y = std::int32_t(wy)};
+    Cmd c{.kind = CmdKind::Cast, .slot = std::uint8_t(slot), .x = std::int32_t(wx), .y = std::int32_t(wy), .sx = src_x_, .sy = src_y_};
+    src_x_ = src_y_ = -1;
     const SkillDef* d = skill_of(net, slot);
     if (d && d->targeted) {
         const DrawUnit* t = unit_at(wx, wy, true, champs_only());  // X held: champions only [U-162]
@@ -287,6 +291,21 @@ void GameView::cast_at_cursor(NetClient& net, int slot) {
         c.target = t->u.id;
     }
     net.send_cmd(c);
+}
+
+// [U-340] is there water to bend at this point? (river / sea / glacier, an ice wall, a puddle / ice patch)
+bool GameView::source_at(const NetClient& net, float wx, float wy) const {
+    const int cx = int(wx) / kCellUnits, cy = int(wy) / kCellUnits;
+    if (wx >= 0 && wy >= 0 && Grid::in_bounds(cx, cy)) {
+        const Cell c = net.seen.at(cx, cy);
+        const Surface s = c.surface();
+        if (c.wall() == Wall::Ice || s == Surface::Water || s == Surface::DeepWater || s == Surface::Glacier) return true;
+    }
+    for (const auto& c : net.cur.clouds)
+        if ((c.kind == std::uint8_t(CloudKind::Puddle) || c.kind == std::uint8_t(CloudKind::IcePatch)) &&
+            (c.x - wx) * (c.x - wx) + (c.y - wy) * (c.y - wy) <= float(c.radius) * float(c.radius))
+            return true;
+    return false;
 }
 
 void GameView::hint(std::string h) {
@@ -297,6 +316,7 @@ void GameView::hint(std::string h) {
 void GameView::cast_key(NetClient& net, int slot) {
     const SkillDef* d = skill_of(net, slot);
     if (!d) return;
+    src_x_ = src_y_ = -1;
     if (d->kind == SkillKind::Passive) return hint(std::format("{} is a passive (always on)", d->name));
     const auto& me = net.cur.me;
     if (net.have_snapshot && me.rank[slot] == 0)
@@ -313,7 +333,11 @@ void GameView::cast_key(NetClient& net, int slot) {
     const bool self = d->kind == SkillKind::Shield || d->kind == SkillKind::Haste || d->kind == SkillKind::Flight ||
                       d->kind == SkillKind::SelfFreeze || d->kind == SkillKind::WindSense ||
                       (d->kind == SkillKind::Burst && d->range == 0) || (d->kind == SkillKind::Heal && d->range == 0);
-    if (self || set_.quick(slot)) {  // [U-163] quick cast per ability / all
+    if (source_first(*d) && set_.quick(slot) && ui_ && source_at(net, view_.wx(ui_->mx), view_.wy(ui_->my))) {
+        src_x_ = std::int32_t(view_.wx(ui_->mx)), src_y_ = std::int32_t(view_.wy(ui_->my));  // [U-340] quick cast on water: source picked
+        pending_ = slot;
+        hint(std::format("{}: source picked, now click where it goes", d->name));
+    } else if (self || set_.quick(slot)) {  // [U-163] quick cast per ability / all
         cast_at_cursor(net, slot);
         pending_ = -1;
     } else {
@@ -545,7 +569,6 @@ void GameView::frame(NetClient& net, double now_s, Ui& ui) {
         return;
     }
     const Snapshot& cur = net.cur;
-    const Snapshot& prev = net.prev;
     // [X-02][U-338] interpolation: positions are drawn 50 ms in the past, between the two snapshots around that moment.
     // A late packet then never shows as a freeze-and-jump (the old way blended only the last two and waited).
     draw_.clear();
@@ -632,7 +655,11 @@ void GameView::frame(NetClient& net, double now_s, Ui& ui) {
         ui.clicked = ui.rclicked = false;
     }
     if (ui.clicked) {
-        if (pending_ >= 0) {
+        const SkillDef* pd = pending_ >= 0 ? skill_of(net, pending_) : nullptr;
+        if (pd && source_first(*pd) && src_x_ < 0 && source_at(net, wx, wy)) {  // [U-340] first click: the source
+            src_x_ = std::int32_t(wx), src_y_ = std::int32_t(wy);
+            hint(std::format("{}: source picked, now click where it goes", pd->name));
+        } else if (pending_ >= 0) {
             cast_at_cursor(net, pending_);
             pending_ = -1;
         } else if (!attack_move_) {  // [U-161] left click = select → info panel
@@ -664,16 +691,46 @@ void GameView::draw_indicator(NetClient& net) {
     {
         const bool* ks = SDL_GetKeyboardState(nullptr);
         const bool held = ks[set_.keys[std::size_t(Action::AttackRange)]] && !(SDL_GetModState() & SDL_KMOD_CTRL) && !chat_open_;
-        if ((held || set_.show_attack_range) && net.have_snapshot)
-            for (const DrawUnit& du : draw_)
-                if (du.u.id == net.my_unit && du.u.alive) {
-                    const float r = float(net.cur.me.attack_range + body_reach(body_by_index(du.u.body), du.u.size_pct));
-                    ground_ring(r_, view_, du.x, du.y, r, {255, 255, 255, 150}, 72);
+        if ((held || set_.show_attack_range) && net.have_snapshot) {
+            const bool water_user = [&] {
+                const auto it = net.roster.find(net.my_unit);
+                if (it == net.roster.end()) return false;
+                const ChampionDef& c = champions()[std::size_t(std::max<int>(0, it->second.champ))];
+                return c.element == Element::Water || c.avatar;
+            }();
+            for (const DrawUnit& du : draw_) {
+                if (!du.u.alive) continue;
+                const float reach = float(body_reach(body_by_index(du.u.body), du.u.size_pct));
+                const UnitKind k = UnitKind(du.u.kind);
+                if (du.u.id == net.my_unit) {  // my autoattack range (edge to edge → from my body's edge)
+                    const float r = float(net.cur.me.attack_range) + reach;
+                    ground_ring(r_, view_, du.x, du.y, r, {255, 255, 255, 170}, 72);
                     ground_ring(r_, view_, du.x, du.y, r + 2, {80, 80, 80, 90}, 72);
+                    // [U-354] XP range: enemies dying inside it give me experience (dashed look: a thin gold ring)
+                    ground_ring(r_, view_, du.x, du.y, float(rules::kXpRange), {235, 200, 90, 110}, 96);
+                    if (water_user)  // [U-348] how far I can draw water from a puddle / ice / a water source
+                        ground_ring(r_, view_, du.x, du.y, float(elements::kWaterSourceCells * kCellUnits), {90, 170, 255, 150}, 64);
+                } else if (k == UnitKind::Champion && du.u.team == net.my_team) {  // [U-307] allies
+                    ground_ring(r_, view_, du.x, du.y, float(du.u.range) + reach, {120, 190, 255, 90}, 48);
+                } else if (k == UnitKind::Turret || k == UnitKind::Nexus) {  // [U-307] turrets (both teams)
+                    ground_ring(r_, view_, du.x, du.y, float(du.u.range) + reach,
+                                du.u.team == net.my_team ? Rgba{120, 190, 255, 120} : Rgba{255, 90, 80, 160}, 80);
+                } else if (k == UnitKind::Monster || k == UnitKind::Boss) {  // [U-307] how far it chases (patience)
+                    const int mi = monster_index(net::kMobNames[std::min<int>(du.u.name_id, int(std::size(net::kMobNames)) - 1)]);
+                    const float patience = float(mi >= 0 ? kMonsters[std::size_t(mi)].patience : rules::kMonsterLeash);  // [U-308]
+                    ground_ring(r_, view_, du.x, du.y, patience, {255, 220, 90, 110}, 72);
                 }
+            }
+        }
     }
+    if (pending_ < 0) src_x_ = src_y_ = -1;
     if (pending_ < 0 || !ui_) return;
     const SkillDef* d = skill_of(net, pending_);
+    if (d && source_first(*d)) {  // [U-340] highlight the picked source / a source under the cursor
+        const float cxw = view_.wx(ui_->mx), cyw = view_.wy(ui_->my);
+        if (src_x_ >= 0) ground_ring(r_, view_, float(src_x_), float(src_y_), 48.f, {120, 210, 255, 230}, 32);
+        else if (source_at(net, cxw, cyw)) ground_ring(r_, view_, cxw, cyw, 40.f, {120, 210, 255, 140}, 32);
+    }
     const DrawUnit* mine = nullptr;
     for (const DrawUnit& du : draw_)
         if (du.u.id == net.my_unit) mine = &du;
@@ -806,6 +863,13 @@ void GameView::draw_hud(NetClient& net, double now_s, Ui& ui) {
     for (const auto& u : cur.units)
         if (u.id == net.my_unit) mu = &u;
     draw_bottom_panel(net, now_s, ui);
+    {  // [U-366] my jungle buff, [U-339] the Avatar's carried water — one line over the minimap
+        std::string extra;
+        static const char* kBuff[] = {"", "Ember (autos burn + slow)", "Tui's Blessing (regen +50 %, cooldowns -10 %)"};
+        if (me.jbuff > 0 && me.jbuff < 3 && me.jbuff_ms > 0) extra += std::format("{} {}:{:02}   ", tr(kBuff[me.jbuff]), me.jbuff_ms / 60'000, me.jbuff_ms / 1000 % 60);
+        if (me.water_max > 0) extra += std::format("{} {}/{}", tr("water"), me.water / 100, me.water_max / 100);
+        if (!extra.empty()) text(r_, W - text_w(extra) - 12, H - 200 - 150 - 24, extra, {170, 220, 255});
+    }
 
     // minimap [U-99]
     if (set_.minimap) {
@@ -838,6 +902,16 @@ void GameView::draw_hud(NetClient& net, double now_s, Ui& ui) {
             draw_icon(du.u.champ, mmx(du.x) - s2 / 2, mmy(du.y) - s2 / 2, s2, false);
             rect(r_, mmx(du.x) - s2 / 2 - 1, mmy(du.y) - s2 / 2 - 1, s2 + 2, s2 + 2,
                  du.u.id == net.my_unit ? Rgba{255, 230, 60} : du.u.team == net.my_team ? Rgba{90, 200, 255} : Rgba{230, 70, 60});
+        }
+        for (const auto& c : cur.camps) {  // [U-365] camp timers: dead camps show the seconds left, epics are gold
+            const float cx = mmx(float(c.x * kCellUnits + 16)), cy = mmy(float(c.y * kCellUnits + 16));
+            if (c.respawn_s == 0) {
+                if (c.epic) circle(r_, cx, cy, 5, {255, 210, 80, 230}, 12);
+                continue;
+            }
+            circle(r_, cx, cy, c.epic ? 5.f : 3.f, {150, 150, 150, 200}, 10);
+            const std::string t = c.respawn_s >= 60 ? std::format("{}:{:02}", c.respawn_s / 60, c.respawn_s % 60) : std::format("{}", c.respawn_s);
+            text(r_, cx - text_w(t, 0.75f) / 2, cy + 4, t, c.epic ? Rgba{255, 210, 80} : Rgba{210, 210, 210}, 0.75f);
         }
         for (const auto& p : cur.pings)  // [U-246]
             if (cur.now_ms - p.ms < 4'500) circle(r_, mmx(float(p.x)), mmy(float(p.y)), 6 + float((cur.now_ms - p.ms) % 1'000) / 100.f, {255, 230, 90, 220}, 12);
@@ -902,6 +976,16 @@ void GameView::draw_hud(NetClient& net, double now_s, Ui& ui) {
                                                   s.alive ? "" : std::format("respawn {}s", s.respawn_ms / 1000)), team_colour(team));
                 ry += 20;
             }
+        // [U-364][U-365] epic monsters: alive or the respawn timer; Lion Turtle stacks per team
+        std::string epics;
+        for (const auto& c : cur.camps)
+            if (c.epic) {
+                const char* nm = net::kMobNames[std::min<int>(c.name_id, int(std::size(net::kMobNames)) - 1)];
+                epics += c.respawn_s == 0 ? std::format("{}: {}   ", tr(nm), tr("up")) : std::format("{}: {}:{:02}   ", tr(nm), c.respawn_s / 60, c.respawn_s % 60);
+            }
+        epics += std::format("{} {} / {}", tr("Lion Turtle stacks"), me.lion_stacks[0], me.lion_stacks[1]);
+        fill_rect(r_, sx, ry + 4, 660, 22, {0, 0, 0, 220});
+        text(r_, sx + 10, ry + 8, epics, {255, 210, 80});
     }
     // death / end
     if (mu && !mu->alive && net.winner < 0) {
@@ -925,7 +1009,13 @@ void GameView::draw_hud(NetClient& net, double now_s, Ui& ui) {
         text(r_, (W - text_w(big, 5)) / 2, H / 2 - 30, big, won ? Rgba{255, 220, 100} : Rgba{255, 90, 90}, 5);
         text(r_, (W - text_w(line, 2)) / 2, H / 2 + 20, line, {255, 255, 255}, 2);
     }
-    if (pending_ >= 0) text(r_, ui.mx + 14, ui.my + 14, "left click: cast  right click: cancel", {255, 255, 255});
+    if (pending_ >= 0) {
+        const SkillDef* pd = skill_of(net, pending_);
+        const char* how = src_x_ >= 0                     ? "source picked - left click: where it goes  right click: cancel"
+                          : pd && source_first(*pd)        ? "left click: cast (on water: pick the source first)  right click: cancel"
+                                                           : "left click: cast  right click: cancel";
+        text(r_, ui.mx + 14, ui.my + 14, how, {255, 255, 255});
+    }
     if (champs_only()) text(r_, ui.mx + 14, ui.my + 26, "CHAMPIONS ONLY", {255, 120, 120});
     draw_portraits(net, ui);
     draw_tooltip(net, ui);

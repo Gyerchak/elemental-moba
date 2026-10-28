@@ -10,7 +10,7 @@ inline constexpr ChampionDef kTideHealer{.name = "Tide Healer", .element = Eleme
  .w = {.name = "Healing Water", .kind = K::Heal, .sub = S::Water, .dmg = 70, .dmg_rank = 35, .ep = 40, .range = 700,
        .radius = 220, .cast_ms = 300, .cd_ms = 12'000, .cost = 60, .ally = true, .desc = "Heals allies [U-78]"},
  .e = {.name = "Ice Wall", .kind = K::Wall, .sub = S::Ice, .range = 700, .width = 300, .cast_ms = 300,
-       .cd_ms = 14'000, .cost = 50, .dur_ms = 2'500, .desc = "Ice wall: weaker, melts; needs a big water source nearby [U-18][U-15][U-294]"},
+       .cd_ms = 14'000, .cost = 320, .dur_ms = 2'500, .desc = "Ice wall: weaker, melts; costs 320 water: needs a source [U-18][U-15][U-294][U-339]"},
  .r = {.name = "Whirlpool", .kind = K::Field, .sub = S::Water, .dmg = 18, .dmg_rank = 9, .ep = 10, .range = 800,
        .radius = 240, .cast_ms = 400, .cd_ms = 14'000, .cost = 60, .dur_ms = 3'000, .cc = C::Slow, .cc_ms = 600,
        .cc_val = 40, .group = true, .desc = "Whirlpool; other waterbenders can feed it"},

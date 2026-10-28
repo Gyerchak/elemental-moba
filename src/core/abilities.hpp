@@ -43,6 +43,8 @@ struct ScaleCtx {
     int size_pct = 100;   // [U-123] sky events make skills bigger too (range, length)
     int width_pct = 100, radius_pct = 100, speed_pct = 100;  // [U-264]
     int dur_pct = 100, dot_pct = 100;                         // [U-264] skill duration / damage-over-time duration
+    int power_pm = 0;     // [U-370] extra power in per-mille on top of power_pct (the moon)
+    int cd_pct = 100;     // [U-370] flat cooldown multiplier after haste (full moon 90)
 };
 
 [[nodiscard]] constexpr std::int64_t scale(const Scaling& s, const ScaleCtx& c) {
@@ -112,14 +114,14 @@ inline constexpr std::int64_t kFireLightRadius = 192;
     const std::int32_t haste =
         base_element(a.sub) == Element::None ? st.non_elemental_haste : st.elemental_haste;  // [U-57]
     return {
-        .damage = nerf(pos(scale(a.damage, c)) * std::max(c.power_pct, 0) / 100),         // [U-123]
+        .damage = nerf(pos(scale(a.damage, c)) * std::max(c.power_pct * 10 + c.power_pm, 0) / 1000),  // [U-123][U-370]
         .range = big(pos(scale(a.range, c) + st.skill_range / 100), c.size_pct),          // [U-113]
         .width = big(pos(scale(a.width, c) + st.skill_width / 100), c.width_pct),         // [U-54]
         .length = big(pos(scale(a.length, c) + st.skill_length / 100), c.size_pct),
         .radius = big(pos(scale(a.radius, c) + (radius_bonus(st) + st.skill_radius) / 100), c.radius_pct),
         .speed = big(pos(scale(a.speed, c) + st.skill_speed / 100), c.speed_pct),
         .cast_time_ms = hasted(pos(scale(a.cast_time_ms, c)), st.cast_speed),            // [U-53][U-114]
-        .cooldown_ms = hasted(pos(scale(a.cooldown_ms, c)), haste),
+        .cooldown_ms = hasted(pos(scale(a.cooldown_ms, c)), haste) * c.cd_pct / 100,  // [U-370] flat, after haste
         .cost = pos(scale(a.cost, c)),
         .light_radius = [&] {
             const std::int64_t r = pos(scale(a.light_radius, c));

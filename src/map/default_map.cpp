@@ -95,8 +95,43 @@ Cell make_cell(int cx, int cy) {
     // 1. Jungle [U-89]: groves of trees + bushes, kept off the lanes.
     if (lane_d > kLaneHalfWidth + 3) {
         const bool grove = hash(cx / 9, cy / 9, 1) % 100 < 45;
-        if (grove && hash(cx, cy, 2) % 100 < 75) c.set_tree(Tree::Alive);
-        else if (hash(cx / 4, cy / 4, 3) % 100 < 9) c.set_bush(Bush::Alive);
+        // [U-346] some groves are ROCK outcrops instead: a rock-wall core (no walking, no seeing through) and a
+        // stone hill one level up around it, with a few trees. They sit where trees already blocked the way.
+        // [U-358] never in the base, on the pole or by the sea: those areas clear the grove later, which used to
+        // leave invisible blocked rock cores around the bases
+        const bool rocks = grove && hash(cx / 9, cy / 9, 7) % 100 < 30 && base_d > kBaseSand + 6 && dist(p, {double(M) - kFireBase.x, double(M) - kFireBase.y}) > kBaseSand + 6 &&
+                           pole_d > kPoleRadius + 6 && sea_d > kSeaHalfWidth + kBeach + 4;
+        if (rocks) {
+            // [U-359] varied shapes: most are a single rock, some small, long, thick or a pair (Claude idea mix)
+            const std::uint32_t g = hash(cx / 9, cy / 9, 11), shape = g % 10;
+            const double gx = (cx / 9) * 9 + 3.0 + double(g / 10 % 4), gy = (cy / 9) * 9 + 3.0 + double(g / 40 % 4);
+            const double ang = double(g / 160 % 8) * 0.3927;  // 8 directions
+            const double ux = cx + 0.5 - gx, uy = cy + 0.5 - gy;
+            double along = ux * std::cos(ang) + uy * std::sin(ang), across = -ux * std::sin(ang) + uy * std::cos(ang);
+            double core = 0.75;                                          // 0-4: a single rock
+            if (shape == 5 || shape == 6) core = 1.5;                    // small
+            else if (shape == 7) along /= 2.6, core = 1.2;               // long
+            else if (shape == 8) core = 2.6;                             // thick
+            else if (shape == 9) along = std::abs(along) - 2.0, core = 0.9;  // a pair
+            const double d = std::hypot(along, across);
+            c.set_surface(Surface::Stone);
+            if (d < core) {
+                c.set_walk(Walk::Blocked);
+                c.set_wall(Wall::Stone);  // [U-362] a real rock: skills hit it (and can break it [U-360])
+                c.set_elevation(2);
+                c.set_vision_fog(SenseBlock::Full);
+                c.set_skill_fog(SenseBlock::Full);
+            } else if (d < core + 1.6) {
+                c.set_elevation(1);
+                if (hash(cx, cy, 8) % 100 < 20) c.set_tree(Tree::Alive);
+            } else if (hash(cx, cy, 2) % 100 < 60) {
+                c.set_tree(Tree::Alive);
+            }
+        } else if (grove && hash(cx, cy, 2) % 100 < 75) {
+            c.set_tree(Tree::Alive);
+        } else if (hash(cx / 4, cy / 4, 3) % 100 < 9) {
+            c.set_bush(Bush::Alive);
+        }
     }
     // 2. Sea [U-85] deep water [?-08] with beaches [X-42].
     if (sea_d < kSeaHalfWidth + kBeach) {

@@ -205,6 +205,41 @@ def quadruped(m, root, size=1.0):
     return J
 
 
+UNITS_PER_M = 38.9  # game units per metre (champion 1.8 m = 70 units)
+
+
+def hitbox_model(m, root):
+    """[U-304] a model built FROM the hitbox: every hitbox circle becomes a body part of exactly that size and place
+    (forward = −Y, the model's front). The first circle is the front → a head with a white mask on it.
+    The game scales the sprite with the unit's size %, so the model always matches its hitbox."""
+    col, acc = hexrgb(m["colour"]), hexrgb(m["accent"])
+    body = material("hb_body", col)
+    mask = material("hb_mask", acc, rough=0.3, emit=0.6)
+    parts = m["circles"]
+    J = {}
+    hip = empty("hip", (0, 0, 0), root)
+    J["hip"] = hip
+    front = max(parts, key=lambda p: p[0])
+    for i, (fwd, side, r) in enumerate(parts):
+        rm = r / UNITS_PER_M
+        z = rm * 1.1 + (0.25 if i == 0 else 0.15)
+        part("sphere", f"hb{i}", hip, (side / UNITS_PER_M, -fwd / UNITS_PER_M, z), scale=(1, 1.15, 0.9), mat=body, r=rm)
+    # legs under the biggest circles, a head + mask in front
+    for fwd, side, r in sorted(parts, key=lambda p: -p[2])[:2]:
+        for sx in (-1, 1):
+            lg = empty(f"leg{len(J)}", (sx * r * 0.6 / UNITS_PER_M, -fwd / UNITS_PER_M, r / UNITS_PER_M * 0.6), hip)
+            J[f"leg{len(J)}"] = lg
+            part("cyl", f"legm{len(J)}", lg, (0, 0, -r * 0.35 / UNITS_PER_M), mat=body, r1=r * 0.14 / UNITS_PER_M, r2=r * 0.2 / UNITS_PER_M,
+                 d=r * 0.9 / UNITS_PER_M)
+    hf, hs, hr = front
+    hrm = hr / UNITS_PER_M
+    neck = empty("neck", (hs / UNITS_PER_M, -(hf + hr) / UNITS_PER_M, hrm * 1.6), hip)
+    J["neck"] = neck
+    part("sphere", "head", neck, (0, -hrm * 0.3, 0), mat=body, r=hrm * 0.75)
+    part("cube", "mask", neck, (0, -hrm * 0.95, 0.02), scale=(hrm * 1.1, 0.03, hrm * 1.2), mat=mask)
+    return J
+
+
 def structure(m, root):
     k = m["kind"]
     stone = material("stone", hexrgb(m["colour"]))
@@ -248,6 +283,15 @@ def pose(J, kind, anim, t):
         hip.location.z = hip["z0"]
         hip.location.y = 0
     s = math.sin(2 * math.pi * t)
+    if kind == "hitbox":  # legs swing, body bobs; death = falls on its side
+        legs = [o for n, o in J.items() if n.startswith("leg")]
+        for i, lg in enumerate(legs):
+            lg.rotation_euler.x = math.radians(25) * math.sin(2 * math.pi * (t + 0.5 * (i % 2))) if anim == "walk" else 0
+        if anim == "death":
+            J["hip"].rotation_euler.y = math.radians(80) * min(1, t * 1.3)
+        elif anim in ("attack", "cast"):
+            J["neck"].rotation_euler.x = math.radians(-20) * math.sin(math.pi * t)
+        return
     if kind == "quad":
         if anim == "walk":
             for n, ph in (("legFR", 0), ("legBL", 0), ("legFL", 0.5), ("legBR", 0.5)):
@@ -310,6 +354,9 @@ for m in MANIFEST:
     elif k == "quad":
         J = quadruped(m, root, size=m.get("size", 1.0))
         kind = "quad"
+    elif k == "hitbox":  # [U-304]
+        J = hitbox_model(m, root)
+        kind = "hitbox"
     else:
         J = structure(m, root)
         kind = "static"
@@ -319,11 +366,17 @@ for m in MANIFEST:
     bpy.ops.export_scene.gltf(filepath=os.path.join(out, "model.glb"), export_format="GLB")  # for a future 3D renderer
     dirs = m.get("dirs", 8)
     for anim in m.get("anims", ["idle"]):
-        n = FRAMES.get(anim, 1) if kind != "static" else 1
+        # structures: one idle frame; their "death" = 5 frames of collapsing, the last one is the ruin [U-310]
+        n = FRAMES.get(anim, 1) if kind != "static" else (5 if anim == "death" else 1)
         for d in range(dirs):
             # direction d: facing the world angle d × 45° (0 = screen right, 2 = towards the camera)
             root.rotation_euler.z = math.radians(90 - d * 45) if dirs > 1 else 0
             for f in range(n):
+                if kind == "static":  # [U-310] collapse: tilt, sink and squash; the last frame is the rubble (end state)
+                    t = f / max(1, n - 1) if anim == "death" else 0.0
+                    root.rotation_euler.x = math.radians(28) * t
+                    root.location.z = -0.45 * t * max(1.0, m["ortho"] / 4)
+                    root.scale = (1 + 0.25 * t, 1 + 0.25 * t, 1 - 0.7 * t)
                 pose(J, kind, anim, f / n)
                 sc.render.filepath = os.path.join(out, f"{anim}_{d}_{f}.png")
                 bpy.ops.render.render(write_still=True)

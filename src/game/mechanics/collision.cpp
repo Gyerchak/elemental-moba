@@ -46,6 +46,13 @@ void World::rebuild_collision_maps() {
                                  struct_block[std::size_t(y) * kGridSize + std::size_t(x)];
             if (blocked) clearance[std::size_t(y) * kGridSize + std::size_t(x)] = 0;
         }
+    // [U-357] a step of more than one level (a cliff) blocks like a wall: both sides keep the body away from it
+    for (int y = 0; y + 1 < kGridSize; ++y)
+        for (int x = 0; x + 1 < kGridSize; ++x) {
+            const int e = grid.at(x, y).effective_elevation();
+            if (std::abs(e - grid.at(x + 1, y).effective_elevation()) > 1 || std::abs(e - grid.at(x, y + 1).effective_elevation()) > 1)
+                clearance[std::size_t(y) * kGridSize + std::size_t(x)] = 0;
+        }
     auto relax = [&](int x, int y, int nx, int ny) {
         if (!Grid::in_bounds(nx, ny)) return;
         auto& a = clearance[std::size_t(y) * kGridSize + std::size_t(x)];
@@ -94,7 +101,7 @@ int World::body_violations(const Unit& u, std::int32_t xs, std::int32_t ys) cons
     for (const Unit& o : units) {
         if (&o == &u || !o.alive) continue;
         const bool structure = o.is_structure() || o.kind == UnitKind::Inhibitor;
-        if (structure ? !(m & kCollStructure) : !((m | o.collide) & kCollUnit)) continue;
+        if (structure ? !(m & kCollStructure) : !(m & o.collide & kCollUnit)) continue;  // [U-367] both must collide
         if (!structure && (u.flying() || o.flying() || !targetable(o))) continue;
         const std::int64_t rr = reach + body_reach(*o.body, size_pct(o));
         if (dist2(xs / kSub, ys / kSub, o.ux(), o.uy()) > rr * rr) continue;
@@ -124,7 +131,7 @@ void World::resolve_overlaps(Unit& u) {
     for (Unit& o : units) {
         if (&o == &u || !o.alive) continue;
         const bool structure = o.is_structure() || o.kind == UnitKind::Inhibitor;
-        if (structure ? !(collide_mask(u) & kCollStructure) : !((u.collide | o.collide) & kCollUnit)) continue;
+        if (structure ? !(collide_mask(u) & kCollStructure) : !(u.collide & o.collide & kCollUnit)) continue;  // [U-367]
         if (!structure && (o.flying() || !targetable(o) || !targetable(u))) continue;
         const std::int64_t rr = reach + body_reach(*o.body, size_pct(o));
         if (dist2(u.ux(), u.uy(), o.ux(), o.uy()) > rr * rr) continue;

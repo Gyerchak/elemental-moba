@@ -23,6 +23,7 @@ void World::effect_hits(Effect& e) {
         if (o.is_structure() && (e.kind == FxKind::Field || e.kind == FxKind::Tornado)) continue;
         if (!reaches(e, o)) continue;  // [U-191][U-216] too high for this hitbox (flying, airborne, raised ground)
         if (!touches(sh, hitbox(o))) continue;  // ONE rule: any touch = hit
+        if (e.def && e.def->hits && !(e.def->hits & cat_bit(o.category()))) continue;  // [U-311] not a unit this skill hits
         // [U-185] lightning redirection: the bolt changes owner and flies on towards the redirector's cursor
         if (e.sub == SubElement::Lightning && (e.kind == FxKind::Bolt || e.kind == FxKind::Wave) && o.st.has(StatusKind::Redirect)) {
             o.st.remove(StatusKind::Redirect);
@@ -42,6 +43,10 @@ void World::effect_hits(Effect& e) {
         }
         mark_hit(e, o.id);
         std::int32_t dmg = e.damage;
+        if (e.def && (e.def->pct_current_hp || e.def->pct_max_hp || e.def->pct_missing_hp)) {  // [U-313] % health parts
+            const std::int64_t mx = o.stats.health.total(), cur = std::max(0, o.hp);
+            dmg += std::int32_t((cur * e.def->pct_current_hp + mx * e.def->pct_max_hp + (mx - cur) * e.def->pct_missing_hp) / 10'000 / 100);
+        }
         // [U-222] sweet spot: a better hit in the best part of the hitbox (not a crit [U-221])
         bool sweet = false;
         if (e.def && e.def->sweet_pct > 0) {
@@ -95,7 +100,7 @@ void World::effect_hits(Effect& e) {
         if (e.combo == Combo::IceShards) apply_cc(e.src, e.owner, o, StatusKind::Slow, 1'500, 40);
         if (e.combo == Combo::Firestorm || (owner && has_passive(*owner, PassiveId::InnerFlame) && e.damage > 0))
             apply_cc(e.src, e.owner, o, StatusKind::Burn, 2'000, 1'500);
-        if (e.knock) knock(o, e.ux() - e.dir.x * 60 / kOne, e.uy() - e.dir.y * 60 / kOne, e.knock);
+        if (e.knock) knock(o, e.ux() - e.dir.x * 60 / kOne, e.uy() - e.dir.y * 60 / kOne, e.knock, e.owner);
         // [X-58] lightning chains through the connected shallow water the target stands in
         if (e.sub == SubElement::Lightning) {
             const int cx = o.ux() / kCellUnits, cy = o.uy() / kCellUnits;
@@ -114,6 +119,11 @@ void World::effect_hits(Effect& e) {
             }
         }
         if (!e.pierce && (e.kind == FxKind::Bolt || e.kind == FxKind::Boulder)) {
+            // [U-312] does this unit stop it? a kill may let it fly on (per skill and category)
+            const std::uint16_t cat = cat_bit(o.category());
+            const std::uint16_t stops = e.def && e.def->stop_on ? e.def->stop_on : kAllCategories;
+            const bool passes = !(stops & cat) || (!o.alive && e.def && (e.def->pass_on_kill & cat));
+            if (passes) continue;
             e.dead = true;
             return;
         }
@@ -218,6 +228,9 @@ void World::step_effects() {
             e.travel_left -= step;
         } else if (e.kind != FxKind::Tornado) {
             e.dead = true;
+            // [U-359] a thrown rock (earth / lava bolt) stays where it lands
+            if (e.kind == FxKind::Bolt && e.def && e.def->kind == SkillKind::Bolt && (e.sub == SubElement::Earth || e.sub == SubElement::Lava))
+                drop_rock(e.ux(), e.uy(), e.sub == SubElement::Lava);
         }
         // dash: drag the owner
         Unit* owner = find(e.owner);
@@ -239,7 +252,9 @@ void World::step_effects() {
             continue;
         }
         // [U-184] skills marked through_walls ignore walls, objects and trees
-        if (e.kind != FxKind::Lantern && !(e.def && (e.def->kind == SkillKind::Dash || e.def->through_walls))) {
+        // [U-346] dashes stop at walls too — only air dashes (over the air) and skills marked through_walls pass
+        const bool air_dash = e.def && e.def->kind == SkillKind::Dash && base_element(e.sub) == Element::Air;
+        if (e.kind != FxKind::Lantern && !(e.def && (air_dash || e.def->through_walls))) {
             const Cell c = grid.at(cx, cy);
             const AttackInfo ai{.sub = e.sub, .elevated = owner && owner->flying()};
             // [U-227] trees: burn (fire / lava) or break (skills marked destroys_trees)

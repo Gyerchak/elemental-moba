@@ -237,7 +237,7 @@ void Server::run(std::stop_token stop) {
             for (const Announce& an : world_->announces) {  // [U-263] everybody hears them
                 Writer w;
                 w.put(Msg::Announce);
-                w.put(NetAnnounce{std::uint8_t(an.kind), std::uint8_t(an.team), {}, an.a, an.b});
+                w.put(NetAnnounce{std::uint8_t(an.kind), std::uint8_t(an.team), an.a_kind, an.a_extra, an.a, an.b});
                 broadcast(w, true);
             }
             world_->announces.clear();

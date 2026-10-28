@@ -25,7 +25,7 @@ ROOT = Path(__file__).resolve().parents[2]
 PACK = ROOT / "resourcepacks" / "default" / "models"
 WORK = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(os.environ.get("OCC_BOX_SCRATCH", "/tmp/em-models")) / "models"
 FRAMES = {"idle": 2, "walk": 6, "cast": 3, "attack": 3, "death": 3}
-FPS = {"idle": 2, "walk": 10, "cast": 8, "attack": 10, "death": 5}
+FPS = {"idle": 2, "walk": 10, "cast": 8, "attack": 10, "death": 5}  # (structures collapse in 1 s)
 HUMAN = ["idle", "walk", "cast", "attack", "death"]
 MOB = ["idle", "walk", "attack", "death"]
 
@@ -58,15 +58,25 @@ def manifest():
         {"id": "angry_beast", "kind": "quad", "size": 1.45, "colour": "6a4a30", "accent": "ff6040", "px": 128, "ortho": 3.2, "anims": MOB},
         {"id": "bandit", "kind": "humanoid", "body": "humanoid", "height": 1.7, "colour": "6a5a48", "accent": "c0a070",
          "weapon": "sword", "px": 112, "ortho": 2.5, "anims": MOB},
-        {"id": "face_stealer", "kind": "humanoid", "body": "broad", "height": 3.2, "colour": "202028", "accent": "ffffff",
-         "px": 192, "ortho": 4.6, "anims": MOB},
+        # [U-304] built from its hitbox (the beast body) — the game scales it with its +60 % size
+        {"id": "face_stealer", "kind": "hitbox", "body": "beast", "colour": "202028", "accent": "ffffff",
+         "px": 160, "ortho": 5.0, "anchor": 0.62, "anims": MOB},
         # structures + nature (1 direction, 1 frame)
-        {"id": "turret", "kind": "turret", "colour": "8a8a90", "accent": "c8a050", "px": 256, "ortho": 6.0, "anchor": 0.85, "dirs": 1, "anims": ["idle"]},
-        {"id": "inhibitor", "kind": "inhibitor", "colour": "707078", "accent": "60d0ff", "px": 192, "ortho": 3.6, "anchor": 0.8, "dirs": 1, "anims": ["idle"]},
-        {"id": "nexus", "kind": "nexus", "colour": "8a8478", "accent": "e0b040", "px": 256, "ortho": 8.0, "anchor": 0.78, "dirs": 1, "anims": ["idle"]},
+        {"id": "turret", "kind": "turret", "colour": "8a8a90", "accent": "c8a050", "px": 256, "ortho": 6.0, "anchor": 0.85, "dirs": 1, "anims": ["idle", "death"]},
+        {"id": "inhibitor", "kind": "inhibitor", "colour": "707078", "accent": "60d0ff", "px": 192, "ortho": 3.6, "anchor": 0.8, "dirs": 1, "anims": ["idle", "death"]},
+        {"id": "nexus", "kind": "nexus", "colour": "8a8478", "accent": "e0b040", "px": 256, "ortho": 8.0, "anchor": 0.78, "dirs": 1, "anims": ["idle", "death"]},
         {"id": "tree", "kind": "tree", "colour": "2f6b2a", "accent": "000000", "px": 160, "ortho": 5.5, "anchor": 0.85, "dirs": 1, "anims": ["idle"]},
         {"id": "bush", "kind": "bush", "colour": "3f7f3a", "accent": "000000", "px": 96, "ortho": 2.6, "anchor": 0.75, "dirs": 1, "anims": ["idle"]},
     ]
+    # [U-304] hitbox circles from the game → "hitbox" models get them
+    bodies = {}
+    for line in dump.splitlines():
+        f = line.split("\t")
+        if f[0] == "body":
+            bodies[f[1]] = [tuple(int(v) for v in c.split(",")) for c in f[4].split(";")]
+    for m in out:
+        if m["kind"] == "hitbox":
+            m["circles"] = bodies[m["body"]]
     return out
 
 
@@ -79,7 +89,7 @@ def pack(m):
     cols, lines = [], []
     col = 0
     for a in m["anims"]:
-        n = 1 if static else FRAMES[a]
+        n = (5 if a == "death" else 1) if static else FRAMES[a]  # structures: 5 collapse frames [U-310]
         lines.append(f"anim {a} {col} {n} {FPS[a]}")
         cols += [(a, f) for f in range(n)]
         col += n

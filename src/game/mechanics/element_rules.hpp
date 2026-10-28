@@ -36,6 +36,20 @@ inline constexpr std::int32_t kIcePatchSlowPct = 20;       // [U-293] an ice pat
 inline constexpr std::int32_t kWaterSourceBonusPct = 15;   // [U-293] a waterbender bending from a puddle / ice patch
 inline constexpr std::int32_t kWaterSourceCells = 4;
 inline constexpr int kIceWallSourceCells = 6;              // [U-294] ice walls need a big water source this close
+// [U-339] water as numbers: the Avatar (resource is not water) carries a small water pool; each water skill takes this much
+inline constexpr std::int32_t kAvatarWaterMax = 15'000, kAvatarWaterCost = 6'000, kAvatarWaterRegen = 250;  // hundredths
+inline constexpr std::int32_t kSourceRangePct = 125;     // [U-339] bending from a chosen source: +25 % range
+inline constexpr std::int32_t kSourceReachCells = 4;     // the source may be this far beyond the skill's range
+inline constexpr std::int32_t kIceWallMeltPerUse = 30;   // [U-339] an ice wall used as a source loses this much HP (of 90)
+// [U-356] lava on the ground: only some cells cool into a small rock; the rest become plain ground again.
+// While it lies there it melts the walls next to it (HP per kLavaMeltMs); ice cools it: the lava's rest time is halved once.
+inline constexpr int kLavaRockPct = 12;
+inline constexpr std::int64_t kLavaMeltMs = 250;
+inline constexpr std::int32_t kLavaMeltStone = 4, kLavaMeltIce = 20, kLavaMeltMetal = 3;
+// [U-360] natural rocks: 2 × a bent wall's HP; broken ones grow back after this long
+inline constexpr int kNaturalWallHpPct = 200;
+inline constexpr std::int64_t kThrownRockMs = 20'000;  // [U-359] the small rock a thrown rock leaves
+inline constexpr std::int64_t kNaturalRockRegrowMs = 180'000;
 
 // ---- fire meets fire [U-241]: the stronger caster (elemental power) wins the clash
 // returns how much of the stronger fire is left, in % (equal power → 0 = both gone)

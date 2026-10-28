@@ -1,5 +1,6 @@
 // Terrain bending at runtime: walls [U-18][U-24][U-44], elevation [U-45], burning [U-14],
 // melting [U-15][U-16], lava → stone [X-56], steam fog [X-57]. Every change → cell_changes (network).
+#include <cmath>
 #include "core/wall_rules.hpp"
 #include <algorithm>
 
@@ -19,8 +20,10 @@ void prepare_match_grid(Grid& g) {
                 cell.set_bush(Bush::None);
                 cell.set_vision_fog(SenseBlock::None);
                 cell.set_skill_fog(SenseBlock::None);
-                if (force_surface || cell.surface() == Surface::DeepWater) cell.set_surface(s);
+                if (force_surface || cell.surface() == Surface::DeepWater || cell.surface() == Surface::Stone) cell.set_surface(s);
                 cell.set_walk(Walk::Walk);
+                cell.set_wall(Wall::None);  // [U-359] map rocks are walls now
+                cell.set_elevation(0);  // [U-346] no rock hill inside a camp
             }
     };
     for (CellPt c : kCamps) {
@@ -32,8 +35,29 @@ void prepare_match_grid(Grid& g) {
         clear_disc(mirror(c), 8, Surface::Land, false);
     }
     clear_disc(kSpiritIsland, 30, Surface::Land, true);  // [X-86]
+    for (CellPt c : kBuffCamps) {  // [U-366]
+        clear_disc(c, 7, Surface::Land, false);
+        clear_disc(mirror(c), 7, Surface::Land, false);
+    }
+    // [U-364] epic islands in the sea + a shallow ford across the sea to each (wade, no swimming)
+    for (CellPt c : {kLionTurtleCell, kDragonsCell}) {
+        for (int t = -48; t <= 48; t += 2) clear_disc({c.first + t, c.second - t}, 3, Surface::Water, true);
+        clear_disc(c, 11, Surface::Land, true);
+    }
+    // [U-349] water fountains in both bases: a pond next to every inhibitor (towards the base) and one by the shrine,
+    // so waterbenders have a source at home
+    auto pond = [&](CellPt c, int r) {
+        clear_disc(c, r, Surface::Water, true);
+        clear_disc(mirror(c), r, Surface::Water, true);
+    };
+    for (const LaneStructs& l : kLaneStructs) {
+        const int dx = kBaseCell.first - l.inhib.first, dy = kBaseCell.second - l.inhib.second;
+        const double len = std::max(1.0, std::hypot(double(dx), double(dy)));
+        pond({l.inhib.first + int(dx / len * 7), l.inhib.second + int(dy / len * 7)}, 3);
+    }
+    pond({kNexusCell.first - 8, kNexusCell.second + 9}, 3);
     for (int k = 0; k < 2; ++k) {  // portals: keep the pole centre open [X-54]
-        const CellPt p = k ? mirror(kNorthPoleCell) : kNorthPoleCell;
+        const CellPt p = k ? mirror(kPortalCell) : kPortalCell;
         clear_disc(p, 6, Surface::Glacier, true);
     }
 }
@@ -252,15 +276,44 @@ void World::scorch(const Effect& e) {
     }
 }
 
+// [U-356] lava lying on the ground melts the walls around it; ice cools it (its rest time is halved once)
+void World::lava_melts_walls() {
+    if (now_ms < lava_melt_next_) return;
+    lava_melt_next_ = now_ms + elements::kLavaMeltMs;
+    constexpr int kDx[] = {1, -1, 0, 0, 0}, kDy[] = {0, 0, 1, -1, 0};
+    for (std::size_t i = 0; i < cell_timers.size(); ++i) {
+        if (cell_timers[i].kind != CellTimerKind::LavaToStone) continue;
+        const int lx = cell_timers[i].x, ly = cell_timers[i].y;
+        for (int k = 0; k < 5; ++k) {
+            const int cx = lx + kDx[k], cy = ly + kDy[k];
+            if (!Grid::in_bounds(cx, cy)) continue;
+            const Wall w = grid.at(cx, cy).wall();
+            if (w == Wall::None) continue;
+            damage_wall(cx, cy, w == Wall::Ice ? elements::kLavaMeltIce : w == Wall::Metal ? elements::kLavaMeltMetal : elements::kLavaMeltStone);
+            CellTimer& t = cell_timers[i];  // damage_wall may not grow the list, but keep the reference fresh
+            if (w == Wall::Ice && !t.iced) {
+                t.iced = true;
+                if (t.at_ms > now_ms) t.at_ms = now_ms + (t.at_ms - now_ms) / 2;
+            }
+        }
+    }
+}
+
 void World::step_terrain() {
     std::erase_if(clouds, [&](const Cloud& c) { return c.until_ms <= now_ms; });
+    lava_melts_walls();
     for (std::size_t i = 0; i < cell_timers.size();) {
         CellTimer& t = cell_timers[i];
         if (t.at_ms > now_ms) {
             ++i;
             continue;
         }
-        if (t.kind == CellTimerKind::LavaToStone) {  // [X-56] cooled lava = stone wall for 4 s
+        if (t.kind == CellTimerKind::LavaToStone &&  // [U-356] most lava cools into plain ground
+            std::uint32_t(t.x * 73'856'093 ^ t.y * 19'349'663 ^ std::int32_t(now_ms / 1000)) % 100 >= std::uint32_t(elements::kLavaRockPct)) {
+            t.kind = CellTimerKind::Restore;
+            continue;  // restored by the next pass of this loop
+        }
+        if (t.kind == CellTimerKind::LavaToStone) {  // [X-56] cooled lava = a small stone rock for 4 s
             Cell c = grid.at(t.x, t.y);
             c.set_surface(Cell(t.raw).surface());
             c.set_wall(Wall::Stone);
@@ -273,6 +326,9 @@ void World::step_terrain() {
             continue;
         }
         cell_public_ = true;  // [U-288] regrowth, walls falling, lava cooling: everybody's map shows it, seen or not
+        if (const Cell was = grid.at(t.x, t.y); was.wall() != Wall::None && Cell(t.raw).wall() == Wall::None &&
+            std::ranges::none_of(wall_breaks, [&](const WallBreak& b) { return b.x == t.x && b.y == t.y && b.ms == now_ms; }))
+            wall_breaks.push_back({t.x, t.y, 0, 0, std::uint8_t(was.wall()), now_ms});  // [U-341] crumbles by time
         set_cell(t.x, t.y, Cell(t.raw));
         cell_public_ = false;
         t = cell_timers.back();
@@ -290,16 +346,61 @@ void World::add_wall_cell(int cx, int cy, Wall kind) {
     if (hp > 0) walls[std::uint32_t(cy) * kGridSize + std::uint32_t(cx)] = {hp, hp};
 }
 
-void World::damage_wall(int cx, int cy, std::int32_t amount) {
+// [U-359] one cell of rock where a thrown rock landed (only on free, walkable ground); a magma rock glows a moment
+void World::drop_rock(std::int32_t x, std::int32_t y, bool magma) {
+    const int cx = x / kCellUnits, cy = y / kCellUnits;
+    if (!Grid::in_bounds(cx, cy) || protected_cell(cx, cy)) return;
+    Cell c = grid.at(cx, cy);
+    if (c.wall() != Wall::None || c.walk() != Walk::Walk || c.tree() == Tree::Alive || c.surface() == Surface::Water ||
+        c.surface() == Surface::DeepWater || c.surface() == Surface::Magma)
+        return;
+    const Circle cell{cx * kCellUnits + kCellUnits / 2, cy * kCellUnits + kCellUnits / 2, kCellUnits / 2};
+    for (const Unit& o : units)
+        if (o.alive && !o.flying() && touches(hitbox(o), cell)) return;  // never on somebody
+    remember(cell_timers, cx, cy, c.raw(), now_ms + elements::kThrownRockMs, CellTimerKind::Restore);
+    c.set_wall(Wall::Stone);
+    c.set_skill_fog(SenseBlock::Full);
+    set_cell(cx, cy, c);
+    add_wall_cell(cx, cy, Wall::Stone);
+    if (magma) glows.push_back({{x, y, 96, 80}, now_ms + 3'000});
+}
+
+bool World::natural_wall(int cx, int cy) const {
+    return std::ranges::none_of(cell_timers, [&](const CellTimer& t) { return t.x == cx && t.y == cy; });
+}
+
+void World::damage_wall(int cx, int cy, std::int32_t amount, Dir from) {
     if (!Grid::in_bounds(cx, cy) || amount <= 0) return;
     const Cell c = grid.at(cx, cy);
-    if (c.wall() == Wall::None) return;
-    auto [it, fresh] = walls.try_emplace(std::uint32_t(cy) * kGridSize + std::uint32_t(cx), WallCell{wall_max_hp(c.wall()), wall_max_hp(c.wall())});
+    if (c.wall() == Wall::None || protected_cell(cx, cy)) return;
+    const std::uint32_t key = std::uint32_t(cy) * kGridSize + std::uint32_t(cx);
+    auto it = walls.find(key);
+    const bool natural = natural_wall(cx, cy);
+    if (natural && (cx < 3 || cy < 3 || cx >= kGridSize - 3 || cy >= kGridSize - 3)) return;  // the map border never breaks
+    if (it == walls.end()) {
+        const std::int32_t hp = wall_max_hp(c.wall()) * (natural ? elements::kNaturalWallHpPct : 100) / 100;
+        it = walls.emplace(key, WallCell{hp, hp}).first;
+    }
     it->second.hp -= amount;
     if (it->second.hp > 0) return;
+    if (natural) {  // [U-360] a map rock breaks into walkable rubble and grows back later
+        remember(cell_timers, cx, cy, c.raw(), now_ms + elements::kNaturalRockRegrowMs, CellTimerKind::Restore);
+        Cell r = c;
+        r.set_wall(Wall::None);
+        r.set_walk(Walk::Walk);
+        r.set_vision_fog(SenseBlock::None);
+        r.set_skill_fog(SenseBlock::None);
+        r.set_elevation(std::min<int>(r.elevation(), 1));
+        cell_public_ = true;
+        set_cell(cx, cy, r);
+        cell_public_ = false;
+    }
     for (CellTimer& t : cell_timers)  // falls now: the timer restores the original cell next tick (public)
         if (t.x == cx && t.y == cy) t.at_ms = now_ms;
     walls.erase(it);
+    // [U-341] broken by a hit: the pieces fly the way the hit went
+    wall_breaks.push_back({std::int16_t(cx), std::int16_t(cy), std::int16_t(std::int64_t(from.x) * 1000 / kOne),
+                           std::int16_t(std::int64_t(from.y) * 1000 / kOne), std::uint8_t(c.wall()), now_ms});
 }
 
 void World::hit_wall(Effect& e, const Unit* owner, int cx, int cy) {
@@ -313,7 +414,7 @@ void World::hit_wall(Effect& e, const Unit* owner, int cx, int cy) {
         const std::int32_t kind_bonus = w == Wall::Stone ? s.wall_damage_stone : w == Wall::Ice ? s.wall_damage_ice : s.wall_damage_metal;
         pct = pct * (10'000 + s.wall_damage + kind_bonus) / 10'000;
     }
-    damage_wall(cx, cy, std::int32_t(std::max<std::int64_t>(1, e.damage) * pct / 100));
+    damage_wall(cx, cy, std::int32_t(std::max<std::int64_t>(1, e.damage) * pct / 100), e.dir);
 }
 
 int World::draw_from_wall(const Unit& u, SubElement sub) {
@@ -385,6 +486,44 @@ int World::big_water_near(const Unit& u, std::size_t* patch) const {
 void World::use_water_source(const Unit& u) {
     std::size_t i = 0;
     if (big_water_near(u, &i) == 2) clouds[i].until_ms = now_ms;
+}
+
+// [U-339][U-340] what kind of water is at this point (game units)
+World::WaterSource World::water_source_at(std::int32_t x, std::int32_t y, std::size_t* patch) const {
+    if (x < 0 || y < 0) return WaterSource::None;
+    const int cx = x / kCellUnits, cy = y / kCellUnits;
+    if (Grid::in_bounds(cx, cy)) {
+        const Cell c = grid.at(cx, cy);
+        if (c.wall() == Wall::Ice) return WaterSource::IceWall;
+        const Surface s = c.surface();
+        if (s == Surface::Water || s == Surface::DeepWater || s == Surface::Glacier) return WaterSource::Lasting;
+    }
+    for (std::size_t i = 0; i < clouds.size(); ++i) {
+        const Cloud& p = clouds[i];
+        if ((p.kind == CloudKind::Puddle || p.kind == CloudKind::IcePatch) && dist2(p.x, p.y, x, y) <= std::int64_t(p.radius) * p.radius) {
+            if (patch) *patch = i;
+            return WaterSource::Patch;
+        }
+    }
+    return WaterSource::None;
+}
+
+bool World::water_sourced(const Unit& u, const SkillDef& d, std::int32_t sx, std::int32_t sy) const {
+    if (sx >= 0 && water_source_at(sx, sy) != WaterSource::None) {
+        const std::int64_t reach = std::max<std::int32_t>(d.range, 300) + elements::kSourceReachCells * kCellUnits;
+        if (dist2(sx, sy, u.ux(), u.uy()) <= reach * reach) return true;
+    }
+    return big_water_near(u) != 0;  // standing next to water: bent from there
+}
+
+void World::take_from_source(const Unit& u, std::int32_t sx, std::int32_t sy) {
+    (void)u;
+    std::size_t i = 0;
+    switch (water_source_at(sx, sy, &i)) {
+        case WaterSource::Patch: clouds[i].until_ms = now_ms; break;  // used up
+        case WaterSource::IceWall: damage_wall(sx / kCellUnits, sy / kCellUnits, elements::kIceWallMeltPerUse); break;  // melts a bit
+        default: break;  // rivers / seas / glaciers never run out
+    }
 }
 
 int World::draw_from_water_source(const Unit& u, SubElement& sub) {

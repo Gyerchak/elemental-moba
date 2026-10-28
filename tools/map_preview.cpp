@@ -26,6 +26,8 @@ Rgb surface_colour(em::Surface s) {
         case Magma: return {230, 80, 20};
         case Metal: return {170, 175, 185};
         case Platinum: return {225, 228, 235};
+        case StoneRoad: return {160, 152, 140};
+        case ForestPath: return {128, 112, 76};
         case Count: break;
     }
     return {255, 0, 255};

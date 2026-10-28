@@ -75,18 +75,22 @@ std::vector<ModView> env_modifiers(Element e, const SkyState& s) {
     };
     const SkyBoost b = sky_boost(e, s);
     const int sight = vision_range_pct(s);
-    // day / night: sight for everybody, +5 % power for fire by day and water by night [X-53]
+    // day / night: sight for everybody, +5 % power for fire by day [X-53]; water follows the moon [U-370]
     if (s.is_day && !s.solar_eclipse)
         add("DAY", "Day", e == Element::Fire ? std::format("{} {}, {} {}", tr("fire power"), pct(5), tr("fuel regen"), pct(fuel_regen_pct(s) - 100))
                                              : std::format("{} {} %", tr("sight"), sight), {255, 220, 120}, false, e != Element::Fire);
     if (!s.is_day)
-        add("NGT", "Night", e == Element::Water ? std::format("{} {}, {} {} %", tr("water power"), pct(5), tr("sight"), sight)
-                                                : std::format("{} {} %", tr("sight"), sight), {120, 130, 200}, sight < 100, e != Element::Water);
+        add("NGT", "Night", std::format("{} {} %", tr("sight"), sight), {120, 130, 200}, sight < 100, true);
+    // [U-370] the moon, all month long: water power +0.5 % per 1 % of moon phase (0 % new … 100 % full)
+    add("MOO", "Moon", e == Element::Water ? std::format("{} {} %, {} +{:.1f} %", tr("moon phase"), s.moon_light_pct, tr("water power"),
+                                                         moon_power_pm(s.moon_light_pct) / 10.0)
+                                           : std::format("{} {} %", tr("moon phase"), s.moon_light_pct),
+        {200, 210, 240}, false, e != Element::Water);
     if (s.full_moon)
-        add("MON", "Full moon", e == Element::Water ? std::format("{} {}, {} {}, XP {}, {}", tr("water power"), pct(50), tr("skill size"), pct(25), pct(25), tr("bloodbending allowed"))
-                                                    : tr("waterbenders +50 % power"), {235, 240, 255}, false, e != Element::Water);
-    if (s.new_moon)
-        add("NEW", "New moon", e == Element::Water ? std::format("{} {}", tr("water power"), pct(-10)) : tr("darkest nights"), {70, 70, 110}, e == Element::Water, e != Element::Water);
+        add("MON", "Full moon", e == Element::Water ? std::format("{} {}, {} {}, {} −10 %, XP {}, {}", tr("ranges / sizes (also water autoattacks)"), pct(kFullMoonSizePct),
+                                                              tr("radius / length"), pct(kFullMoonSizePct), tr("cooldowns"), pct(25), tr("bloodbending allowed"))
+                                                    : tr("waterbenders: +50 % power, +25 % ranges, −10 % cooldowns"), {235, 240, 255}, false, e != Element::Water);
+    if (s.new_moon) add("NEW", "New moon", e == Element::Water ? std::format("{} +0 %", tr("water power")) : tr("darkest nights"), {70, 70, 110}, false, true);
     if (s.solar_eclipse) {
         const bool fire = e == Element::Fire;
         add("ECL", "Solar eclipse", fire ? std::format("{} {} %{}", tr("fire power"), b.power_pct, b.muted ? std::string(" — ") + tr("FIRE MUTED") : "")

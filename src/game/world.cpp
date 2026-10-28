@@ -2,6 +2,8 @@
 #include <chrono>
 #include "core/surface_rules.hpp"
 #include "game/world.hpp"
+#include "game/mobs/monsters.hpp"
+#include "game/mechanics/element_rules.hpp"
 
 #include <algorithm>
 #include <format>
@@ -70,6 +72,20 @@ void World::refuse(Unit& u, std::string why) {
 
 void World::add_feed(std::string text) {
     feed.push_back({now_ms, std::move(text)});
+}
+
+UnitCategory Unit::category() const {  // [U-311]
+    switch (kind) {
+        case UnitKind::Champion: return UnitCategory::Champion;
+        case UnitKind::Minion: return mtype == MinionType::Siege ? UnitCategory::SiegeMinion : mtype == MinionType::Super ? UnitCategory::SuperMinion
+                                                                                                                       : UnitCategory::Minion;
+        case UnitKind::Monster: return UnitCategory::Monster;
+        case UnitKind::Boss: return UnitCategory::EpicMonster;
+        case UnitKind::Turret: return UnitCategory::Turret;
+        case UnitKind::Inhibitor: return UnitCategory::Inhibitor;
+        case UnitKind::Nexus: return UnitCategory::Shrine;
+    }
+    return UnitCategory::Monster;
 }
 
 std::uint8_t World::mob_name_id(const Unit& u) {
@@ -183,12 +199,15 @@ ResolvedAbility World::resolved(const Unit& u, Slot s) const {
         b.power_pct += 50;
         b.size_pct += 25, b.width_pct += 25, b.radius_pct += 25;
     }
+    if (u.team != Team::Neutral) b.power_pct += lion_stacks[std::size_t(u.team) & 1] * kLionTurtlePctPerStack;  // [U-364]
+    if (u.jbuff == std::uint8_t(JungleBuff::TuiBlessing) && u.jbuff_until > now_ms) b.cd_pct = b.cd_pct * kTuiCdPct / 100;  // [U-366]
     const int extra = has_passive(u, PassiveId::MistForm) ? 10 : 0;
     const std::uint32_t rank = std::max<std::uint32_t>(1, u.ab[std::size_t(s)].rank);
     return resolve(to_ability(*d, s), ScaleCtx{.stats = u.stats, .rank = rank, .level = std::uint32_t(u.level),
                                                .power_pct = b.power_pct, .size_pct = b.size_pct + extra,
                                                .width_pct = b.width_pct + extra, .radius_pct = b.radius_pct + extra,
-                                               .speed_pct = b.speed_pct + extra, .dur_pct = b.dur_pct, .dot_pct = b.dot_pct});
+                                               .speed_pct = b.speed_pct + extra, .dur_pct = b.dur_pct, .dot_pct = b.dot_pct,
+                                               .power_pm = b.moon_pm, .cd_pct = b.cd_pct});
 }
 
 // ---------------------------------------------------------------- water + elevation [U-188..U-191]
@@ -280,7 +299,7 @@ std::int32_t World::attack_period_ms(const Unit& u) const {
     return std::int32_t(std::max<std::int64_t>(200, 100'000 / std::min<std::int64_t>(per_s100, 500)));
 }
 
-bool World::can_cast_now(const Unit& u, Slot s, std::string* why) const {
+bool World::can_cast_now(const Unit& u, Slot s, std::string* why, std::int32_t sx, std::int32_t sy) const {
     auto no = [&](const char* w) {
         if (why) *why = w;
         return false;
@@ -305,14 +324,17 @@ bool World::can_cast_now(const Unit& u, Slot s, std::string* why) const {
         const int cx = u.ux() / kCellUnits, cy = u.uy() / kCellUnits;
         if (Grid::in_bounds(cx, cy) && !can_bend_on(d->sub, grid.at(cx, cy).surface())) return no("no earth to bend here");
     }
-    // [U-294] waterbenders carry little water: an ice wall needs a big water source nearby
-    if (d->kind == SkillKind::Wall && d->sub == SubElement::Ice && big_water_near(u) == 0)
-        return no("ice wall: needs a big water source nearby (river, sea, pole ice, a puddle)");
+    // [U-294][U-339] water as numbers: a skill bent from a source costs no carried water
+    const bool water_free = water_skill(*d) && water_sourced(u, *d, sx, sy);
+    if (water_skill(*d) && u.water_max > 0 && !water_free && u.water < elements::kAvatarWaterCost)
+        return no("not enough water: bend it from a source (river, sea, pole ice, a puddle, an ice wall)");
     if (u.st.has(StatusKind::Swimming) && d->kind != SkillKind::WaterSpout && d->kind != SkillKind::IcePath)
         return no("swimming: no spells (only water mobility skills)");  // [U-188]
     const bool recast = d->casts > 1 && a.mc.casts_used > 0 && a.mc.casts_used < d->casts && now_ms <= a.mc.window_end_ms;
     if (!recast && a.cd_end_ms > now_ms && !u.no_cooldowns) return no("cooldown");
-    const std::int64_t cost = resolved(u, s).cost * 100;
+    const std::int64_t cost = water_free && u.stats.resource == ResourceKind::Water ? 0 : resolved(u, s).cost * 100;
+    if (u.stats.resource == ResourceKind::Water && cost > u.res_max)
+        return no("costs more water than you carry: bend it from a source (river, sea, pole ice, a puddle, an ice wall)");
     const bool free_fuel = u.stats.resource == ResourceKind::Fuel && unlimited_fuel(sky);  // [U-138]
     // [U-268] calm flame: what the fuel lacks is paid with life (HP ×2, never the last 1 HP); rage never blocks
     const std::int64_t life = u.stats.resource == ResourceKind::Fuel ? std::max<std::int64_t>(0, u.hp - 100) / kLifePerFuel : 0;
@@ -338,28 +360,31 @@ void World::recompute_stats(Unit& u) {
     s.range = d.range;
     s.resource = d.resource;
     u.collide = kCollDefault;
-    if (&d == &champions()[2] || &d == &champions()[3]) u.collide |= kCollUnit;  // [X-96] Stone Warden, Iron Sentinel body-block
+    // [U-367] every champion body-blocks; the Mist Dancer's mist form walks through units (Claude idea)
     for (std::int16_t it : u.items)
         if (it >= 0) {
             add_item(s, kItems[std::size_t(it)]);
-            if (kItems[std::size_t(it)].unit_collision) u.collide |= kCollUnit;
+            if (kItems[std::size_t(it)].ghost) u.collide &= std::uint8_t(~kCollUnit);  // [U-367]
         }
+    if (has_passive(u, PassiveId::MistForm)) u.collide &= std::uint8_t(~kCollUnit);
     if (has_passive(u, PassiveId::Rooted)) s.tenacity += 2'000;
     if (has_passive(u, PassiveId::MetalSkin)) s.defence.bonus += 1'500;
     if (has_passive(u, PassiveId::LightFeet)) s.move_speed.bonus += 1'500;
     apply_loadout(s, u.loadout);                                   // [U-177] runes + specialisation
     if (u.lotus_until > now_ms) s.cast_speed += kLotusCastSpeed;  // [X-46][U-114]
     if (u.tmp_size_until > now_ms) s.model_size += u.tmp_size;     // [U-129]
-    u.attack_range = d.attack_range;
+    u.attack_range = d.attack_range * sky_boost(d.element, sky).auto_range_pct / 100;  // [U-370] water autos at full moon
     if (d.stance && u.stance_b) {  // [U-72] knives stance: ranged, weaker hits
         s.range = Range::Ranged;
         s.attack.base = s.attack.base * 80 / 100;
-        u.attack_range = 420;
+        u.attack_range = 420 * sky_boost(d.element, sky).auto_range_pct / 100;
     }
     u.as100 = d.as;
     u.stats = s;
     u.res_max = d.res_max;
     u.res_regen = d.res_regen;
+    u.water_max = d.avatar && d.resource != ResourceKind::Water ? elements::kAvatarWaterMax : 0;  // [U-339]
+    u.water = std::min(u.water, u.water_max);
     const std::int32_t new_max = s.health.total();
     if (old_max > 0) u.hp = std::max(1, u.hp + (new_max - old_max));
     u.hp = std::min(u.hp, new_max);
@@ -480,7 +505,7 @@ void World::command(std::uint32_t id, const Cmd& c) {
         case CmdKind::Cast: {
             const Slot s = Slot(std::min<int>(c.slot, int(Slot::Count) - 1));
             std::string why;
-            if (!can_cast_now(u, s, &why)) {
+            if (!can_cast_now(u, s, &why, c.sx, c.sy)) {
                 const SkillDef* d0 = u.skill[std::size_t(s)];
                 refuse(u, std::format("{}: {}", d0 ? std::string(d0->name) : std::string("skill"), why));
                 break;
@@ -499,7 +524,7 @@ void World::command(std::uint32_t id, const Cmd& c) {
                 refuse(u, "already casting");
                 break;
             }
-            start_cast(u, {OrderKind::Cast, c.target, c.x, c.y, std::uint8_t(s)});
+            start_cast(u, {OrderKind::Cast, c.target, c.x, c.y, std::uint8_t(s), c.sx, c.sy});
             break;
         }
         case CmdKind::Stop:  // [U-265] S stops moving / attacking; the cast or channel goes on
@@ -534,7 +559,7 @@ void World::command(std::uint32_t id, const Cmd& c) {
         case CmdKind::UseItem: use_item(u, c.slot, c.x, c.y); break;
         case CmdKind::Portal: {  // [X-54][U-350] channel 8 s (= recall) at a pole portal → the other one
             refuse(u, "portal: stand in the beam of light at a pole (glacier corner)");
-            for (const auto& p : {kNorthPoleCell, mirror(kNorthPoleCell)}) {
+            for (const auto& p : {kPortalCell, mirror(kPortalCell)}) {
                 if (dist2(u.ux(), u.uy(), p.first * kCellUnits, p.second * kCellUnits) <= 260LL * 260) {
                     u.order = {OrderKind::Portal};
                     u.path.clear();
@@ -543,7 +568,7 @@ void World::command(std::uint32_t id, const Cmd& c) {
                     u.st.add(StatusKind::Channel, u.channel_end_ms, 0, u.id);
                     u.fail_ms = -1;
                     // the far portal shows that someone is coming (everybody sees it)
-                    const auto& far = p == kNorthPoleCell ? mirror(kNorthPoleCell) : kNorthPoleCell;
+                    const auto& far = p == kPortalCell ? mirror(kPortalCell) : kPortalCell;
                     std::erase_if(clouds, [&](const Cloud& c) { return c.kind == CloudKind::Arrival && c.owner == u.id; });
                     clouds.push_back({far.first * kCellUnits, far.second * kCellUnits, 90, u.channel_end_ms, CloudKind::Arrival, u.id});
                 }
@@ -575,7 +600,11 @@ void World::step() {
     ++tick;
     now_ms = std::int64_t(tick * 1'000 / cfg.tick_hz);
     path_budget_ = kPathCellsPerTick;  // [U-287]
+    const bool was_full = sky.full_moon;
     sky = WorldClock::at_ms(cfg.start_ms + now_ms);
+    if (sky.full_moon != was_full)  // [U-370] the full moon starts / ends: autoattack ranges change
+        for (Unit& u : units)
+            if (u.kind == UnitKind::Champion) recompute_stats(u);
     earth_events.clear();
     earth_event_team.clear();
 
@@ -620,6 +649,7 @@ void World::step() {
     }
     std::erase_if(waves, [&](const WaveOut& w) { return now_ms - w.ms > 2'000; });
     std::erase_if(hits, [&](const HitEvent& h) { return now_ms - h.ms > 1'000; });
+    std::erase_if(wall_breaks, [&](const WallBreak& b) { return now_ms - b.ms > 1'000; });
     std::erase_if(pings, [&](const PingEvent& p) { return now_ms - p.ms > 5'000; });
     for (Unit& u : units)  // [U-246] moving or casting ends an emote
         if (u.emote != 255 && (now_ms > u.emote_until || u.moving || u.casting)) u.emote = 255;

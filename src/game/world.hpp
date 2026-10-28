@@ -54,6 +54,7 @@ struct Cmd {
     std::int16_t item = -1;      // Buy
     std::uint32_t target = 0;    // unit id
     std::int32_t x = 0, y = 0;   // game units
+    std::int32_t sx = -1, sy = -1;  // [U-340] the chosen source (water / rock) for skills that start from one; −1 = none
 };
 
 enum class OrderKind : std::uint8_t { None, Move, Attack, AttackMove, Cast, Portal, Recall };
@@ -62,6 +63,7 @@ struct Order {
     std::uint32_t target = 0;
     std::int32_t x = 0, y = 0;  // game units
     std::uint8_t slot = 0;
+    std::int32_t sx = -1, sy = -1;  // [U-340] chosen source
 };
 
 struct AbilityRt {
@@ -77,9 +79,10 @@ enum CollideBits : std::uint8_t {
     kCollTree = 2,       // living trees
     kCollWall = 4,       // map walls + temporary bent walls (stone / ice) [U-24]
     kCollStructure = 8,  // turrets, inhibitors, Nation Shrines: fixed walls, not bendable [X-95]
-    kCollUnit = 16,      // unit vs unit: off by default, on for some champions / monsters / items [X-96]
+    kCollUnit = 16,      // unit vs unit [X-96]; [U-367] ON for everybody: two units collide when BOTH have it.
+                         // Spirits, items / effects that let you pass through units clear it.
 };
-inline constexpr std::uint8_t kCollDefault = kCollTerrain | kCollTree | kCollWall | kCollStructure;
+inline constexpr std::uint8_t kCollDefault = kCollTerrain | kCollTree | kCollWall | kCollStructure | kCollUnit;
 
 struct BotMem {
     std::uint8_t lane = 1;
@@ -96,8 +99,14 @@ struct DmgTag {
     std::int16_t item = -1;    // Item: item id
 };
 // one hit a champion took — kept for the last 30 s for the death recap [U-262]
+// [U-311] what a unit is — skill rules (which units a skill hits / what stops it) and other rules use this
+enum class UnitCategory : std::uint8_t { Champion, Minion, SiegeMinion, SuperMinion, Monster, EpicMonster, Turret, Inhibitor, Shrine, Count };
+[[nodiscard]] constexpr std::uint16_t cat_bit(UnitCategory c) { return std::uint16_t(1u << int(c)); }
+inline constexpr std::uint16_t kAllCategories = 0x1ff;
+inline constexpr std::uint16_t kMinionCategories = cat_bit(UnitCategory::Minion) | cat_bit(UnitCategory::SiegeMinion) | cat_bit(UnitCategory::SuperMinion);
+
 // [U-302] named monsters (the order = the network name id; net::kMobNames is the same list)
-inline constexpr const char* kMobNameList[] = {"", "Spirit Wolf", "Wandering Spirit", "Cursed Spirit", "Angry Beast", "Bandit", "Face Stealer"};
+inline constexpr const char* kMobNameList[] = {"", "Spirit Wolf", "Wandering Spirit", "Cursed Spirit", "Angry Beast", "Bandit", "Face Stealer", "Bandit Archer", "Platypus Bear", "Moon Koi", "Lion Turtle", "Sun Dragons"};
 struct TakenHit {
     std::int64_t ms = 0;
     std::uint32_t src = 0;
@@ -223,8 +232,14 @@ struct Unit {
     bool cycle_ready = false;          //         all four used → the next skill +40 %
     bool cycle_boost = false;          //         the skill being cast now gets it
     bool source_ice = false;           // [U-293] waterbender: water taken from sources becomes ice (else water)
+    std::int32_t water = 0, water_max = 0;  // [U-339] carried water of champions whose resource is NOT water (the Avatar)
     std::int64_t magic_until = 0;      // [U-264] non-bender magic stance
     std::uint8_t awakened = 255;       // [U-296] a non-bender's awakened Element (255 = not awakened)
+    std::uint8_t jbuff = 0;            // [U-366] JungleBuff the champion carries …
+    std::int64_t jbuff_until = 0;      // … until then
+    std::int8_t mob = -1;              // [U-308] index in kMonsters (game/mobs/monsters.hpp), −1 = not a monster
+    std::uint32_t turret_last = 0;     // [U-309] turrets: the champion of the last shot …
+    std::int32_t turret_streak = 0;    //         … and how many shots in a row
     std::int64_t dried_ms = -1;        // [U-344] the moment a fire hit dried me (no burn from that hit)
     std::int64_t stat_dmg_from_champs = 0;  // [U-296] damage taken from champions (decides the random element)
     std::uint8_t magic_sub = 0;        //         its SubElement
@@ -236,6 +251,7 @@ struct Unit {
 
     [[nodiscard]] std::int32_t ux() const { return x / kSub; }
     [[nodiscard]] std::int32_t uy() const { return y / kSub; }
+    [[nodiscard]] UnitCategory category() const;  // [U-311]
     [[nodiscard]] bool is_structure() const {
         return kind == UnitKind::Turret || kind == UnitKind::Inhibitor || kind == UnitKind::Nexus;
     }
@@ -305,6 +321,12 @@ struct CellChange {
 struct WallCell {  // [U-288] a player-made wall cell
     std::int32_t hp = 0, max = 0;
 };
+struct WallBreak {  // [U-341] a wall piece fell: broken by a hit (pushed in dx / dy) or crumbled by time (0 / 0)
+    std::int16_t x = 0, y = 0;
+    std::int16_t dx = 0, dy = 0;  // direction × 1000
+    std::uint8_t kind = 0;        // Wall
+    std::int64_t ms = 0;
+};
 struct DeathRecap {
     std::uint32_t victim = 0, killer = 0;
     std::int64_t ms = 0;
@@ -323,6 +345,7 @@ struct Announce {
     std::uint32_t a = 0, b = 0;  // killer / victim (or the structure)
     Team team = Team::Neutral;    // the team that scored
     std::int64_t ms = 0;
+    std::uint8_t a_kind = 255, a_extra = 0;  // [U-363] what the killer was (shown even when it is not on screen)
 };
 // [X-103] every damage instance, for floating numbers / swing marks on the client
 struct HitEvent {
@@ -385,6 +408,7 @@ struct CellTimer {
     std::uint32_t raw = 0;
     std::int64_t at_ms = 0;
     CellTimerKind kind = CellTimerKind::Restore;
+    bool iced = false;  // [U-356] lava: already cooled by ice once (rest time halved)
 };
 
 // Prepares the default map for a match (camps cleared, spirit island) — same on server and client.
@@ -415,7 +439,7 @@ public:
     [[nodiscard]] bool in_base(const Unit& u) const;
     [[nodiscard]] std::pair<std::int32_t, std::int32_t> fountain(Team t) const;  // units
     [[nodiscard]] std::int32_t attack_period_ms(const Unit& u) const;
-    [[nodiscard]] bool can_cast_now(const Unit& u, Slot s, std::string* why = nullptr) const;
+    [[nodiscard]] bool can_cast_now(const Unit& u, Slot s, std::string* why = nullptr, std::int32_t sx = -1, std::int32_t sy = -1) const;
     [[nodiscard]] PassiveId special_passive(const Unit& u) const;  // seismic / heat sense from F/G
     [[nodiscard]] bool has_passive(const Unit& u, PassiveId p) const;
     // ---- water and elevation [U-188..U-191]
@@ -432,6 +456,13 @@ public:
     // returns 0 none, 1 a lasting source (river / sea / pole / ice wall), 2 a puddle / ice patch (index in *patch)
     [[nodiscard]] int big_water_near(const Unit& u, std::size_t* patch = nullptr) const;
     void use_water_source(const Unit& u);  // a puddle / ice patch used for an ice wall is gone
+    // [U-339][U-340] water as numbers
+    enum class WaterSource : std::uint8_t { None, Lasting, Patch, IceWall };  // river / sea / glacier, puddle / ice patch, ice wall
+    [[nodiscard]] WaterSource water_source_at(std::int32_t x, std::int32_t y, std::size_t* patch = nullptr) const;
+    // a water skill has its water: a chosen source in reach, or one near the caster (then it costs no carried water)
+    [[nodiscard]] bool water_sourced(const Unit& u, const SkillDef& d, std::int32_t sx, std::int32_t sy) const;
+    void take_from_source(const Unit& u, std::int32_t sx, std::int32_t sy);  // a puddle is used up, an ice wall melts a bit
+    [[nodiscard]] static bool water_skill(const SkillDef& d) { return base_element(d.sub) == Element::Water; }
     [[nodiscard]] bool elevated(const Unit& u) const;       // flying or riding water → melee / ground can't hit
     [[nodiscard]] bool can_hit_elevated(const Effect& e) const;
     // [U-216] heights (game units): terrain level × 40 + airborne 60 / water ride 80 / flying 120
@@ -492,6 +523,12 @@ public:
     std::uint32_t next_id = 1;
     std::unordered_map<std::uint32_t, std::size_t> index;
     std::vector<CellTimer> cell_timers;
+    std::int64_t lava_melt_next_ = 0;  // [U-356]
+    std::array<std::int32_t, 2> lion_stacks{};  // [U-364] Lion Turtle stacks per team (permanent)
+    void apply_monster_growth(Unit& m);         // [U-365] stats for its respawn count
+    [[nodiscard]] bool natural_wall(int cx, int cy) const;  // [U-360] a map rock (no timer brings it down)
+    void lava_melts_walls();
+    void drop_rock(std::int32_t x, std::int32_t y, bool magma);  // [U-359] a thrown rock stays where it lands
     // [X-94] collision helpers
     std::vector<std::uint8_t> struct_block;  // cells under alive structures (never bendable) [X-95]
     std::vector<std::uint8_t> clearance;     // cells to the nearest blocker (Chebyshev, max 7) for A*
@@ -529,6 +566,7 @@ public:
     // after defence: shields, HP, statistics, hit events, death [U-254] (burns come in here directly)
     void apply_hit(Unit* src, Unit& dst, std::int32_t hund, SubElement sub, bool physical, bool is_auto);
     void announce(AnnounceKind k, std::uint32_t a, std::uint32_t b, Team t);
+    Unit make_monster(std::string_view name, std::int32_t x_sub, std::int32_t y_sub);  // [U-308]
     // [U-302] index of a monster's name in kMobNameList (0 = not a named monster)
     [[nodiscard]] static std::uint8_t mob_name_id(const Unit& u);
     // [U-264] the element a skill really has now (a non-bender in a magic stance turns physical into magic)
@@ -539,7 +577,9 @@ public:
     void heal(Unit& u, std::int32_t hundredths);
     void apply_cc(const Stats& src_stats, std::uint32_t src_id, Unit& dst, StatusKind k, std::int32_t ms,
                   std::int32_t value, SubElement sub = SubElement::Physical);
-    void knock(Unit& dst, std::int32_t from_x, std::int32_t from_y, std::int32_t dist_units);
+    void knock(Unit& dst, std::int32_t from_x, std::int32_t from_y, std::int32_t dist_units, std::uint32_t src_id = 0);
+    static constexpr std::int32_t kKnockSpeed = 1'200;  // [U-368] units / s: a displacement holds the unit dist / speed
+    static constexpr std::uint8_t kCcDisplaced = 254;   // [U-368] TakenHit::cc marker for a displacement
     void interrupt(Unit& u, std::uint32_t event);  // [U-337] break the cast / channel if its rules say so
     void update_attack(Unit& u);
     void fire_auto(Unit& u, Unit& target);
@@ -557,7 +597,8 @@ public:
     std::unordered_map<std::uint32_t, WallCell> walls;  // key = y × kGridSize + x
     bool cell_public_ = false;                           // set_cell: the change is public (by time / destruction)
     void add_wall_cell(int cx, int cy, Wall kind);
-    void damage_wall(int cx, int cy, std::int32_t amount);  // ≤ 0 HP → the cell falls (public)
+    void damage_wall(int cx, int cy, std::int32_t amount, Dir from = {});  // ≤ 0 HP → the cell falls (public)
+    std::vector<WallBreak> wall_breaks;  // [U-341] the last second of falling wall pieces (for the animation)
     // hit on a wall cell by an effect: damage by element + the owner's wall stats
     void hit_wall(Effect& e, const Unit* owner, int cx, int cy);
     // casting next to a wall that feeds this skill: +15 % damage, the wall loses HP. Returns the bonus %.

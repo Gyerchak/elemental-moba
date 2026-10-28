@@ -49,7 +49,7 @@ constexpr SpecialRow kSpecialRows[] = {
     {Element::Water, {.name = "Ice Path", .kind = K::IcePath, .sub = S::Ice, .radius = 160, .cast_ms = 0, .cd_ms = 20'000,
                       .dur_ms = 6'000, .desc = "Freeze the water around you into walkable ice for 6 s [U-188]"}},
     {Element::Water, {.name = "Iceberg", .kind = K::Wall, .sub = S::Ice, .range = 700, .radius = 150, .cast_ms = 400,
-                      .cd_ms = 35'000, .dur_ms = 15'000, .desc = "Raise an iceberg ring from the water for 15 s — bends the map; needs a big water source nearby [U-225][U-294]",
+                      .cd_ms = 35'000, .cost = 320, .dur_ms = 15'000, .desc = "Raise an iceberg ring from the water for 15 s — bends the map; costs 320 water: needs a source [U-225][U-294][U-339]",
                       .env_bend = true}},
     {Element::Water, {.name = "Snow Squall", .kind = K::Cone, .sub = S::Ice, .dmg = 40, .dmg_rank = 15, .ep = 25, .range = 500,
                       .width = 340, .cast_ms = 250, .cd_ms = 14'000, .cost = 40, .cc = C::Blind, .cc_ms = 1'000, .cc_val = 30,

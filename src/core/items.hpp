@@ -32,7 +32,8 @@ struct ItemDef {
     ItemActive active = ItemActive::None;
     std::int32_t active_cd_ms = 0;
     bool unique = false;
-    bool unit_collision = false;  // [X-96] the wearer body-blocks other units
+    bool unit_collision = false;  // [X-96] (old: everybody body-blocks now [U-367])
+    bool ghost = false;           // [U-367] the wearer walks through units (and units through it)
     std::int32_t slow_resist = 0, slow_resist_ice = 0;  // [U-218]
     std::int32_t move_speed_pct = 0;                    // [U-219] % move speed
     bool attack_while_moving = false;                   // [U-217] mechanic ready, no item uses it yet

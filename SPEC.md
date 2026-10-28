@@ -525,5 +525,31 @@ Additions outside the plan live in `ENGINE-EXTRAS.md`, never here.
 - [U-352] **Elevation rework**: some walls are **round raised rocks** (small / medium / big) = a temporary raised ground level. 1 level up can be walked off; 2 levels only with mobility skills that go over the ground (flight, jet propulsion, water lift carrying self or an ally). **Dents** (−1 / −2) work the same in reverse, drawn differently, and other earthbenders cannot use them like raised rocks. **Thrown rocks collide** with each other (like the fire clash, adjusted: a bigger stone partly passes and deals partial damage with a partial hitbox).
 - [U-353] Problems with own champions; search for bugs and fix everything; publish the next patch on GitHub.
 
+## 30. Round 8 (2026-10-28)
+
+- [U-354] The range view (` and Ctrl+`) also shows the **XP range** (where you get experience from dying enemies).
+- [U-355] **Portals** stand at the **farthest** NW / SE edges of the map (within ~300 units of the real corner), not just near the edge.
+- [U-356] **Lava on the ground** makes far fewer stones. It slowly **melts stone walls** and melts **ice walls** faster; ice cools the lava — while melting ice the lava's remaining time is halved.
+- [U-357] **Pathing**: bots still get stuck on walls. The path must keep the unit's real hitbox clear (irregular / unique shapes and sizes, the body moves while walking) on long paths; the player can still go to an exact spot.
+- [U-358] Odd **unwalkable spots around the bases**: explain them or remove them. Only skills or real elevated terrain may raise ground, and it must be visible.
+- [U-359] **Walls**: much easier to destroy with abilities; varied shapes (thick, long, small, most a single rock). A thrown rock leaves a small rock where it lands (a magma rock leaves a magma rock).
+- [U-360] **Natural rocks** are stronger than bent ones, but much softer than now.
+- [U-361] Waterbenders' **Ice Path** works on **deep and shallow** water.
+- [U-362] **Lava throw** passes through walls — it must not.
+- [U-363] **Death by a jungle mob** shows "unknown" — track it properly.
+- [U-364] **Epic monsters** (Avatar-universe themed) with effects: one with a stackable effect, one giving gold; respawn timers on Tab and on the map. Big monsters show their HP bar over them; epic monsters show the number on the bar.
+- [U-365] **Jungle tuning**: stat growth per respawn, XP, gold, HP etc. adjustable per mob for easy balance; more jungle mobs; camp respawn timers visible on the minimap.
+- [U-366] **Jungle buffs**, **jungle items**, **support items** (like LoL).
+- [U-367] **Collision for everything**: allies, enemy minions, minions with each other, players, monsters — no one passes through anyone, unless an item / effect allows it. **Spirits** pass by default.
+- [U-368] **Displacement time** counts as CC (for the recap, tenacity-like rules, stats).
+- [U-369] **Recall and portal channel: 6 s**.
+- [U-370] **Moon phase** tracked all the time (0 % new moon → 100 % full moon → back down). Waterbenders gain from the **moon**, not the night: **+0.5 % damage per 1 % moon phase** (exact formula in code). At **full moon**: +25 % to all ranges (also water-based autoattacks) and radius / length, and **−10 % cooldowns** (flat cooldown reduction, not haste — add the stat type if missing). Fix the inaccurate tooltip.
+- [U-371] **Post-game screen**: local chat (team / all, default all); **graphs** to pick from (gold, XP, leads, damage dealt over time, healing, highest hit, highest autoattack, damage / min, gold / min, CS / min, damage taken (+ / min), damage to minions, damage to monsters).
+- [U-372] **Ping wheel** with icons and sounds; **emote wheel**; official emotes, own emotes (like own skins / champions, server decides if others may bring theirs), emote skins, own sounds per emote.
+- [U-373] **Everything visual / audio is configurable in resource packs**: every graphic, animation, sound, picture, ping, SFX, music, model, loading screen, champions on the loading screen, the menu — anything.
+- [U-374] **Server content download**: a server with another game version or its own resource packs offers them for download (forced → agree or leave); server-side options. Optional **server password** (separate from login); the client may remember it.
+- [U-375] **Named versions + version ID**: users name versions (no name → server name + creation date); every version gets an ID computed from its files (a hash, like Europa Universalis 4 checksums) so clients can see if versions match.
+- [U-376] Update everything on GitHub; continue the plan.
+
 ---
 *Hubert continues editing the plan later — new ideas get the next free `[U-xx]` number.*
