@@ -294,8 +294,10 @@ void GameView::cast_at_cursor(NetClient& net, int slot) {
 }
 
 // [U-340] is there water to bend at this point? (river / sea / glacier, an ice wall, a puddle / ice patch)
-bool GameView::source_at(const NetClient& net, float wx, float wy) const {
+bool GameView::source_at(const NetClient& net, float wx, float wy, const SkillDef* d) const {
     const int cx = int(wx) / kCellUnits, cy = int(wy) / kCellUnits;
+    if (d && d->sub == SubElement::Earth)  // [U-378] earth: a rock (any stone wall)
+        return wx >= 0 && wy >= 0 && Grid::in_bounds(cx, cy) && net.seen.at(cx, cy).wall() == Wall::Stone;
     if (wx >= 0 && wy >= 0 && Grid::in_bounds(cx, cy)) {
         const Cell c = net.seen.at(cx, cy);
         const Surface s = c.surface();
@@ -333,7 +335,7 @@ void GameView::cast_key(NetClient& net, int slot) {
     const bool self = d->kind == SkillKind::Shield || d->kind == SkillKind::Haste || d->kind == SkillKind::Flight ||
                       d->kind == SkillKind::SelfFreeze || d->kind == SkillKind::WindSense ||
                       (d->kind == SkillKind::Burst && d->range == 0) || (d->kind == SkillKind::Heal && d->range == 0);
-    if (source_first(*d) && set_.quick(slot) && ui_ && source_at(net, view_.wx(ui_->mx), view_.wy(ui_->my))) {
+    if (source_first(*d) && set_.quick(slot) && ui_ && source_at(net, view_.wx(ui_->mx), view_.wy(ui_->my), d)) {
         src_x_ = std::int32_t(view_.wx(ui_->mx)), src_y_ = std::int32_t(view_.wy(ui_->my));  // [U-340] quick cast on water: source picked
         pending_ = slot;
         hint(std::format("{}: source picked, now click where it goes", d->name));
@@ -656,7 +658,7 @@ void GameView::frame(NetClient& net, double now_s, Ui& ui) {
     }
     if (ui.clicked) {
         const SkillDef* pd = pending_ >= 0 ? skill_of(net, pending_) : nullptr;
-        if (pd && source_first(*pd) && src_x_ < 0 && source_at(net, wx, wy)) {  // [U-340] first click: the source
+        if (pd && source_first(*pd) && src_x_ < 0 && source_at(net, wx, wy, pd)) {  // [U-340] first click: the source
             src_x_ = std::int32_t(wx), src_y_ = std::int32_t(wy);
             hint(std::format("{}: source picked, now click where it goes", pd->name));
         } else if (pending_ >= 0) {
@@ -729,7 +731,7 @@ void GameView::draw_indicator(NetClient& net) {
     if (d && source_first(*d)) {  // [U-340] highlight the picked source / a source under the cursor
         const float cxw = view_.wx(ui_->mx), cyw = view_.wy(ui_->my);
         if (src_x_ >= 0) ground_ring(r_, view_, float(src_x_), float(src_y_), 48.f, {120, 210, 255, 230}, 32);
-        else if (source_at(net, cxw, cyw)) ground_ring(r_, view_, cxw, cyw, 40.f, {120, 210, 255, 140}, 32);
+        else if (source_at(net, cxw, cyw, d)) ground_ring(r_, view_, cxw, cyw, 40.f, {120, 210, 255, 140}, 32);
     }
     const DrawUnit* mine = nullptr;
     for (const DrawUnit& du : draw_)
@@ -865,7 +867,7 @@ void GameView::draw_hud(NetClient& net, double now_s, Ui& ui) {
     draw_bottom_panel(net, now_s, ui);
     {  // [U-366] my jungle buff, [U-339] the Avatar's carried water — one line over the minimap
         std::string extra;
-        static const char* kBuff[] = {"", "Ember (autos burn + slow)", "Tui's Blessing (regen +50 %, cooldowns -10 %)"};
+        static const char* kBuff[] = {"", "Ember (autos burn + slow)", "Wan Shi Tong's Wisdom (regen +50 %, cooldowns -10 %)"};
         if (me.jbuff > 0 && me.jbuff < 3 && me.jbuff_ms > 0) extra += std::format("{} {}:{:02}   ", tr(kBuff[me.jbuff]), me.jbuff_ms / 60'000, me.jbuff_ms / 1000 % 60);
         if (me.water_max > 0) extra += std::format("{} {}/{}", tr("water"), me.water / 100, me.water_max / 100);
         if (!extra.empty()) text(r_, W - text_w(extra) - 12, H - 200 - 150 - 24, extra, {170, 220, 255});
@@ -1012,7 +1014,7 @@ void GameView::draw_hud(NetClient& net, double now_s, Ui& ui) {
     if (pending_ >= 0) {
         const SkillDef* pd = skill_of(net, pending_);
         const char* how = src_x_ >= 0                     ? "source picked - left click: where it goes  right click: cancel"
-                          : pd && source_first(*pd)        ? "left click: cast (on water: pick the source first)  right click: cancel"
+                          : pd && source_first(*pd)        ? "left click: cast (on water / a rock: pick the source first)  right click: cancel"
                                                            : "left click: cast  right click: cancel";
         text(r_, ui.mx + 14, ui.my + 14, how, {255, 255, 255});
     }

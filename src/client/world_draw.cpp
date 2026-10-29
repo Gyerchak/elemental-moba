@@ -155,14 +155,20 @@ void GameView::draw_wall_damage(NetClient& net) {
     for (const auto& wh : net.cur.walls) {
         const float wx = float(wh.x * kCellUnits + 16), wy = float(wh.y * kCellUnits + 16);
         const float sx = view_.sx(wx), gy = view_.sy(wy), top = view_.sy_h(wy, 60);
-        const float dmg = float(100 - wh.pct) / 100.f;  // 0 = whole … 1 = about to fall
-        fill_rect(r_, sx - 16 * z, top, 32 * z, gy - top, {20, 20, 20, std::uint8_t(140 * dmg)});
-        const int cracks = 1 + int(dmg * 4);
-        for (int k = 0; k < cracks; ++k) {  // zig-zag cracks, more with less HP
+        // [U-379] three states: untouched (< 1/3 of the HP lost) · mildly cracked (1/3 … 2/3) · almost torn apart (> 2/3)
+        const int lost = 100 - wh.pct;
+        const int state = lost * 3 < 100 ? 0 : lost * 3 < 200 ? 1 : 2;
+        if (state == 0) continue;
+        fill_rect(r_, sx - 16 * z, top, 32 * z, gy - top, {20, 20, 20, std::uint8_t(state == 1 ? 40 : 120)});
+        const int cracks = state == 1 ? 2 : 5;
+        for (int k = 0; k < cracks; ++k) {
             const float cx = sx + float((wh.x * 7 + k * 11) % 20 - 10) * z;
             line(r_, cx, top + 2, cx + 5 * z, top + (gy - top) * 0.4f, {10, 10, 10, 230});
             line(r_, cx + 5 * z, top + (gy - top) * 0.4f, cx - 3 * z, gy - 2, {10, 10, 10, 230});
         }
+        if (state == 2)  // chunks already missing at the top edge
+            for (int k = 0; k < 3; ++k)
+                fill_rect(r_, sx + float((wh.y * 5 + k * 9) % 24 - 12) * z, top - 1, 6 * z, 7 * z, {0, 0, 0, 160});
     }
 }
 

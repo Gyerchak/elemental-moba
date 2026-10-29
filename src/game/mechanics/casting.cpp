@@ -86,9 +86,19 @@ void World::cast_skill(Unit& u, Slot slot, std::int32_t tx, std::int32_t ty, std
     // [U-340] source first: a water skill bent from a chosen source starts there, +25 % range
     const bool from_source = water_skill(d) && u.cast.sx >= 0 && u.cast.slot == std::uint8_t(slot) &&
                              water_source_at(u.cast.sx, u.cast.sy) != WaterSource::None && water_sourced(u, d, u.cast.sx, u.cast.sy);
-    const bool starts_at_source = from_source && (d.kind == SkillKind::Bolt || d.kind == SkillKind::Wave || d.kind == SkillKind::Cone);
-    if (from_source) r.range = r.range * elements::kSourceRangePct / 100;
-    const std::int32_t ox = starts_at_source ? u.cast.sx : u.ux(), oy = starts_at_source ? u.cast.sy : u.uy();
+    // [U-378] rock bending (Taliyah W-like): an earth bolt / wave picks up a chosen rock and throws IT
+    const bool from_rock = !from_source && d.sub == SubElement::Earth && source_first(d) && u.cast.sx >= 0 &&
+                           u.cast.slot == std::uint8_t(slot) && rock_source_at(u.cast.sx, u.cast.sy) &&
+                           dist2(u.cast.sx, u.cast.sy, u.ux(), u.uy()) <=
+                               std::int64_t(d.range + elements::kSourceReachCells * kCellUnits) * (d.range + elements::kSourceReachCells * kCellUnits);
+    const bool starts_at_source = (from_source && (d.kind == SkillKind::Bolt || d.kind == SkillKind::Wave || d.kind == SkillKind::Cone)) || from_rock;
+    if (from_source || from_rock) r.range = r.range * elements::kSourceRangePct / 100;
+    std::int32_t ox = starts_at_source ? u.cast.sx : u.ux(), oy = starts_at_source ? u.cast.sy : u.uy();
+    if (from_rock) {  // the rock leaves its place (the whole segment / rock breaks) and flies from just beyond it
+        const Dir rd = dir_of(std::int64_t(tx) - ox, std::int64_t(ty) - oy);
+        damage_wall(ox / kCellUnits, oy / kCellUnits, 1'000'000, rd);
+        ox += rd.x * 48 / kOne, oy += rd.y * 48 / kOne;
+    }
     // [U-264] sky events (planetary alignment) stretch durations; damage-over-time has its own %
     const bool dot_skill = d.kind == SkillKind::Field && d.dmg > 0;
     const std::int32_t dur_ms = std::int32_t(std::int64_t(d.dur_ms) * (dot_skill ? r.dot_pct : r.dur_pct) / 100);
@@ -122,6 +132,7 @@ void World::cast_skill(Unit& u, Slot slot, std::int32_t tx, std::int32_t ty, std
     e.dir = dir;
     e.damage = std::int32_t(r.damage * (u.rage_boost ? 100 + kRageBoostPct : 100) / 100 * (u.cycle_boost ? 140 : 100) / 100);  // [U-268][U-279]
     if (e.damage > 0) e.damage = e.damage * (100 + draw_from_wall(u, e.sub)) / 100;  // [U-288] a wall nearby as the source
+    if (from_rock) e.damage = e.damage * (100 + elements::kRockSourceBonusPct) / 100;  // [U-378]
     if (from_source && champions()[std::size_t(u.champ)].element == Element::Water) {  // [U-340] the chosen source, form chosen
         e.sub = u.source_ice ? SubElement::Ice : SubElement::Water;
         e.flow = flow_of(e.sub);
@@ -222,9 +233,14 @@ void World::cast_skill(Unit& u, Slot slot, std::int32_t tx, std::int32_t ty, std
         }
         case SkillKind::Wall: {
             if (d.sub == SubElement::Ice && !from_source) use_water_source(u);  // [U-294] a puddle / ice patch used as the source is gone
+            // [U-380] the wall standard: segments of 100, 33 / 66 / 99 thick, 1 / 2 levels, HP per segment (+ per rank)
+            const int rank = std::max<int>(1, u.ab[std::size_t(slot)].rank);
+            const WallSpec ws{.thick = (d.wall_thick ? std::clamp<int>(d.wall_thick, 1, 3) : 2) * kWallThickStep,
+                              .level = d.wall_level ? std::clamp<int>(d.wall_level, 1, 2) : 2,
+                              .hp = (d.wall_hp ? d.wall_hp : d.sub == SubElement::Ice ? kIceWallSegHp : kWallSegHp) + d.wall_hp_rank * (rank - 1)};
             if (d.radius > 0) {  // ring [Iron Prison]
                 raise_ring(px, py, std::int32_t(r.radius), wall_kind_of(d.sub) == Wall::Metal ? dur_ms * kMetalWallLifePct / 100 : dur_ms, u.team,
-                           wall_kind_of(d.sub));
+                           wall_kind_of(d.sub), ws);
                 e.kind = FxKind::Burst;
                 e.x = px * kSub;
                 e.y = py * kSub;
@@ -236,7 +252,7 @@ void World::cast_skill(Unit& u, Slot slot, std::int32_t tx, std::int32_t ty, std
                 const Dir along{-dir.y, dir.x};
                 raise_wall(px, py, along, std::int32_t(r.width), wall_kind_of(d.sub),
                            wall_kind_of(d.sub) == Wall::Metal ? dur_ms * kMetalWallLifePct / 100 : dur_ms, u.team,
-                           base_element(d.sub) == Element::Earth);
+                           base_element(d.sub) == Element::Earth, ws);
             }
             break;
         }

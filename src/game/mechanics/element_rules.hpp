@@ -48,7 +48,8 @@ inline constexpr std::int64_t kLavaMeltMs = 250;
 inline constexpr std::int32_t kLavaMeltStone = 4, kLavaMeltIce = 20, kLavaMeltMetal = 3;
 // [U-360] natural rocks: 2 × a bent wall's HP; broken ones grow back after this long
 inline constexpr int kNaturalWallHpPct = 200;
-inline constexpr std::int64_t kThrownRockMs = 20'000;  // [U-359] the small rock a thrown rock leaves
+inline constexpr std::int64_t kThrownRockMs = 20'000;
+inline constexpr std::int32_t kRockSourceBonusPct = 20;  // [U-378] a real rock thrown: +20 % damage (and +25 % range)  // [U-359] the small rock a thrown rock leaves
 inline constexpr std::int64_t kNaturalRockRegrowMs = 180'000;
 
 // ---- fire meets fire [U-241]: the stronger caster (elemental power) wins the clash

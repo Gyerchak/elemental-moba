@@ -76,3 +76,6 @@ THERE SHOULD BE ANOTHER CHARACTER MAGE TYPES WHICH IS AVATAR, THOSE SHOULD BE RE
 | [?-44] | U-367 | "Unless they are spirits": read as spirits PASS through units by default. | Spirits pass; change `spirit` in monsters.hpp. |
 | [?-45] | U-364 | Which epic monsters? | Claude picks: Lion Turtle (stacking power), Sun Dragons (gold); Face Stealer stays. Names / numbers editable in monsters.hpp. |
 | [?-46] | U-356 | "Lava shouldn't create stones as much" — how much? | 12 % of lava cells become a rock (kLavaRockPct). |
+| [?-47] | U-377 | "2 × the full moon" — power only or every bonus? | Every bonus doubled: power +100 %, sizes +50 %, cooldowns −20 %. |
+| [?-48] | U-378 | Taliyah W style: rock picked first, then where it goes — for earth bolts / waves only so far. Also for walls / pillars? | Only bolts / waves for now. |
+| [?-49] | U-380 | Lava / thrown single rocks are not "wall skills": they keep per-cell HP (stone 140). | Assumed. |

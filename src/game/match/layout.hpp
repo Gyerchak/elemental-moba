@@ -45,7 +45,7 @@ inline constexpr std::array<CellPt, 2> kNexusTurrets{{{60, 458}, {53, 451}}};
 inline constexpr std::array<CellPt, 5> kCamps{{{110, 300}, {150, 410}, {230, 430}, {80, 360}, {190, 360}}};
 // [X-97] aggressive camps: cursed spirit, angry beast, bandits — attack whoever comes close
 inline constexpr std::array<CellPt, 3> kAggroCamps{{{130, 250}, {270, 400}, {60, 250}}};
-// [U-366] buff camps (Fire side; mirrored): Platypus Bear (Ember buff), Moon Koi (Tui's Blessing)
+// [U-366] buff camps (Fire side; mirrored): Platypus Bear (Ember buff), Knowledge Seeker (Wan Shi Tong's Wisdom)
 inline constexpr std::array<CellPt, 2> kBuffCamps{{{205, 310}, {110, 440}}};
 // [U-364] epic monsters on islands in the sea (one each, not mirrored), reached by a shallow ford
 inline constexpr CellPt kLionTurtleCell{170, 170};

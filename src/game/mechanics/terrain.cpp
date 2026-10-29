@@ -75,43 +75,80 @@ void remember(std::vector<CellTimer>& timers, int x, int y, std::uint32_t raw, s
 }  // namespace
 
 void World::raise_wall(std::int32_t x, std::int32_t y, Dir along, std::int32_t length, Wall kind, std::int32_t life_ms,
-                       Team by_team, bool earthbending) {
-    // [X-38] stone 4 s, ice 2.5 s (the skill's own duration wins). 2 cells thick → no diagonal leaks.
+                       Team by_team, bool earthbending, const WallSpec& ws) {
+    // [U-380] n segments of 100 units side by side (at least one), centred on x / y
+    const int n = std::max(1, (length + kWallSegLen / 2) / kWallSegLen);
+    for (int i = 0; i < n; ++i) {
+        const std::int32_t off = (2 * i - (n - 1)) * kWallSegLen / 2;
+        raise_segment(x + rot_x(along, off, 0), y + rot_y(along, off, 0), along, kind, life_ms, by_team, earthbending, ws);
+    }
+}
+
+void World::raise_ring(std::int32_t x, std::int32_t y, std::int32_t radius, std::int32_t life_ms, Team by_team, Wall kind,
+                       const WallSpec& ws) {
+    // [U-380] a ring of segments, each along the tangent; as many as fit on the circle (at least 4)
+    const int n = std::max(4, int((2 * 314 * std::int64_t(radius) / 100 + kWallSegLen / 2) / kWallSegLen));
+    for (int i = 0; i < n; ++i) {
+        const Dir r = kDirs[std::size_t(i * 64 / n) % 64];
+        raise_segment(x + r.x * radius / kOne, y + r.y * radius / kOne, Dir{-r.y, r.x}, kind, life_ms, by_team, true, ws);
+    }
+}
+
+void World::raise_segment(std::int32_t x, std::int32_t y, Dir along, Wall kind, std::int32_t life_ms, Team by_team, bool earthbending,
+                          const WallSpec& ws) {
     const Dir side{-along.y, along.x};
-    for (std::int32_t s = -length / 2; s <= length / 2; s += 12)
-        for (std::int32_t t = -16; t <= 16; t += 16) {
+    std::vector<std::uint32_t> cells;
+    const int half_t = std::max(8, ws.thick / 2);
+    for (std::int32_t s = -kWallSegLen / 2; s <= kWallSegLen / 2; s += 8)
+        for (std::int32_t t = -half_t; t <= half_t; t += 8) {
             const int cx = (x + rot_x(along, s, 0) + side.x * t / kOne) / kCellUnits;
             const int cy = (y + rot_y(along, s, 0) + side.y * t / kOne) / kCellUnits;
             if (!Grid::in_bounds(cx, cy) || protected_cell(cx, cy)) continue;
-            Cell c = grid.at(cx, cy);
+            const std::uint32_t key = std::uint32_t(cy) * kGridSize + std::uint32_t(cx);
+            if (std::ranges::find(cells, key) != cells.end()) continue;
+            const Cell c = grid.at(cx, cy);
             if (c.surface() == Surface::DeepWater && kind != Wall::Ice) continue;
-            remember(cell_timers, cx, cy, c.raw(), now_ms + life_ms, CellTimerKind::Restore);
-            c.set_wall(kind);
-            c.set_temp_walkable(false);
-            if (kind == Wall::Stone || kind == Wall::Metal) c.set_vision_fog(SenseBlock::Full);
-            c.set_skill_fog(SenseBlock::Full);
-            set_cell(cx, cy, c);
-            add_wall_cell(cx, cy, kind);  // [U-288]
-            if (earthbending) {
-                earth_events.push_back({cx, cy});
-                earth_event_team.push_back(by_team);
-            }
+            if (c.wall() != Wall::None) continue;  // never on top of another wall
+            cells.push_back(key);
         }
-}
-
-void World::raise_ring(std::int32_t x, std::int32_t y, std::int32_t radius, std::int32_t life_ms, Team by_team, Wall kind) {
-    for (int k = 0; k < 64; ++k) {
-        const int cx = (x + kDirs[k].x * radius / kOne) / kCellUnits, cy = (y + kDirs[k].y * radius / kOne) / kCellUnits;
-        if (!Grid::in_bounds(cx, cy) || protected_cell(cx, cy)) continue;
+    if (cells.empty()) return;
+    const std::uint32_t id = next_seg_++;
+    WallSeg& seg = segs[id];
+    seg = {ws.hp, ws.hp, cells, now_ms + life_ms};
+    // [U-380] who stands on it: a unit whose whole body fits on the segment is LIFTED on top (the cells it stands on
+    // become walkable at the raised level); everybody else is pushed out of it as before
+    bool lifted = false;
+    for (const Unit& o : units) {
+        if (!o.alive || o.flying() || o.is_structure() || o.kind == UnitKind::Inhibitor) continue;
+        const Shape body = hitbox(o);
+        bool touches_seg = false, fits = true;
+        for (int i = 0; i < body.n; ++i)
+            for (int k = -1; k < 64; k += 8) {
+                const Circle& c = body.c[i];
+                const std::int32_t px = k < 0 ? c.x : c.x + kDirs[k].x * (c.r - 1) / kOne;
+                const std::int32_t py = k < 0 ? c.y : c.y + kDirs[k].y * (c.r - 1) / kOne;
+                const std::uint32_t key = std::uint32_t(py / kCellUnits) * kGridSize + std::uint32_t(px / kCellUnits);
+                const bool in = std::ranges::find(cells, key) != cells.end();
+                touches_seg |= in;
+                fits &= in;
+            }
+        if (touches_seg && fits) lifted = true;
+    }
+    for (const std::uint32_t key : cells) {
+        const int cx = int(key % kGridSize), cy = int(key / kGridSize);
         Cell c = grid.at(cx, cy);
         remember(cell_timers, cx, cy, c.raw(), now_ms + life_ms, CellTimerKind::Restore);
         c.set_wall(kind);
-        c.set_skill_fog(SenseBlock::Full);
+        c.set_temp_elevation(c.elevation() + ws.level);  // [U-380] 1 or 2 levels high
+        c.set_temp_walkable(lifted);                     // somebody stands on it: its top is ground for them
         if (kind == Wall::Stone || kind == Wall::Metal) c.set_vision_fog(SenseBlock::Full);
+        c.set_skill_fog(SenseBlock::Full);
         set_cell(cx, cy, c);
-        add_wall_cell(cx, cy, kind);  // [U-288]
-        earth_events.push_back({cx, cy});
-        earth_event_team.push_back(by_team);
+        walls[key] = {ws.hp, ws.hp, id};
+        if (earthbending) {
+            earth_events.push_back({cx, cy});
+            earth_event_team.push_back(by_team);
+        }
     }
 }
 
@@ -302,6 +339,7 @@ void World::lava_melts_walls() {
 void World::step_terrain() {
     std::erase_if(clouds, [&](const Cloud& c) { return c.until_ms <= now_ms; });
     lava_melts_walls();
+    if (tick % cfg.tick_hz == 0) std::erase_if(segs, [&](const auto& kv) { return kv.second.until_ms + 1'000 < now_ms; });  // [U-380]
     for (std::size_t i = 0; i < cell_timers.size();) {
         CellTimer& t = cell_timers[i];
         if (t.at_ms > now_ms) {
@@ -365,6 +403,12 @@ void World::drop_rock(std::int32_t x, std::int32_t y, bool magma) {
     if (magma) glows.push_back({{x, y, 96, 80}, now_ms + 3'000});
 }
 
+bool World::rock_source_at(std::int32_t x, std::int32_t y) const {
+    const int cx = x / kCellUnits, cy = y / kCellUnits;
+    return x >= 0 && y >= 0 && Grid::in_bounds(cx, cy) && grid.at(cx, cy).wall() == Wall::Stone && !protected_cell(cx, cy) &&
+           cx >= 3 && cy >= 3 && cx < kGridSize - 3 && cy < kGridSize - 3;
+}
+
 bool World::natural_wall(int cx, int cy) const {
     return std::ranges::none_of(cell_timers, [&](const CellTimer& t) { return t.x == cx && t.y == cy; });
 }
@@ -375,6 +419,26 @@ void World::damage_wall(int cx, int cy, std::int32_t amount, Dir from) {
     if (c.wall() == Wall::None || protected_cell(cx, cy)) return;
     const std::uint32_t key = std::uint32_t(cy) * kGridSize + std::uint32_t(cx);
     auto it = walls.find(key);
+    if (it != walls.end() && it->second.seg) {  // [U-380] a segment: shared HP, it falls as a whole
+        const auto sg = segs.find(it->second.seg);
+        if (sg != segs.end()) {
+            WallSeg& seg = sg->second;
+            seg.hp -= amount;
+            for (const std::uint32_t k : seg.cells)
+                if (auto w = walls.find(k); w != walls.end() && w->second.seg == sg->first) w->second.hp = std::max(0, seg.hp);
+            if (seg.hp > 0) return;
+            for (const std::uint32_t k : seg.cells) {
+                const int x = int(k % kGridSize), y = int(k / kGridSize);
+                for (CellTimer& t : cell_timers)
+                    if (t.x == x && t.y == y) t.at_ms = now_ms;
+                if (auto w = walls.find(k); w != walls.end() && w->second.seg == sg->first) walls.erase(w);
+                wall_breaks.push_back({std::int16_t(x), std::int16_t(y), std::int16_t(std::int64_t(from.x) * 1000 / kOne),
+                                       std::int16_t(std::int64_t(from.y) * 1000 / kOne), std::uint8_t(grid.at(x, y).wall()), now_ms});
+            }
+            segs.erase(sg);
+            return;
+        }
+    }
     const bool natural = natural_wall(cx, cy);
     if (natural && (cx < 3 || cy < 3 || cx >= kGridSize - 3 || cy >= kGridSize - 3)) return;  // the map border never breaks
     if (it == walls.end()) {

@@ -200,7 +200,7 @@ ResolvedAbility World::resolved(const Unit& u, Slot s) const {
         b.size_pct += 25, b.width_pct += 25, b.radius_pct += 25;
     }
     if (u.team != Team::Neutral) b.power_pct += lion_stacks[std::size_t(u.team) & 1] * kLionTurtlePctPerStack;  // [U-364]
-    if (u.jbuff == std::uint8_t(JungleBuff::TuiBlessing) && u.jbuff_until > now_ms) b.cd_pct = b.cd_pct * kTuiCdPct / 100;  // [U-366]
+    if (u.jbuff == std::uint8_t(JungleBuff::Wisdom) && u.jbuff_until > now_ms) b.cd_pct = b.cd_pct * kWisdomCdPct / 100;  // [U-366]
     const int extra = has_passive(u, PassiveId::MistForm) ? 10 : 0;
     const std::uint32_t rank = std::max<std::uint32_t>(1, u.ab[std::size_t(s)].rank);
     return resolve(to_ability(*d, s), ScaleCtx{.stats = u.stats, .rank = rank, .level = std::uint32_t(u.level),

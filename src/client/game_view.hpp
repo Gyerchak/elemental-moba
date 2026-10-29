@@ -132,7 +132,7 @@ private:
     std::vector<SkyBanner> sky_banners_;  // longest remaining time seen per status → duration animation
     int pending_ = -1;          // skill waiting for a click (normal cast)
     std::int32_t src_x_ = -1, src_y_ = -1;  // [U-340] the source picked by the first click (−1 = none yet)
-    [[nodiscard]] bool source_at(const NetClient& net, float wx, float wy) const;
+    [[nodiscard]] bool source_at(const NetClient& net, float wx, float wy, const SkillDef* d = nullptr) const;
     void draw_camp_timers(NetClient& net);  // [U-365]
     int attack_move_ = 0;       // 0 off, 1 anything (D), 2 closest champion only (A) [X-98]
     std::string hint_;

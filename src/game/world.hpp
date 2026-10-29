@@ -9,6 +9,7 @@
 #include <utility>
 #include <vector>
 
+#include "core/wall_rules.hpp"
 #include "core/core.hpp"
 #include "core/channel_rules.hpp"
 #include "game/content.hpp"
@@ -106,7 +107,7 @@ inline constexpr std::uint16_t kAllCategories = 0x1ff;
 inline constexpr std::uint16_t kMinionCategories = cat_bit(UnitCategory::Minion) | cat_bit(UnitCategory::SiegeMinion) | cat_bit(UnitCategory::SuperMinion);
 
 // [U-302] named monsters (the order = the network name id; net::kMobNames is the same list)
-inline constexpr const char* kMobNameList[] = {"", "Spirit Wolf", "Wandering Spirit", "Cursed Spirit", "Angry Beast", "Bandit", "Face Stealer", "Bandit Archer", "Platypus Bear", "Moon Koi", "Lion Turtle", "Sun Dragons"};
+inline constexpr const char* kMobNameList[] = {"", "Spirit Wolf", "Wandering Spirit", "Cursed Spirit", "Angry Beast", "Bandit", "Face Stealer", "Bandit Archer", "Platypus Bear", "Knowledge Seeker", "Lion Turtle", "Sun Dragons"};
 struct TakenHit {
     std::int64_t ms = 0;
     std::uint32_t src = 0;
@@ -320,6 +321,12 @@ struct CellChange {
 };
 struct WallCell {  // [U-288] a player-made wall cell
     std::int32_t hp = 0, max = 0;
+    std::uint32_t seg = 0;  // [U-380] its wall segment (shared HP), 0 = a single cell
+};
+struct WallSeg {  // [U-380] one 100-unit piece of a skill wall: all its cells share the HP and fall together
+    std::int32_t hp = 0, max = 0;
+    std::vector<std::uint32_t> cells;
+    std::int64_t until_ms = 0;
 };
 struct WallBreak {  // [U-341] a wall piece fell: broken by a hit (pushed in dx / dy) or crumbled by time (0 / 0)
     std::int16_t x = 0, y = 0;
@@ -461,7 +468,9 @@ public:
     [[nodiscard]] WaterSource water_source_at(std::int32_t x, std::int32_t y, std::size_t* patch = nullptr) const;
     // a water skill has its water: a chosen source in reach, or one near the caster (then it costs no carried water)
     [[nodiscard]] bool water_sourced(const Unit& u, const SkillDef& d, std::int32_t sx, std::int32_t sy) const;
-    void take_from_source(const Unit& u, std::int32_t sx, std::int32_t sy);  // a puddle is used up, an ice wall melts a bit
+    void take_from_source(const Unit& u, std::int32_t sx, std::int32_t sy);
+    // [U-378] a rock to bend (Taliyah-W-like): any stone wall cell — a map rock, a bent wall, a thrown rock
+    [[nodiscard]] bool rock_source_at(std::int32_t x, std::int32_t y) const;  // a puddle is used up, an ice wall melts a bit
     [[nodiscard]] static bool water_skill(const SkillDef& d) { return base_element(d.sub) == Element::Water; }
     [[nodiscard]] bool elevated(const Unit& u) const;       // flying or riding water → melee / ground can't hit
     [[nodiscard]] bool can_hit_elevated(const Effect& e) const;
@@ -604,9 +613,14 @@ public:
     // casting next to a wall that feeds this skill: +15 % damage, the wall loses HP. Returns the bonus %.
     int draw_from_wall(const Unit& u, SubElement sub);
     void raise_wall(std::int32_t x, std::int32_t y, Dir along, std::int32_t length, Wall kind, std::int32_t life_ms,
-                    Team by_team, bool earthbending);
+                    Team by_team, bool earthbending, const WallSpec& ws = {});
     void raise_ring(std::int32_t x, std::int32_t y, std::int32_t radius, std::int32_t life_ms, Team by_team,
-                    Wall kind = Wall::Stone);
+                    Wall kind = Wall::Stone, const WallSpec& ws = {});
+    // [U-380] one segment (100 long, ws.thick wide, centred at x / y); units that fit on it are lifted on top
+    void raise_segment(std::int32_t x, std::int32_t y, Dir along, Wall kind, std::int32_t life_ms, Team by_team, bool earthbending,
+                       const WallSpec& ws);
+    std::unordered_map<std::uint32_t, WallSeg> segs;  // [U-380]
+    std::uint32_t next_seg_ = 1;
     void raise_pillar(std::int32_t x, std::int32_t y, std::int32_t radius, std::int32_t life_ms, Team by_team);
     void lava_pool(std::int32_t x, std::int32_t y, std::int32_t radius, std::int32_t life_ms);
     void steam_cloud(std::int32_t x, std::int32_t y, std::int32_t radius, std::int32_t life_ms);

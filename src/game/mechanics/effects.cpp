@@ -19,7 +19,10 @@ void World::effect_hits(Effect& e) {
         if (!e.ally && o.team == e.team && o.st.has(StatusKind::Wet) &&
             (fire_family(e.sub) || base_element(e.sub) == Element::Water) && touches(sh, hitbox(o)))
             dry(o);
-        if (e.ally ? o.team != e.team : o.team == e.team) continue;
+        // [U-381] an ally may throw lightning INTO an ally who is redirecting: the ally sends it on (ally → ally → enemy)
+        const bool ally_redirect = !e.ally && o.team == e.team && o.id != e.owner && e.sub == SubElement::Lightning &&
+                                   (e.kind == FxKind::Bolt || e.kind == FxKind::Wave) && o.st.has(StatusKind::Redirect);
+        if (!ally_redirect && (e.ally ? o.team != e.team : o.team == e.team)) continue;
         if (o.is_structure() && (e.kind == FxKind::Field || e.kind == FxKind::Tornado)) continue;
         if (!reaches(e, o)) continue;  // [U-191][U-216] too high for this hitbox (flying, airborne, raised ground)
         if (!touches(sh, hitbox(o))) continue;  // ONE rule: any touch = hit

@@ -88,9 +88,11 @@ int World::body_violations(const Unit& u, std::int32_t xs, std::int32_t ys) cons
             }
             const Cell cell = grid.at(px / kCellUnits, py / kCellUnits);
             const bool open = cell.temp_walkable();
-            if ((m & kCollTerrain) && !open &&
-                ((cell.walk() == Walk::Blocked && cell.surface() != Surface::DeepWater) ||  // deep water = swim [U-188]
-                 cell.walk() == Walk::FlyOnly || std::abs(cell.effective_elevation() - ground) > 1))
+            const bool wall_top = open && cell.wall() != Wall::None;  // [U-380] the top of a raised wall: a step like any other
+            if ((m & kCollTerrain) &&
+                ((!open && ((cell.walk() == Walk::Blocked && cell.surface() != Surface::DeepWater) ||  // deep water = swim [U-188]
+                            cell.walk() == Walk::FlyOnly)) ||
+                 ((!open || wall_top) && std::abs(cell.effective_elevation() - ground) > 1)))
                 ++bad;
             else if ((m & kCollTree) && cell.tree() == Tree::Alive) ++bad;
             else if ((m & kCollWall) && !open && cell.wall() != Wall::None) ++bad;

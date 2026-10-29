@@ -97,8 +97,8 @@ std::vector<ModView> env_modifiers(Element e, const SkyState& s) {
                                          : tr("firebenders lose their power; darkness"), {150, 60, 60}, fire, !fire);
     }
     if (s.comet_landed && unlimited_fuel(s))
-        add("CMT", "Comet", e == Element::Fire ? std::format("{} {}, {} {}, XP {}, {}", tr("fire power"), pct(75), tr("skill size"), pct(40), pct(40), tr("unlimited fuel"))
-                                               : tr("firebenders +75 % power"), {255, 90, 60}, false, e != Element::Fire);
+        add("CMT", "Comet", e == Element::Fire ? std::format("{} {}, {} {}, {} −20 %, XP {}, {}", tr("fire power"), pct(100), tr("ranges / sizes (also fire autoattacks)"), pct(50), tr("cooldowns"), pct(50), tr("unlimited fuel"))
+                                               : tr("firebenders: +100 % power, +50 % ranges, −20 % cooldowns"), {255, 90, 60}, false, e != Element::Fire);
     if (s.planetary_alignment)
         add("ALN", "Planetary alignment", e != Element::None ? std::format("{}: {} {}, {} {}, {} {}, {} {}, {} {}, {} {}", tr("magic skills"),
                                                                            tr("power"), pct(25), tr("width"), pct(25), tr("radius"), pct(25),

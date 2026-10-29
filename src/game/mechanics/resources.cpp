@@ -42,7 +42,7 @@ void World::regen(Unit& u) {
     }
     // resources
     std::int64_t r = u.res_regen;
-    if (u.jbuff == std::uint8_t(JungleBuff::TuiBlessing) && u.jbuff_until > now_ms) r = r * kTuiRegenPct / 100;  // [U-366]
+    if (u.jbuff == std::uint8_t(JungleBuff::Wisdom) && u.jbuff_until > now_ms) r = r * kWisdomRegenPct / 100;  // [U-366]
     switch (u.stats.resource) {
         case ResourceKind::Fuel:
             if (unlimited_fuel(sky)) {  // [U-138]

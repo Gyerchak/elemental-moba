@@ -34,6 +34,7 @@ struct SkyBoost {
 inline constexpr int kMoonPowerPmPerPct = 5;   // 0.5 % = 5 ‰ per 1 % of moon phase
 inline constexpr int kFullMoonSizePct = 25, kFullMoonCdPct = 90;
 [[nodiscard]] constexpr int moon_power_pm(int moon_phase_pct) { return kMoonPowerPmPerPct * moon_phase_pct; }
+inline constexpr int kCometMoonFactor = 2;  // [U-377] comet (fire) = 2 × full moon (water)
 
 // [U-124] 0 ms before/after the eclipse middle → 100 %, middle → 0 %, linear between.
 [[nodiscard]] constexpr std::int64_t eclipse_mid_ms(const SkyState& s) {
@@ -51,10 +52,12 @@ inline constexpr int kFullMoonSizePct = 25, kFullMoonCdPct = 90;
     switch (e) {
         case Element::Fire:
             if (s.is_day) b.power_pct += 5;  // [X-53]
-            if (comet) {                     // [U-123] comet > full moon [X-67]
-                b.power_pct += 75;
-                b.size_pct += 40, b.width_pct += 40, b.radius_pct += 40, b.speed_pct += 40;
-                b.xp_pct += 40;
+            if (comet) {  // [U-123][X-67][U-377] the comet = exactly 2 × the full moon's bonuses for waterbending
+                b.moon_pm += kCometMoonFactor * moon_power_pm(100);  // +100 %
+                const int sz = kCometMoonFactor * kFullMoonSizePct;  // +50 %
+                b.size_pct += sz, b.width_pct += sz, b.radius_pct += sz, b.speed_pct += sz, b.auto_range_pct += sz;
+                b.cd_pct = 100 - kCometMoonFactor * (100 - kFullMoonCdPct);  // cooldowns × 0.80
+                b.xp_pct += kCometMoonFactor * 25;
             }
             break;
         case Element::Water:
@@ -113,9 +116,9 @@ static_assert(eclipse_factor_pct(sky_at_s(25 * 60)) == 0 && eclipse_factor_pct(s
 static_assert(element_power_pct(Element::Fire, sky_at_s(25 * 60)) == 0 && sky_boost(Element::Fire, sky_at_s(25 * 60)).muted);
 static_assert(sky_boost(Element::Fire, sky_at_s(24 * 60 + 57)).muted && !sky_boost(Element::Fire, sky_at_s(25 * 60 + 3)).muted);
 static_assert(!sky_boost(Element::Water, sky_at_s(25 * 60)).muted);
-// 25:15: half eclipse × (100 + 5 day) = 52 %. 31:00 (day): 100 + 5 day + 75 comet = 180 %.
+// 25:15: half eclipse × (100 + 5 day) = 52 %. 31:00 (day): 105 % + comet 100 % = 2050 ‰ [U-377].
 static_assert(element_power_pct(Element::Fire, sky_at_s(25 * 60 + 15)) == 52);
-static_assert(sky_boost(Element::Fire, sky_at_s(31 * 60)).power_pct == 180 && sky_boost(Element::Fire, sky_at_s(31 * 60)).size_pct == 140);
+static_assert(sky_boost(Element::Fire, sky_at_s(31 * 60)).power_pm() == 2'050 && sky_boost(Element::Fire, sky_at_s(31 * 60)).size_pct == 150);
 // [U-370] full moon (100 % phase): 1000 + 5 × 100 = 1500 ‰ = +50 %, cooldowns × 0.90; new moon: +0 %
 static_assert(sky_boost(Element::Water, sky_at_s(30 * 60)).power_pm() == 1'500 && sky_boost(Element::Water, sky_at_s(30 * 60)).cd_pct == 90);
 static_assert(sky_boost(Element::Water, sky_at_s(0)).power_pm() == 1'000);

@@ -551,5 +551,14 @@ Additions outside the plan live in `ENGINE-EXTRAS.md`, never here.
 - [U-375] **Named versions + version ID**: users name versions (no name → server name + creation date); every version gets an ID computed from its files (a hash, like Europa Universalis 4 checksums) so clients can see if versions match.
 - [U-376] Update everything on GitHub; continue the plan.
 
+## 31. Round 9 (2026-10-29)
+
+- [U-377] **Comet**: firebending gets **2 × the full moon's** bonus for waterbending (full moon water +50 % → comet fire +100 %).
+- [U-378] **Bending solid objects like Taliyah's W**: pick a rock (first click), then where it goes (second click) — the rock itself is bent.
+- [U-379] **Wall HP shown in 3 states**: untouched (< 1/3 damage), mildly cracked (1/3–2/3), almost torn apart (> 2/3).
+- [U-380] **Wall standard for every wall ability**: walls are built from **segments 100 units long**, **33 / 66 / 99 units thick**, raised **1 or 2 levels**. Any shape the skill chooses. A unit whose hitbox fits on a segment is **lifted on top** of it; level 2 traps a unit without mobility. **Segment HP**: abilities **300**, **ice 100**; settable per skill and per rank (skills may raise segment HP per level etc.). Nothing hard-coded beyond these standards; earlier wall rules stay where they do not conflict.
+- [U-381] **Ally lightning redirect**: an ally may hit an ally with lightning; the ally can redirect it (ally → ally → enemy).
+- [U-382] Keep the established standards; everything configurable.
+
 ---
 *Hubert continues editing the plan later — new ideas get the next free `[U-xx]` number.*

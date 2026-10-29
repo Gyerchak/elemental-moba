@@ -17,7 +17,16 @@ namespace em {
         default: return 0;
     }
 }
-inline constexpr int kMetalWallLifePct = 150;  // metal stands 1.5 × the skill's duration
+inline constexpr int kMetalWallLifePct = 150;
+// [U-380] the wall standard for every wall skill: segments 100 units long, 33 / 66 / 99 thick, 1 or 2 levels high,
+// HP per segment 300 (ice 100) — per skill / per rank in SkillDef. (wall_max_hp above = single cells: lava rocks,
+// thrown rocks; natural rocks × 2.)
+inline constexpr int kWallSegLen = 100, kWallThickStep = 33, kWallSegHp = 300, kIceWallSegHp = 100;
+struct WallSpec {
+    int thick = 66;   // units
+    int level = 2;    // levels above the ground
+    int hp = kWallSegHp;
+};  // metal stands 1.5 × the skill's duration
 // the wall a skill raises: ice from ice, metal from metalbending, else stone
 [[nodiscard]] constexpr Wall wall_kind_of(SubElement s) {
     return s == SubElement::Ice ? Wall::Ice : (s == SubElement::Metal || s == SubElement::MetalArmor) ? Wall::Metal : Wall::Stone;

@@ -207,12 +207,18 @@ clang 22 and GCC 16 (`README.md` → Build / Play).
 - [x] Recap / kill feed never "unknown" (killer kind sent) [U-363]; displacement = timed CC [U-368].
 - [x] Moon: +0.5 % water power per 1 % phase all month; full moon +25 % ranges (water autos too), cooldowns × 0.90 [U-370].
 - [x] Everybody collides (allies, minions, monsters); spirits, ghost items and the Mist Dancer pass [U-367].
-- [x] Jungle: growth per respawn, respawn timers per monster, buff camps (Ember, Tui's Blessing), epic Lion Turtle (team stacks) + Sun Dragons (team gold), timers on minimap / map / Tab, HP numbers on big monsters [U-364..U-366].
+- [x] Jungle: growth per respawn, respawn timers per monster, buff camps (Ember, Wan Shi Tong's Wisdom), epic Lion Turtle (team stacks) + Sun Dragons (team gold), timers on minimap / map / Tab, HP numbers on big monsters [U-364..U-366].
 - [ ] Jungle / support items [U-366]; buff passes to the killer.
 - [ ] Post-game chat + graphs [U-371]; ping + emote wheels, own emotes / sounds [U-372].
 - [ ] Everything in resource packs [U-373]; server download of versions / packs, server password [U-374]; named versions + file hash ID [U-375].
 
-## M9 — Extras
+## M20 — Round 9 (2026-10-29)
+
+- [x] Comet = 2 × full moon [U-377]; rock bending source-first (Taliyah W-like) [U-378]; wall cracks in 3 states [U-379].
+- [x] Wall segments 100 × 33/66/99, levels 1/2, lifting, segment HP 300 / ice 100 per skill + rank [U-380].
+- [x] Ally → ally lightning redirect [U-381]; no koi spirits in the jungle (Knowledge Seeker).
+- [ ] Walls in free shapes drawn by the player (now: line / ring); per-champion wall upgrades in kits.
+
 
 - [x] Text chat (Enter) [X-23].
 - [ ] Replays, spectator [X-19][X-20]; audio + sound fog [X-18]; ping wheel / voice [X-23]; PL/EN [X-28].

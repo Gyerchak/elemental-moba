@@ -140,12 +140,18 @@ struct SkillDef {
     // [U-340] source first, then destination: first click picks the water (later: rock) source, second the target.
     // −1 = default (water bolts / waves / cones / walls yes), 0 no, 1 yes
     std::int8_t source_first = -1;
+    // [U-380] wall skills: the wall is built of SEGMENTS 100 units long. 0 = the standard:
+    //   wall_thick 1 / 2 / 3 = 33 / 66 / 99 units (0 = 2), wall_level 1 / 2 levels high (0 = 2),
+    //   wall_hp per segment (0 = 300; ice 100), + wall_hp_rank per rank above 1
+    std::uint8_t wall_thick = 0, wall_level = 0;
+    std::int16_t wall_hp = 0, wall_hp_rank = 0;
 };
 
 // [U-340] does this skill ask for a source first?
 [[nodiscard]] constexpr bool source_first(const SkillDef& d) {
     if (d.source_first >= 0) return d.source_first == 1;
     const bool water = d.sub == SubElement::Water || d.sub == SubElement::Ice;
+    if (d.sub == SubElement::Earth && (d.kind == SkillKind::Bolt || d.kind == SkillKind::Wave)) return true;  // [U-378] rock bending
     return water && (d.kind == SkillKind::Bolt || d.kind == SkillKind::Wave || d.kind == SkillKind::Cone || d.kind == SkillKind::Wall);
 }
 

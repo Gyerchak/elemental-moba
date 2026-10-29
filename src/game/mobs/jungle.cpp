@@ -70,7 +70,7 @@ void World::spawn_jungle() {
     for (int side = 0; side < 2; ++side)  // [U-366] buff camps
         for (std::size_t i = 0; i < kBuffCamps.size(); ++i) {
             const CellPt c = side == 0 ? kBuffCamps[i] : mirror(kBuffCamps[i]);
-            spawn_unit(make_monster(i == 0 ? "Platypus Bear" : "Moon Koi", cell_mid(c.first), cell_mid(c.second)));
+            spawn_unit(make_monster(i == 0 ? "Platypus Bear" : "Knowledge Seeker", cell_mid(c.first), cell_mid(c.second)));
         }
     // [X-55] Face Stealer on the spirit island [X-86]
     spawn_unit(make_monster("Face Stealer", cell_mid(kSpiritIsland.first + 14), cell_mid(kSpiritIsland.second + 14)));

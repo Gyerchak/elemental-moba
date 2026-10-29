@@ -19,9 +19,9 @@ enum class UnitCategory : std::uint8_t;  // world.hpp
 
 // [U-366] jungle buffs (Claude ideas, Avatar themed) — what the killer gets
 //   Ember (Platypus Bear): autoattacks burn (1 % max HP over 2 s) and slow 15 % for 1 s
-//   Tui's Blessing (Moon Koi): resource regen +50 %, cooldowns × 0.90
-enum class JungleBuff : std::uint8_t { None, Ember, TuiBlessing };
-inline constexpr int kTuiCdPct = 90, kTuiRegenPct = 150, kEmberSlowPct = 15;
+//   Wan Shi Tong's Wisdom (Knowledge Seeker): resource regen +50 %, cooldowns × 0.90
+enum class JungleBuff : std::uint8_t { None, Ember, Wisdom };
+inline constexpr int kWisdomCdPct = 90, kWisdomRegenPct = 150, kEmberSlowPct = 15;
 inline constexpr int kLionTurtlePctPerStack = 4;  // [U-364] every Lion Turtle stack: +4 % power for the team
 // [U-364] what an epic monster gives the killer's team
 enum class TeamReward : std::uint8_t { None, LionTurtleStack, DragonGold, FaceSteal };
@@ -74,9 +74,9 @@ inline constexpr std::array kMonsters = {
     MonsterDef{.name = "Platypus Bear", .body = &kBeastBody, .aggressive = true, .hp = 260'000, .attack = 7'000, .defence = 3'000,
                .elemental_defence = 2'500, .attack_speed = 60, .model_size = 1'500, .sight = 700, .gold = 100, .xp = 220,
                .respawn_ms = 150'000, .buff = JungleBuff::Ember, .buff_ms = 90'000},
-    MonsterDef{.name = "Moon Koi", .spirit = true, .hp = 220'000, .attack = 5'000, .defence = 2'500, .elemental_defence = 3'500,
+    MonsterDef{.name = "Knowledge Seeker", .spirit = true, .hp = 220'000, .attack = 5'000, .defence = 2'500, .elemental_defence = 3'500,
                .attack_speed = 60, .attack_range = 350, .range = Range::Ranged, .sight = 700, .gold = 100, .xp = 220,
-               .respawn_ms = 150'000, .buff = JungleBuff::TuiBlessing, .buff_ms = 90'000},
+               .respawn_ms = 150'000, .buff = JungleBuff::Wisdom, .buff_ms = 90'000},
     // [U-364] epic monsters (Claude ideas): a stacking team buff and a gold one
     MonsterDef{.name = "Lion Turtle", .body = &kBeastBody, .boss = true, .hp = 900'000, .attack = 10'000, .defence = 7'000,
                .elemental_defence = 7'000, .move_speed = 20'000, .attack_speed = 45, .attack_range = 120, .model_size = 9'000,
