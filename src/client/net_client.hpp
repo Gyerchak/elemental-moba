@@ -33,6 +33,7 @@ struct Snapshot {
     std::vector<net::NetWallHp> walls;  // [U-288] damaged wall pieces
     std::vector<net::NetCamp> camps;    // [U-365] jungle camps + respawn timers
     std::vector<net::NetCompanion> companions;  // [U-407]
+    std::vector<net::NetWallSeg> segs;          // [U-443] wall segments (drawn rotated)
     std::vector<net::NetFalcon> falcons;  // [U-235]
     std::vector<net::NetGhost> ghosts;
     std::vector<net::NetScore> scores;

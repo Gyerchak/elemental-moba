@@ -318,6 +318,18 @@ void Server::send_snapshot(Player& p) {
             wh.push_back({std::int16_t(x), std::int16_t(y), std::uint8_t(std::clamp(wc.hp * 100 / std::max(1, wc.max), 1, 99)), 0});
         }
         w.put<std::uint16_t>(std::uint16_t(wh.size()));
+        // [U-443] the segments my team made, or that it sees (any of their cells)
+        std::vector<NetWallSeg> sg;
+        for (const auto& [id, s] : W.segs) {
+            bool seen = s.team == team;
+            for (std::size_t k = 0; !seen && k < s.cells.size(); ++k) seen = vm.cell(int(s.cells[k] % kGridSize), int(s.cells[k] / kGridSize));
+            if (!seen || sg.size() >= 300 || s.until_ms + 1'000 < W.now_ms || s.cells.empty()) continue;
+            if (W.grid.at(int(s.cells[0] % kGridSize), int(s.cells[0] / kGridSize)).wall() == Wall::None) continue;  // fallen
+            sg.push_back({s.x, s.y, std::int16_t(s.along.x), std::int16_t(s.along.y), std::int16_t(kWallSegLen), s.thick, s.level, s.kind,
+                          std::uint8_t(std::clamp(s.hp * 100 / std::max(1, s.max), 0, 100)), 0});
+        }
+        w.put<std::uint16_t>(std::uint16_t(sg.size()));
+        for (const NetWallSeg& n : sg) w.put(n);
         for (const NetWallHp& n : wh) w.put(n);
         std::vector<NetWallBreak> wb;  // [U-341] pieces that fell in the last second, where the team sees
         for (const WallBreak& b : W.wall_breaks)
@@ -407,6 +419,8 @@ void Server::send_snapshot(Player& p) {
         {  // [U-433]
             const SkillDef* cd = me->skill[std::size_t(i)];
             m.charges[i] = cd && cd->charges ? std::uint8_t(cd->charges - a.charges_used) : 255;
+            m.charge_total_ms[i] = cd ? cd->charge_ms : 0;
+            m.charge_left_ms[i] = cd && cd->charges && a.charges_used > 0 ? std::int32_t(std::max<std::int64_t>(0, a.charge_next_ms - W.now_ms)) : 0;
         }
         if (me->skill[std::size_t(i)]) {
             const ResolvedAbility ra = W.resolved(*me, Slot(i));

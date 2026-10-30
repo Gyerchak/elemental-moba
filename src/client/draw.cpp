@@ -81,6 +81,40 @@ void ellipse(SDL_Renderer* r, float x, float y, float rx, float ry, Rgba c, int 
     SDL_RenderLines(r, p.data(), int(p.size()));
 }
 
+void cooldown_sweep(SDL_Renderer* r, float x, float y, float s, float fraction, Rgba c) {
+    fraction = std::clamp(fraction, 0.f, 1.f);
+    if (fraction <= 0) return;
+    // a fan from the centre: the cooled-down part (from 12 o'clock clockwise) is open, the rest is shaded — clipped to
+    // the square by projecting each ray onto the square's border
+    const float cx = x + s / 2, cy = y + s / 2, h = s / 2;
+    const int steps = std::max(4, int(64 * fraction));
+    thread_local std::vector<SDL_Vertex> v;
+    thread_local std::vector<int> idx;
+    v.clear(), idx.clear();
+    const SDL_FColor fc{c.r / 255.f, c.g / 255.f, c.b / 255.f, c.a / 255.f};
+    v.push_back({{cx, cy}, fc, {0, 0}});
+    const float start = (1 - fraction) * 6.2831853f;  // the shaded part ends at 12 o'clock (it shrinks clockwise)
+    for (int i = 0; i <= steps; ++i) {
+        const float a = start + float(i) / float(steps) * fraction * 6.2831853f;
+        const float dx = std::sin(a), dy = -std::cos(a);
+        const float k = h / std::max(std::abs(dx), std::abs(dy));  // to the square's border
+        v.push_back({{cx + dx * k, cy + dy * k}, fc, {0, 0}});
+        if (i > 0) idx.insert(idx.end(), {0, i, i + 1});
+    }
+    SDL_RenderGeometry(r, nullptr, v.data(), int(v.size()), idx.data(), int(idx.size()));
+}
+
+void ring_arc(SDL_Renderer* r, float cx, float cy, float rad, float progress, Rgba c, float thick) {
+    progress = std::clamp(progress, 0.f, 1.f);
+    const int steps = std::max(3, int(40 * progress));
+    set_color(r, c);
+    for (float t = 0; t < thick; t += 1)
+        for (int i = 0; i < steps; ++i) {
+            const float a0 = float(i) / float(steps) * progress * 6.2831853f, a1 = float(i + 1) / float(steps) * progress * 6.2831853f;
+            SDL_RenderLine(r, cx + std::sin(a0) * (rad + t), cy - std::cos(a0) * (rad + t), cx + std::sin(a1) * (rad + t), cy - std::cos(a1) * (rad + t));
+        }
+}
+
 void fill_rect(SDL_Renderer* r, float x, float y, float w, float h, Rgba c) {
     set_color(r, c);
     const SDL_FRect f{x, y, w, h};

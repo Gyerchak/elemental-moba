@@ -37,6 +37,7 @@ constexpr ActionInfo kInfo[kActions] = {
     {"cancel_cast", "Cancel cast / channel", SDL_SCANCODE_Z},
     {"attack_range", "Attack range circle (hold; Ctrl = on / off)", SDL_SCANCODE_GRAVE},
     {"source_form", "Waterbenders: water source as water / ice", SDL_SCANCODE_K},
+    {"quick_cast_all", "Quick cast all on / off", SDL_SCANCODE_N},  // [U-447]
     {"item1", "Item 1", SDL_SCANCODE_1}, {"item2", "Item 2", SDL_SCANCODE_2}, {"item3", "Item 3", SDL_SCANCODE_3},
     {"item4", "Item 4", SDL_SCANCODE_4}, {"item5", "Item 5", SDL_SCANCODE_5}, {"item6", "Item 6", SDL_SCANCODE_6},
     {"item7", "Item 7", SDL_SCANCODE_7}, {"item8", "Item 8", SDL_SCANCODE_8}, {"item9", "Item 9", SDL_SCANCODE_9},

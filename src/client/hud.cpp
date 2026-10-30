@@ -340,16 +340,27 @@ void GameView::draw_bottom_panel(NetClient& net, double now_s, Ui& ui) {
                 text(r_, sx + 25 - text_w(utf8_cut(d->name, 5)) / 2, sy + 21, utf8_cut(d->name, 5), learned ? Rgba{255, 255, 255} : Rgba{110, 110, 110});
             }
         }
-        if (cd_left > 0 && learned && me.cd_total_ms[i] > 0) {
-            const float f = std::min(1.f, float(cd_left) / float(me.cd_total_ms[i]));
-            fill_rect(r_, sx, sy + 50 * (1 - f), 50, 50 * f, {0, 0, 0, 175});
-            text(r_, sx + 25 - text_w(sec1(cd_left), 1.5f) / 2, sy + 19, sec1(cd_left), {255, 255, 255}, 1.5f);
+        if (cd_left > 0 && learned && me.cd_total_ms[i] > 0) {  // [U-444] a clockwise sweep + the exact time
+            const float f = std::min(1.f, float(cd_left) / float(std::max<std::int64_t>(me.cd_total_ms[i], cd_left)));
+            cooldown_sweep(r_, sx, sy, 50, f, {0, 0, 0, 185});
+            const std::string ts = cd_left < 1'000 ? std::format("{:.1f}", cd_left / 1000.0) : std::format("{}", (cd_left + 999) / 1000);
+            text(r_, sx + 26 - text_w(ts, 1.6f) / 2, sy + 19, ts, {0, 0, 0}, 1.6f);  // (a shadow)
+            text(r_, sx + 25 - text_w(ts, 1.6f) / 2, sy + 18, ts, {255, 255, 255}, 1.6f);
+            cd_was_[std::size_t(i)] = true;
+        } else if (cd_was_[std::size_t(i)]) {  // just became ready: a short bright flash
+            cd_was_[std::size_t(i)] = false;
+            cd_ready_t_[std::size_t(i)] = last_frame_;
         }
+        if (const double fl = last_frame_ - cd_ready_t_[std::size_t(i)]; fl >= 0 && fl < 0.35)
+            fill_rect(r_, sx, sy, 50, 50, {255, 255, 230, std::uint8_t(160 * (1 - fl / 0.35))});
         if (me.stolen_ms > 0 && me.stolen_slot == i) text(r_, sx + 2, sy + 38, "STOLEN", {255, 80, 255});
         if (me.recast[i] > 0 && d && d->casts > 1) text(r_, sx + 30, sy + 2, std::format("{}/{}", me.recast[i], d->casts), {255, 255, 120});
-        if (me.charges[i] != 255) {  // [U-433] charges ready (a small badge)
-            fill_rect(r_, sx + 34, sy + 32, 15, 15, {20, 20, 30, 230});
-            text(r_, sx + 37, sy + 35, std::format("{}", me.charges[i]), me.charges[i] > 0 ? Rgba{140, 230, 255} : Rgba{150, 150, 150});
+        if (me.charges[i] != 255) {  // [U-433][U-444] charges ready + a ring filling up to the next charge
+            fill_circle(r_, sx + 41, sy + 40, 9, {20, 20, 30, 235}, 16);
+            if (me.charge_total_ms[i] > 0 && me.charge_left_ms[i] > 0)
+                ring_arc(r_, sx + 41, sy + 40, 9, 1.f - float(me.charge_left_ms[i]) / float(me.charge_total_ms[i]), {140, 230, 255, 255}, 2);
+            const std::string cs = std::format("{}", me.charges[i]);
+            text(r_, sx + 41 - text_w(cs) / 2, sy + 36, cs, me.charges[i] > 0 ? Rgba{140, 230, 255} : Rgba{150, 150, 150});
         }
         if (d && me.s_cost[i] > 0 && me.res < me.s_cost[i] * 100 && cd.resource != ResourceKind::Rage)  // no resource
             fill_rect(r_, sx, sy, 50, 50, cd.resource == ResourceKind::Fuel ? Rgba{140, 30, 30, 90} : Rgba{20, 40, 140, 90});  // fuel: HP pays
@@ -450,6 +461,8 @@ void GameView::draw_bottom_panel(NetClient& net, double now_s, Ui& ui) {
     if (icon_button(ui, bx + 42, y0 + 6, 38, "SCORE", key_name(Action::Score), show_score_)) show_score_ = !show_score_;
     if (icon_button(ui, bx + 42, y0 + 46, 38, set_.auto_attack ? "AA on" : "AA off", key_name(Action::ToggleAutoAttack), set_.auto_attack))
         on_action(Action::ToggleAutoAttack, false, net);
+    if (icon_button(ui, bx + 42, y0 + 86, 38, set_.quick_cast_all ? "QC on" : "QC off", key_name(Action::QuickCastAll), set_.quick_cast_all))  // [U-447]
+        on_action(Action::QuickCastAll, false, net);
 
     if (hover_slot >= 0) draw_skill_tooltip(net, hover_slot, kx + float(hover_slot) * sp, above - 54, alt, hover_plus);  // [U-238]
 }

@@ -388,6 +388,8 @@ void NetClient::handle(const std::uint8_t* data, std::size_t n, double now_s) {
             for (auto& c : s.clouds) c = r.get<NetCloud>();
             s.walls.resize(r.get<std::uint16_t>());  // [U-288]
             for (auto& wh : s.walls) wh = r.get<NetWallHp>();
+            s.segs.resize(r.get<std::uint16_t>());   // [U-443]
+            for (auto& sg : s.segs) sg = r.get<NetWallSeg>();
             {  // [U-341] new falling wall pieces → local animations (each once)
                 const std::uint16_t nb = r.get<std::uint16_t>();
                 for (int i = 0; i < nb && !r.bad(); ++i) {

@@ -55,6 +55,20 @@ void outlined(SDL_Renderer* r, float x, float y, std::string_view s, Rgba c, flo
 void GameView::terrain_begin(NetClient& net) {
     wall_pct_.clear();  // [U-438] damaged wall cells this frame
     for (const auto& wh : net.cur.walls) wall_pct_[std::uint32_t(wh.y) * kGridSize + std::uint32_t(wh.x)] = wh.pct;
+    // [U-443] wall segments: which cells they cover (those are not drawn one by one) and in which row each is drawn
+    seg_cells_.clear();
+    seg_rows_.clear();
+    for (std::size_t i = 0; i < net.cur.segs.size(); ++i) {
+        const auto& s = net.cur.segs[i];
+        const float ax = float(s.dx) / kOne, ay = float(s.dy) / kOne, hl = float(s.len) / 2 + 16, ht = float(s.thick) / 2 + 16;
+        const int r = int((hl + ht) / kCellUnits) + 1, ccx = s.x / kCellUnits, ccy = s.y / kCellUnits;
+        for (int y = ccy - r; y <= ccy + r; ++y)
+            for (int x = ccx - r; x <= ccx + r; ++x) {
+                const float px = float(x * kCellUnits + 16 - s.x), py = float(y * kCellUnits + 16 - s.y);
+                if (std::abs(px * ax + py * ay) <= hl && std::abs(-px * ay + py * ax) <= ht) seg_cells_.insert(std::uint32_t(y) * kGridSize + std::uint32_t(x));
+            }
+        seg_rows_[ccy].push_back(i);
+    }
     terr_on_ = view_.hz > 0 && set_.tree_models && view_.zoom >= 0.2f;
     if (!terr_on_) return;
     const int up = int(std::ceil(300.f * view_.hz / std::max(0.1f, view_.gy) / kCellUnits)) + 1;  // tall models
@@ -67,12 +81,51 @@ void GameView::terrain_begin(NetClient& net) {
     terr_k_ = 0;
 }
 
+// [U-443] one wall segment as a rotated block: four sides (far ones first) and the top, at its real angle
+void GameView::draw_segment(const net::NetWallSeg& s) {
+    const float ax = float(s.dx) / kOne, ay = float(s.dy) / kOne, sx_ = -ay, sy_ = ax;
+    const float hl = float(s.len) / 2, ht = float(s.thick) / 2;
+    const float h = s.kind == std::uint8_t(Wall::Ice) ? 30.f + 18.f * s.level : s.kind == std::uint8_t(Wall::Metal) ? 36.f + 20.f * s.level
+                                                                                                                      : 32.f + 22.f * s.level;
+    const float gx[4] = {float(s.x) - ax * hl - sx_ * ht, float(s.x) + ax * hl - sx_ * ht, float(s.x) + ax * hl + sx_ * ht, float(s.x) - ax * hl + sx_ * ht};
+    const float gyw[4] = {float(s.y) - ay * hl - sy_ * ht, float(s.y) + ay * hl - sy_ * ht, float(s.y) + ay * hl + sy_ * ht, float(s.y) - ay * hl + sy_ * ht};
+    Rgba side{84, 78, 70, 255}, top{122, 114, 102, 255};
+    if (s.kind == std::uint8_t(Wall::Ice)) side = {150, 205, 235, 190}, top = {205, 238, 252, 210};
+    if (s.kind == std::uint8_t(Wall::Metal)) side = {110, 116, 128, 255}, top = {185, 191, 205, 255};
+    auto quad = [&](SDL_FPoint a, SDL_FPoint b, SDL_FPoint c, SDL_FPoint d, Rgba col) {
+        const SDL_FColor fc{col.r / 255.f, col.g / 255.f, col.b / 255.f, col.a / 255.f};
+        const SDL_Vertex v[4] = {{a, fc, {}}, {b, fc, {}}, {c, fc, {}}, {d, fc, {}}};
+        const int idx[6] = {0, 1, 2, 0, 2, 3};
+        SDL_RenderGeometry(r_, nullptr, v, 4, idx, 6);
+    };
+    SDL_FPoint g[4], t[4];
+    for (int k = 0; k < 4; ++k) g[k] = {view_.sx(gx[k]), view_.sy(gyw[k])}, t[k] = {view_.sx(gx[k]), view_.sy_h(gyw[k], h)};
+    int order[4] = {0, 1, 2, 3};  // sides sorted far → near (by their screen depth)
+    std::sort(order, order + 4, [&](int a, int b) { return g[a].y + g[(a + 1) % 4].y < g[b].y + g[(b + 1) % 4].y; });
+    for (int k : order) {
+        const int n = (k + 1) % 4;
+        const float shade = 0.75f + 0.25f * std::abs(g[n].x - g[k].x) / std::max(1.f, std::hypot(g[n].x - g[k].x, g[n].y - g[k].y));
+        quad(g[k], g[n], t[n], t[k], {std::uint8_t(side.r * shade), std::uint8_t(side.g * shade), std::uint8_t(side.b * shade), side.a});
+    }
+    quad(t[0], t[1], t[2], t[3], top);
+    // [U-438] its HP state: cracks on the top and the near side
+    const int lost = 100 - s.pct, state = lost * 3 < 100 ? 0 : lost * 3 < 200 ? 1 : 2;
+    for (int k = 0; k < (state == 0 ? 0 : state == 1 ? 2 : 5); ++k) {
+        const float f = 0.15f + 0.17f * float(k);
+        const SDL_FPoint p0{t[0].x + (t[1].x - t[0].x) * f, t[0].y + (t[1].y - t[0].y) * f}, p1{t[3].x + (t[2].x - t[3].x) * (f + 0.06f), t[3].y + (t[2].y - t[3].y) * (f + 0.06f)};
+        line(r_, p0.x, p0.y, (p0.x + p1.x) / 2 + 3, (p0.y + p1.y) / 2, {15, 15, 15, 230});
+        line(r_, (p0.x + p1.x) / 2 + 3, (p0.y + p1.y) / 2, p1.x, p1.y, {15, 15, 15, 230});
+    }
+}
+
 void GameView::terrain_until(NetClient& net, float screen_y) {
     if (!terr_on_) return;
     for (; terr_k_ <= terr_y1_ - terr_y0_; ++terr_k_) {
         const int y = view_.flip ? terr_y1_ - terr_k_ : terr_y0_ + terr_k_;  // back to front on screen
         if (view_.sy(float(y * kCellUnits + 16)) > screen_y) return;
         draw_terrain_row(net, y);
+        if (const auto it = seg_rows_.find(y); it != seg_rows_.end())  // [U-443] the segments centred on this row
+            for (std::size_t i : it->second) draw_segment(net.cur.segs[i]);
     }
 }
 
@@ -98,12 +151,19 @@ void GameView::draw_terrain_row(NetClient& net, int y) {
             } else if (trees && c.bush() == Bush::Alive && ((x + y) % 2 == 0)) {
                 if (bush) Sprites::draw(r_, *bush, "idle", 0, 0, sx, gy, z * 0.7f);
                 else fill_ellipse(r_, sx, view_.sy_h(wy, 10), 18 * z, 12 * z, {54, 128, 44, 230}, 12);
-            } else if (c.walk() == Walk::Blocked && c.surface() == Surface::Stone && c.wall() == Wall::None) {
-                // [U-346] a natural rock wall in the jungle: a big rough rock, higher than player walls
-                const float top = view_.sy_h(wy, 85 + float((x * 7 + y * 3) % 20));
-                fill_rect(r_, sx - 17 * z, top, 34 * z, gy - top, {104, 98, 90, 255});
-                fill_rect(r_, sx - 17 * z, top - 7 * z * view_.gy, 34 * z, 14 * z * view_.gy, {146, 140, 128, 255});
-                line(r_, sx - 6 * z, top + 6 * z, sx + 4 * z, gy - 6 * z, {80, 76, 70, 200});
+            } else if (c.wall() != Wall::None && seg_cells_.contains(std::uint32_t(y) * kGridSize + std::uint32_t(x))) {
+                // [U-443] part of a wall segment: drawn as one rotated block (draw_segment), not cell by cell
+            } else if (c.walk() == Walk::Blocked && c.surface() == Surface::Stone && c.elevation() >= 1) {
+                // [U-443][U-346] a natural map rock: a rounded boulder of a few lumps (size / shade vary per cell),
+                // so outcrops read as natural rock, not as square blocks
+                const std::uint32_t hsh = std::uint32_t(x) * 73'856'093u ^ std::uint32_t(y) * 19'349'663u;
+                const float hgt = 70 + float(hsh % 30), rr = (17 + float(hsh / 7 % 6)) * z;
+                const float top = view_.sy_h(wy, hgt);
+                fill_ellipse(r_, sx, gy - 2 * z, rr * 1.15f, rr * 0.55f * view_.gy, {58, 54, 50, 200}, 14);           // foot shadow
+                fill_ellipse(r_, sx, (top + gy) / 2, rr * 1.05f, (gy - top) / 2 + 3 * z, {98, 92, 84, 255}, 16);       // body
+                fill_ellipse(r_, sx - rr * 0.25f, top + (gy - top) * 0.3f, rr * 0.7f, (gy - top) * 0.3f, {126, 119, 108, 255}, 14);  // light face
+                fill_ellipse(r_, sx + rr * 0.35f, top + (gy - top) * 0.55f, rr * 0.45f, (gy - top) * 0.25f, {84, 79, 72, 255}, 12);   // dark lump
+                fill_ellipse(r_, sx - rr * 0.35f, top + 4 * z, rr * 0.35f, 4 * z * view_.gy + 1, {156, 150, 138, 255}, 10);           // highlight
                 draw_wall_cracks(x, y, top);
             } else if (c.wall() == Wall::Stone) {  // raised block
                 const float top = view_.sy_h(wy, 60);

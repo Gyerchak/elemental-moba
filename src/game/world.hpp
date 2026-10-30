@@ -353,6 +353,12 @@ struct WallSeg {  // [U-380] one 100-unit piece of a skill wall: all its cells s
     std::int32_t hp = 0, max = 0;
     std::vector<std::uint32_t> cells;
     std::int64_t until_ms = 0;
+    // [U-443] its shape for drawing: centre (units), direction along it, thickness, height, kind, who made it
+    std::int32_t x = 0, y = 0;
+    Dir along{kOne, 0};
+    std::int16_t thick = 66;
+    std::uint8_t level = 2, kind = 0;
+    Team team = Team::Neutral;
 };
 struct WallBreak {  // [U-341] a wall piece fell: broken by a hit (pushed in dx / dy) or crumbled by time (0 / 0)
     std::int16_t x = 0, y = 0;

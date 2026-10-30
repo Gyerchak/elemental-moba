@@ -27,6 +27,7 @@ enum class Action : std::uint8_t {
     CancelCast,        // [U-265] Z: cancel the cast / channel
     AttackRange,       // [U-289] ` (hold): my autoattack range circle; Ctrl + ` = always on / off
     SourceForm,        // [U-293] K: waterbenders — water from sources comes as water / ice
+    QuickCastAll,      // [U-447] N: "quick cast all" on / off
     Item1, Item2, Item3, Item4, Item5, Item6, Item7, Item8, Item9,  // [U-322] 1 = the special slot
     Count
 };

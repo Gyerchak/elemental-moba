@@ -40,6 +40,10 @@ void text(SDL_Renderer* r, float x, float y, std::string_view s, Rgba c = {}, fl
 void init_text(SDL_Renderer* r);  // once, after the renderer exists
 // Cut `s` (UTF-8 safe) so it fits in `max_w` pixels, ending with "…" when cut [U-250] (no text over other text).
 [[nodiscard]] std::string fit_text(std::string s, float max_w, float scale = 1);
+// [U-444] a cooldown sweep: the part of the square [x, y, s] still on cooldown (fraction 0 … 1), clockwise from 12 o'clock
+void cooldown_sweep(SDL_Renderer* r, float x, float y, float s, float fraction, Rgba c);
+// a ring arc (progress 0 … 1, clockwise from 12 o'clock) around a centre
+void ring_arc(SDL_Renderer* r, float cx, float cy, float rad, float progress, Rgba c, float thick = 2);
 // [U-389] the first n CHARACTERS (UTF-8 safe: never half a Polish letter)
 [[nodiscard]] inline std::string utf8_cut(std::string_view s, std::size_t n) {
     std::size_t i = 0, chars = 0;

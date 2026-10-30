@@ -190,6 +190,13 @@ struct NetWallHp {
     std::int16_t x, y;
     std::uint8_t pct, pad;
 };
+// [U-443] one wall segment as it is: centre, direction, thickness, height, kind, HP % — drawn rotated (any angle)
+struct NetWallSeg {
+    std::int32_t x, y;
+    std::int16_t dx, dy;           // along (Q14)
+    std::int16_t len, thick;
+    std::uint8_t level, kind, pct, pad;
+};
 // [U-241] a cloud everyone sees (it blocks vision for both teams)
 struct NetCloud {
     std::int32_t x, y;
@@ -343,6 +350,7 @@ struct NetMe {
     std::int32_t water, water_max;  // [U-339] the Avatar's carried water
     std::int16_t lion_stacks[2];    // [U-364] Lion Turtle stacks per team
     std::uint8_t charges[kSkillSlots];  // [U-433] charges ready per skill (255 = the skill has no charges)
+    std::int32_t charge_left_ms[kSkillSlots], charge_total_ms[kSkillSlots];  // [U-444] the next charge: time left / full
 };
 
 // [U-407] a travel companion on its way (or carrying its rider home)

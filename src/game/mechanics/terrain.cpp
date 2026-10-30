@@ -126,7 +126,7 @@ void World::raise_segment(std::int32_t x, std::int32_t y, Dir along, Wall kind, 
     if (cells.empty()) return;
     const std::uint32_t id = next_seg_++;
     WallSeg& seg = segs[id];
-    seg = {ws.hp, ws.hp, cells, now_ms + life_ms};
+    seg = {ws.hp, ws.hp, cells, now_ms + life_ms, x, y, along, std::int16_t(ws.thick), std::uint8_t(ws.level), std::uint8_t(kind), by_team};
     // [U-380] who stands on it: a unit whose whole body fits on the segment is LIFTED on top (the cells it stands on
     // become walkable at the raised level); everybody else is pushed out of it as before
     bool lifted = false;

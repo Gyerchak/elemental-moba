@@ -6,6 +6,7 @@
 #include <array>
 #include <cstdint>
 #include <unordered_map>
+#include <unordered_set>
 #include <string>
 #include <vector>
 
@@ -48,6 +49,9 @@ private:
     void terrain_begin(NetClient& net);                 // [U-389]
     void draw_wall_cracks(int x, int y, float top);     // [U-438]
     std::unordered_map<std::uint32_t, std::uint8_t> wall_pct_;
+    std::unordered_set<std::uint32_t> seg_cells_;                       // [U-443] cells drawn as part of a segment
+    std::unordered_map<int, std::vector<std::size_t>> seg_rows_;         // row → segments centred there
+    void draw_segment(const net::NetWallSeg& s);
     void terrain_until(NetClient& net, float screen_y);
     void draw_terrain_row(NetClient& net, int y);
     bool terr_on_ = false;
@@ -175,6 +179,9 @@ private:
     std::unordered_map<std::uint32_t, AnimMem> anim_mem_;
     std::unordered_map<std::uint32_t, double> fx_born_;
     int sent_companion_ = -1;  // [U-407]
+    bool force_quick_ = false; // [U-452] Ctrl + skill with nothing to level
+    std::array<bool, kSkillSlots> cd_was_{};          // [U-444] on cooldown last frame …
+    std::array<double, kSkillSlots> cd_ready_t_{};     // … ready since (the flash)
     float info_bottom_ = 0;    // [U-430] bottom of the selected unit's info panel (last frame)
     std::vector<net::NetFx> fx_draw_;                 // [U-389] this frame's effects at their delayed positions
     std::vector<net::NetCompanion> comp_draw_;

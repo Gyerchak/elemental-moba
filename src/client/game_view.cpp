@@ -397,7 +397,7 @@ void GameView::cast_key(NetClient& net, int slot, bool from_click) {
     const bool self = d->kind == SkillKind::Shield || d->kind == SkillKind::Haste || d->kind == SkillKind::Flight ||
                       d->kind == SkillKind::SelfFreeze || d->kind == SkillKind::WindSense ||
                       (d->kind == SkillKind::Burst && d->range == 0) || (d->kind == SkillKind::Heal && d->range == 0);
-    const bool quick = set_.quick(slot) && !from_click;
+    const bool quick = (set_.quick(slot) || force_quick_) && !from_click;
     if (d->control == 2 && !from_click && ui_) {  // [U-402] hold the key and move the mouse: the wall follows the path
         drawing_slot_ = slot;
         draw_path_ = {{view_.wx(ui_->mx), view_.wy(ui_->my)}};
@@ -569,10 +569,12 @@ void GameView::on_action(Action a, bool ctrl, NetClient& net) {
             // [U-301] only this skill: blocked → a notice, never another skill instead
             const SkillDef* sd = skill_of(net, sl);
             const DrawUnit* mine = me_unit();
-            if (net.have_snapshot && net.cur.me.skill_points <= 0) hint(tr("no skill points (one per level)"));
-            else if (sd && mine && net.cur.me.rank[sl] >= skill_max_rank(*sd, mine->u.level))
-                hint(std::format("{}: {}", sd->name, tr("cannot level up now — pick another skill")));
-            else net.send_cmd({.kind = CmdKind::LevelUp, .slot = std::uint8_t(sl)});
+            // [U-452] nothing to level here → Ctrl + skill = a QUICK cast of it (a hold shortcut, whatever the setting)
+            const bool can_level = net.have_snapshot && net.cur.me.skill_points > 0 && sd && mine && net.cur.me.rank[sl] < skill_max_rank(*sd, mine->u.level);
+            if (can_level) net.send_cmd({.kind = CmdKind::LevelUp, .slot = std::uint8_t(sl)});
+            else if (sd && net.cur.me.rank[sl] > 0) force_quick_ = true, cast_key(net, sl), force_quick_ = false;
+            else if (net.have_snapshot && net.cur.me.skill_points <= 0) hint(tr("no skill points (one per level)"));
+            else hint(std::format("{}: {}", sd ? sd->name : "?", tr("cannot level up now — pick another skill")));
         } else {
             cast_key(net, sl);
         }
@@ -583,6 +585,11 @@ void GameView::on_action(Action a, bool ctrl, NetClient& net) {
         return;
     }
     switch (a) {
+        case Action::QuickCastAll:  // [U-447]
+            set_.quick_cast_all = !set_.quick_cast_all;
+            set_.save();
+            hint(set_.quick_cast_all ? tr("quick cast: ALL skills") : tr("quick cast: per skill (Options)"));
+            return;
         case Action::Stop: net.send_cmd({.kind = CmdKind::Stop}); pending_ = -1; break;  // [U-265] the cast goes on
         case Action::CancelCast: net.send_cmd({.kind = CmdKind::CancelCast}); pending_ = -1; break;  // [U-265] Z
         case Action::Stance: net.send_cmd({.kind = CmdKind::Stance}); break;            // [U-72]
