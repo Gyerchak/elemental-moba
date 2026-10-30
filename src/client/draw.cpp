@@ -27,9 +27,11 @@ Rgba resource_colour(std::uint8_t kind, std::uint64_t t) {
 
 void fill_circle(SDL_Renderer* r, float x, float y, float rad, Rgba c, int seg) {
     if (rad <= 0.3f) return;
-    std::vector<SDL_Vertex> v(std::size_t(seg) + 1);
-    std::vector<int> idx;
-    idx.reserve(std::size_t(seg) * 3);
+    // [U-389] reused buffers: no heap allocation per shape (hundreds per frame used to hitch)
+    thread_local std::vector<SDL_Vertex> v;
+    thread_local std::vector<int> idx;
+    v.resize(std::size_t(seg) + 1);
+    idx.clear();
     const SDL_FColor fc{c.r / 255.f, c.g / 255.f, c.b / 255.f, c.a / 255.f};
     v[0] = {{x, y}, fc, {0, 0}};
     for (int i = 0; i < seg; ++i) {
@@ -41,7 +43,8 @@ void fill_circle(SDL_Renderer* r, float x, float y, float rad, Rgba c, int seg) 
 }
 
 void circle(SDL_Renderer* r, float x, float y, float rad, Rgba c, int seg) {
-    std::vector<SDL_FPoint> p(std::size_t(seg) + 1);
+    thread_local std::vector<SDL_FPoint> p;  // [U-389] reused
+    p.resize(std::size_t(seg) + 1);
     for (int i = 0; i <= seg; ++i) {
         const float a = float(i) * 6.2831853f / float(seg);
         p[std::size_t(i)] = {x + std::cos(a) * rad, y + std::sin(a) * rad};
@@ -52,9 +55,11 @@ void circle(SDL_Renderer* r, float x, float y, float rad, Rgba c, int seg) {
 
 void fill_ellipse(SDL_Renderer* r, float x, float y, float rx, float ry, Rgba c, int seg) {
     if (rx <= 0.3f || ry <= 0.2f) return;
-    std::vector<SDL_Vertex> v(std::size_t(seg) + 1);
-    std::vector<int> idx;
-    idx.reserve(std::size_t(seg) * 3);
+    // [U-389] reused buffers: no heap allocation per shape (hundreds per frame used to hitch)
+    thread_local std::vector<SDL_Vertex> v;
+    thread_local std::vector<int> idx;
+    v.resize(std::size_t(seg) + 1);
+    idx.clear();
     const SDL_FColor fc{c.r / 255.f, c.g / 255.f, c.b / 255.f, c.a / 255.f};
     v[0] = {{x, y}, fc, {0, 0}};
     for (int i = 0; i < seg; ++i) {
@@ -66,7 +71,8 @@ void fill_ellipse(SDL_Renderer* r, float x, float y, float rx, float ry, Rgba c,
 }
 
 void ellipse(SDL_Renderer* r, float x, float y, float rx, float ry, Rgba c, int seg) {
-    std::vector<SDL_FPoint> p(std::size_t(seg) + 1);
+    thread_local std::vector<SDL_FPoint> p;  // [U-389] reused
+    p.resize(std::size_t(seg) + 1);
     for (int i = 0; i <= seg; ++i) {
         const float a = float(i) * 6.2831853f / float(seg);
         p[std::size_t(i)] = {x + std::cos(a) * rx, y + std::sin(a) * ry};

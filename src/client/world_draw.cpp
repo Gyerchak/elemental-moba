@@ -131,12 +131,11 @@ void GameView::update_fog_fade(double now_s) {
             fog_shown_px_[i] = b;
             continue;
         }
-        std::uint32_t out = 0;
-        for (int sh = 0; sh < 32; sh += 8) {
-            const int ca = int((a >> sh) & 255), cb = int((b >> sh) & 255);
-            out |= std::uint32_t(ca + (cb - ca) * t / 256) << sh;
-        }
-        fog_shown_px_[i] = out;
+        // [U-389] only the alpha fades; the colour is the visible side's (a fade from "clear" 0,0,0,0 used to pass
+        // through a dark wrong colour → a faint dark halo at the fog edge)
+        const int aa = int(a >> 24), ab = int(b >> 24);
+        const std::uint32_t rgb = (ab > 0 ? b : a) & 0x00ffffffu;
+        fog_shown_px_[i] = rgb | std::uint32_t(aa + (ab - aa) * t / 256) << 24;
     }
     SDL_UpdateTexture(fog_tex_, nullptr, fog_shown_px_.data(), kGridSize * 4);
 }

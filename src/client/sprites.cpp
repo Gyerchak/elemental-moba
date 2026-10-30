@@ -52,7 +52,8 @@ void Sprites::draw(SDL_Renderer* r, const SpriteSheet& s, const std::string& ani
     // half a pixel inside the frame: the smooth filter must never read the NEIGHBOUR frame (thin lines / specks) [U-338]
     const SDL_FRect src{float((a.col + f) * s.px) + 0.5f, float(row * s.px) + 0.5f, float(s.px) - 1.f, float(s.px) - 1.f};
     const float size = s.ortho_m * kUnitsPerMetre * scale;  // the frame width on screen
-    const SDL_FRect dst{sx - size * s.ax, sy - size * s.ay, size, size};
+    // [U-389] whole pixels: fractional positions made thin lines shimmer while moving / zoomed out
+    const SDL_FRect dst{std::round(sx - size * s.ax), std::round(sy - size * s.ay), std::round(size), std::round(size)};
     SDL_SetTextureColorMod(s.tex, tint.r, tint.g, tint.b);
     SDL_SetTextureAlphaMod(s.tex, tint.a);
     SDL_RenderTexture(r, s.tex, &src, &dst);

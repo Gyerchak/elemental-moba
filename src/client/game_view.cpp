@@ -709,7 +709,8 @@ void GameView::frame(NetClient& net, double now_s, Ui& ui) {
         view_.cx = std::clamp(view_.cx, 0.f, float(kMapUnits));
         view_.cy = std::clamp(view_.cy, 0.f, float(kMapUnits));
     }
-    if (now_s - last_fog_ > 0.1 || net.grid_dirty) {
+    // [U-389] terrain changes are shown quickly, but at most 30× a second (fire / wall fights rebuilt every frame → hitches)
+    if (now_s - last_fog_ > 0.1 || (net.grid_dirty && now_s - last_fog_ > 0.033)) {
         rebuild_textures(net, now_ms, last_fog_ < 0);
         fog_fade_from_ = now_s;
         fog_fade_t_ = -1;
@@ -895,7 +896,10 @@ void GameView::draw_hud(NetClient& net, double now_s, Ui& ui) {
                                       sky.minute_of_day % 60, tr("sight"), vision_range_pct(sky),
                                       nx.name.empty() ? std::string() : std::format("   {}: {} {}", tr("next"), nx.name, mmss(nx.in_ms))),
          {220, 220, 160});
-    text(r_, bx0 + 300, 46, std::format("{:.0f} ms  {:.0f} fps", net.ping_ms, frame_ms_ > 0 ? 1000.0 / frame_ms_ : 0.0), {150, 160, 180});
+    {  // [U-389] right end of the clock line (it used to sit in the chip row)
+        const std::string pf = std::format("{:.0f} ms  {:.0f} fps", net.ping_ms, frame_ms_ > 0 ? 1000.0 / frame_ms_ : 0.0);
+        text(r_, bx0 + 472 - text_w(pf), 10, pf, {150, 160, 180});
+    }
     {
         float cx = bx0 + 8;
         const ModView* hov = nullptr;
@@ -932,7 +936,7 @@ void GameView::draw_hud(NetClient& net, double now_s, Ui& ui) {
             const Rgba col = c.channel == net::Chat::Team ? Rgba{140, 200, 255} : c.channel == net::Chat::All ? Rgba{255, 255, 255}
                            : c.channel == net::Chat::Whisper ? Rgba{230, 140, 255} : c.channel == net::Chat::System ? Rgba{255, 220, 120}
                                                                                                                   : Rgba{200, 255, 200};
-            text(r_, 10, cy, std::format("[{}] {}: {}", net::chat_name(c.channel), c.from, c.text), col);
+            text(r_, 10, cy, fit_text(std::format("[{}] {}: {}", net::chat_name(c.channel), c.from, c.text), W - 250), col);  // [U-389]
             cy += 12;
         }
     if (chat_open_) {
@@ -999,10 +1003,19 @@ void GameView::draw_hud(NetClient& net, double now_s, Ui& ui) {
         }
         for (const auto& p : cur.pings)  // [U-246]
             if (cur.now_ms - p.ms < 4'500) circle(r_, mmx(float(p.x)), mmy(float(p.y)), 6 + float((cur.now_ms - p.ms) % 1'000) / 100.f, {255, 230, 90, 220}, 12);
-        rect(r_, std::min(mmx(view_.wx(0)), mmx(view_.wx(view_.sw))), std::min(mmy(view_.wy(0)), mmy(view_.wy(view_.sh))),
-             view_.sw / view_.zoom * sc, view_.sh / (view_.zoom * view_.gy) * sc, {255, 255, 255, 180});
+        SDL_SetRenderClipRect(r_, nullptr);
+        {  // [U-389] the camera frame stays inside the minimap (far zoom made it huge)
+            const SDL_Rect clip{int(mx), int(my), int(ms), int(ms)};
+            SDL_SetRenderClipRect(r_, &clip);
+            rect(r_, std::min(mmx(view_.wx(0)), mmx(view_.wx(view_.sw))), std::min(mmy(view_.wy(0)), mmy(view_.wy(view_.sh))),
+                 view_.sw / view_.zoom * sc, view_.sh / (view_.zoom * view_.gy) * sc, {255, 255, 255, 180});
+            SDL_SetRenderClipRect(r_, nullptr);
+        }
         rect(r_, mx, my, ms, ms, {140, 140, 160});
-        if (hover(ui, mx, my, ms, ms)) {
+        // [U-389] the shop window lies over the minimap on small screens: its clicks belong to the shop
+        const float shop_w = std::min(W - 80, 1100.f), shop_h = std::min(H - 260, 620.f);
+        const bool over_shop = show_shop_ && hover(ui, shop_x_, shop_y_ - 24, shop_w, shop_h + 24);
+        if (!over_shop && hover(ui, mx, my, ms, ms)) {
             const float wx = view_.fx((ui.mx - mx) / sc), wy = view_.fx((ui.my - my) / sc);
             if (ui.clicked) {
                 cam_lock_ = false;
@@ -1045,7 +1058,7 @@ void GameView::draw_hud(NetClient& net, double now_s, Ui& ui) {
         if (hover(ui, shop_x_, shop_y_, sw, sh)) mouse_on_hud_ = true;
     }
     // scoreboard
-    if (show_score_ || net.winner >= 0) {
+    if (show_score_ && net.winner < 0) {  // [U-389] (at the end the victory screen + post-game stats take over)
         const float sx = W / 2 - 360, sy = 90;
         // [U-411] epic monster timers at the top (like other MOBAs); Lion Turtle stacks per team
         std::string epics;
@@ -1056,7 +1069,7 @@ void GameView::draw_hud(NetClient& net, double now_s, Ui& ui) {
             }
         epics += std::format("{} {} / {}", tr("Lion Turtle stacks"), me.lion_stacks[0], me.lion_stacks[1]);
         fill_rect(r_, sx, sy - 26, 720, 22, {0, 0, 0, 220});
-        text(r_, sx + 10, sy - 22, epics, {255, 210, 80});
+        text(r_, sx + 10, sy - 22, fit_text(epics, 700), {255, 210, 80});
         fill_rect(r_, sx, sy, 720, 40 + 10 * 22.f, {0, 0, 0, 220});
         text(r_, sx + 10, sy + 8, tr("Champion            Lvl  K / D / A   CS   items   bounty"), {255, 255, 255});
         float ry = sy + 28;
@@ -1066,8 +1079,9 @@ void GameView::draw_hud(NetClient& net, double now_s, Ui& ui) {
                 if (r == net.roster.end() || r->second.team != team) continue;
                 int items = 0;
                 for (auto i : s.items) items += i >= 0;
-                text(r_, sx + 10, ry, std::format("{:<18}  {:>3}  {:>2} / {:>2} / {:>2}  {:>4}   {:>2}", r->second.name.substr(0, 18), s.level, s.kills, s.deaths,
-                                                  s.assists, s.cs, items), team_colour(team));
+                text(r_, sx + 10, ry, fit_text(r->second.name, 150), team_colour(team));  // [U-389] the name in its own column
+                text(r_, sx + 166, ry, std::format("{:>3}  {:>2} / {:>2} / {:>2}  {:>4}   {:>2}", s.level, s.kills, s.deaths, s.assists, s.cs, items),
+                     team_colour(team));
                 // [U-413] the bounty: gold when it is a shutdown (above 300), grey when lowered by deaths
                 const Rgba bc = s.bounty > 300 ? Rgba{255, 200, 60} : s.bounty < 300 ? Rgba{150, 150, 150} : Rgba{220, 220, 220};
                 const std::string bs = s.bounty > 300 ? std::format("{} g  SHUTDOWN", s.bounty) : std::format("{} g", s.bounty);
@@ -1111,9 +1125,11 @@ void GameView::draw_hud(NetClient& net, double now_s, Ui& ui) {
     draw_tooltip(net, ui);
     if (attack_move_) text(r_, ui.mx + 14, ui.my + 14, attack_move_ == 2 ? "attack-move CHAMPIONS ONLY: left click" : "attack-move: left click", {255, 200, 200});
     if (last_frame_ - hint_t_ < 2.5) {
-        const float tw = text_w(hint_, 2);
+        const float hs = W < 1400 ? 1.5f : 2.f;  // [U-389] never under the minimap / chat
+        const std::string hint_fit = fit_text(hint_, W - 460, hs);
+        const float tw = text_w(hint_fit, hs);
         fill_rect(r_, (W - tw) / 2 - 8, py - 104, tw + 16, 24, {0, 0, 0, 190});
-        text(r_, (W - tw) / 2, py - 100, hint_, {255, 230, 140}, 2);
+        text(r_, (W - tw) / 2, py - 100, hint_fit, {255, 230, 140}, hs);
     }
     // [X-25] debug: cell under the cursor
     {

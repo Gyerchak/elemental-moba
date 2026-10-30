@@ -148,6 +148,7 @@ int App::run() {
         ui_.typed.clear();
         SDL_Event e;
         while (SDL_PollEvent(&e)) {
+            if (ren_) SDL_ConvertEventToRenderCoordinates(ren_, &e);  // [U-389] mouse in render pixels (HiDPI / scaled screens)
             if (e.type == SDL_EVENT_MOUSE_WHEEL) ui_.wheel += e.wheel.y;  // scroll lists [U-250]
             if (e.type == SDL_EVENT_QUIT) quit_ = true;
             if (e.type == SDL_EVENT_MOUSE_MOTION) {

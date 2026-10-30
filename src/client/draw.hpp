@@ -40,6 +40,16 @@ void text(SDL_Renderer* r, float x, float y, std::string_view s, Rgba c = {}, fl
 void init_text(SDL_Renderer* r);  // once, after the renderer exists
 // Cut `s` (UTF-8 safe) so it fits in `max_w` pixels, ending with "…" when cut [U-250] (no text over other text).
 [[nodiscard]] std::string fit_text(std::string s, float max_w, float scale = 1);
+// [U-389] the first n CHARACTERS (UTF-8 safe: never half a Polish letter)
+[[nodiscard]] inline std::string utf8_cut(std::string_view s, std::size_t n) {
+    std::size_t i = 0, chars = 0;
+    while (i < s.size() && chars < n) {
+        const unsigned char c = static_cast<unsigned char>(s[i]);
+        i += c < 0x80 ? 1 : c < 0xE0 ? 2 : c < 0xF0 ? 3 : 4;
+        ++chars;
+    }
+    return std::string(s.substr(0, std::min(i, s.size())));
+}
 void end_frame_text();            // once per frame: drops strings not drawn for a while
 
 // World → screen transform [U-174][U-175].

@@ -265,7 +265,7 @@ void GameView::draw_bottom_panel(NetClient& net, double now_s, Ui& ui) {
     fill_rect(r_, x0, y0, panel_w, 128, {10, 10, 18, 225});
     rect(r_, x0, y0, panel_w, 128, {70, 60, 45});
     mouse_on_hud_ = hover(ui, x0, y0 - 70, panel_w, 200) || (set_.minimap && hover(ui, W - 208, H - 358, 208, 208)) ||
-                    (show_shop_ && hover(ui, 60, 80, 560, 30 + float(kItems.size()) * 22));
+                    (show_shop_ && hover(ui, shop_x_, shop_y_ - 24, std::min(W - 80, 1100.f), std::min(H - 260, 620.f) + 24));  // [U-389] the real shop rect
 
     // left: icon + name + level/XP, stats beside it
     draw_icon(champ, x0 + 8, y0 + 8, 72, mu && !mu->alive);
@@ -274,7 +274,7 @@ void GameView::draw_bottom_panel(NetClient& net, double now_s, Ui& ui) {
         text(r_, x0 + 62, y0 + 66, std::format("{}", mu->level), {255, 230, 120}, 1.5f);
     }
     text(r_, x0 + 8, y0 + 84, std::string(cd.name), hex(cd.colour));
-    text(r_, x0 + 8, y0 + 96, it->second.name.substr(0, 11), {200, 200, 210});
+    text(r_, x0 + 8, y0 + 96, utf8_cut(it->second.name, 11), {200, 200, 210});
     fill_rect(r_, x0 + 8, y0 + 110, 72, 5, {30, 30, 30, 255});
     fill_rect(r_, x0 + 8, y0 + 110, 72 * float(me.xp_this) / float(std::max<std::int64_t>(1, me.xp_next)), 5, {190, 120, 255});
     if (me.skill_points > 0) text(r_, x0 + 8, y0 + 117, std::format("+{} pts", me.skill_points), {255, 220, 120});
@@ -337,7 +337,7 @@ void GameView::draw_bottom_panel(NetClient& net, double now_s, Ui& ui) {
             } else {
                 const Rgba ec = hex(element_colour(base_element(d->sub)));
                 fill_circle(r_, sx + 25, sy + 25, 16, with_alpha(ec, learned ? 200 : 60), 16);
-                text(r_, sx + 25 - text_w(d->name.substr(0, 5)) / 2, sy + 21, std::string(d->name.substr(0, 5)), learned ? Rgba{255, 255, 255} : Rgba{110, 110, 110});
+                text(r_, sx + 25 - text_w(utf8_cut(d->name, 5)) / 2, sy + 21, utf8_cut(d->name, 5), learned ? Rgba{255, 255, 255} : Rgba{110, 110, 110});
             }
         }
         if (cd_left > 0 && learned && me.cd_total_ms[i] > 0) {
@@ -484,7 +484,7 @@ void GameView::draw_portraits(NetClient& net, Ui& ui) {
             text(r_, x + sz + 8, y + 26, "T", {0, 0, 0});
             if (learned && !ready) text(r_, x + sz + 24, y + 26, std::format("{}s", s.cd_left[5] / 1000), {200, 200, 200});
         }
-        text(r_, x + sz + 4, y + 40, r->second.name.substr(0, 9), {200, 200, 210});
+        text(r_, x + sz + 4, y + 40, utf8_cut(r->second.name, 9), {200, 200, 210});
         if (hover(ui, x, y, sz, sz) && ui.clicked) {  // click → camera on them
             ui.clicked = false;
             if (du) center_on(du->x, du->y);
