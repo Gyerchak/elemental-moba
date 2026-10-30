@@ -11,6 +11,9 @@ namespace em {
 
 void World::heal(Unit& u, std::int32_t hundredths) {
     if (!u.alive) return;
+    if (classic_rules(cfg.ruleset) && hundredths > 0)  // [U-416] grievous wounds: healing −value %
+        for (int i = 0; i < u.st.size(); ++i)
+            if (u.st[i].kind == StatusKind::Grievous) hundredths = hundredths * (100 - std::clamp<int>(u.st[i].value, 0, 100)) / 100;
     u.hp = std::min(u.stats.health.total(), u.hp + hundredths);
 }
 
@@ -173,6 +176,14 @@ void World::apply_hit(Unit* src, Unit& dst, std::int32_t hund, SubElement sub, b
     interrupt(dst, hund > 0 ? std::uint32_t(kIntDamageHp) : before_shield > 0 ? std::uint32_t(kIntDamageShield) : 0u);
     dst.hp -= hund;
     dst.last_hurt_ms = now_ms;
+    // [U-416] classic rule sets: lifesteal (autoattacks), omnivamp (everything), grievous wounds on hit
+    if (src && src != &dst && src->kind == UnitKind::Champion && classic_rules(cfg.ruleset) && hund > 0) {
+        const std::int64_t vamp = src->stats.omnivamp + (is_auto ? src->stats.lifesteal : 0);
+        if (vamp > 0) heal(*src, std::int32_t(std::int64_t(hund) * vamp / 10'000));
+        if (src->stats.grievous_on_hit > 0 && !dst.is_structure())
+            dst.st.add(StatusKind::Grievous, now_ms + 3'000, std::int16_t(src->stats.grievous_on_hit / 100), src->id);
+    }
+    if (dst.kind == UnitKind::Champion && dst.hp > 0) passive_proc(dst, src, 4);  // [U-416] low-HP passives
     // [U-268] rage fills by fighting
     if (dst.stats.resource == ResourceKind::Rage) dst.res = std::min(dst.res_max, dst.res + hund * kRageTakenPct / 100);
     if (src && src->stats.resource == ResourceKind::Rage && src != &dst) src->res = std::min(src->res_max, src->res + hund * kRageDealtPct / 100);
@@ -384,8 +395,31 @@ void World::fire_auto(Unit& u, Unit& target) {
 
 // [U-217] the special shapes of an autoattack, after the main hit: splash around the target, a line behind it,
 // or chain jumps. Champions use their AutoAttackDef; plain single hits do nothing here.
+void World::passive_proc(Unit& u, Unit* target, std::uint8_t trigger) {
+    if (u.kind != UnitKind::Champion || !u.alive || now_ms < u.proc_ready_ms) return;
+    const SkillDef* p = u.skill[std::size_t(Slot::P)];
+    if (!p || p->proc != trigger) return;
+    if (trigger == 4 && u.hp * 100 > std::int64_t(u.stats.health.total()) * p->proc_hp_pct) return;
+    u.proc_ready_ms = now_ms + p->proc_cd_ms;  // first: the hits below can never trigger it again
+    std::int64_t dealt = 0;
+    if (target && target->alive && target->team != u.team && (p->proc_dmg > 0 || p->proc_pct_max_hp > 0)) {
+        const std::int64_t dmg = p->proc_dmg + std::int64_t(target->stats.health.total()) / 100 * p->proc_pct_max_hp / 10'000;
+        const std::int32_t before = target->hp;
+        const DmgTag saved = dmg_tag_;
+        dmg_tag_ = {DmgFrom::Passive};
+        deal_damage(&u, *target, std::int32_t(dmg), p->sub, p->sub == SubElement::Physical, /*is_auto=*/false);
+        dmg_tag_ = saved;
+        dealt = std::max<std::int64_t>(0, before - target->hp);
+        if (target->alive && p->proc_cc != StatusKind::Count) apply_cc(u.stats, u.id, *target, p->proc_cc, p->proc_cc_ms, p->cc_val, p->sub);
+    }
+    const std::int64_t h = dealt * p->proc_heal_pct / 100 + std::int64_t(u.stats.health.total()) * p->proc_heal_max_hp / 10'000;
+    if (h > 0) heal(u, std::int32_t(h));
+    if (p->proc_shield > 0) u.st.add(StatusKind::Shield, now_ms + 3'000, std::int16_t(std::min(p->proc_shield, 30'000)), u.id);
+}
+
 void World::auto_extras(Unit& u, Unit& primary, std::int32_t dmg, SubElement sub, bool physical) {
     if (u.kind != UnitKind::Champion) return;
+    passive_proc(u, &primary, 1);  // [U-416] on-hit passives (empowered autoattack)
     if (u.jbuff == std::uint8_t(JungleBuff::Ember) && u.jbuff_until > now_ms && primary.alive) {  // [U-366]
         apply_cc(u.stats, u.id, primary, StatusKind::Burn, 2'000, primary.stats.health.total() / 200);  // per second: 1 % over 2 s
         apply_cc(u.stats, u.id, primary, StatusKind::Slow, 1'000, kEmberSlowPct);
@@ -561,6 +595,14 @@ void World::on_kill(Unit* killer, Unit& dead) {
         case UnitKind::Minion: {
             static constexpr std::int32_t kGold[] = {21, 14, 60, 60}, kXp[] = {60, 30, 93, 97};
             const auto t = std::size_t(dead.mtype);
+            if (k && k->team == dead.team) {  // [U-416] a deny (Dota-like): no gold; the enemies nearby get half the XP
+                const Team enemy = dead.team == Team::FireNation ? Team::EarthNation : Team::FireNation;
+                const auto en = champs_near(enemy, dead.ux(), dead.uy(), rules::kXpRange);
+                for (Unit* c : en) reward(*c, dead, 0, kXp[t] / 2 / std::int64_t(std::max<std::size_t>(1, en.size())));
+                if (k->kind == UnitKind::Champion) add_feed(std::format("{} denied a minion", k->name));
+                dead.respawn_ms = now_ms + 600;
+                break;
+            }
             const auto near = champs_near(kt, dead.ux(), dead.uy(), rules::kXpRange);  // [U-195] XP range 1 000
             const std::int64_t share = kXp[t] * 130 / 100 / std::int64_t(std::max<std::size_t>(1, near.size())) + kXp[t] / 4;
             for (Unit* c : near) reward(*c, dead, c == k ? kGold[t] : 0, share);  // gold: last hit only

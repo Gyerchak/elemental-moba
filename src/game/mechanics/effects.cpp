@@ -77,6 +77,11 @@ void World::effect_hits(Effect& e) {
             for (std::size_t sl = 0; sl < owner->skill.size(); ++sl)
                 if (owner->skill[sl] == e.def) dmg_tag_.slot = std::uint8_t(sl);
         deal_damage(owner, o, dmg, e.sub, e.physical, false, &e.src);
+        if (owner && o.team != owner->team) {  // [U-416] passives that trigger on a skill hit
+            const DmgTag keep = dmg_tag_;
+            passive_proc(*owner, &o, 2);
+            dmg_tag_ = keep;
+        }
         hit_flags_ = 0;
         dmg_tag_ = {};
         // keystone Fuel the Fire: skill hits on champions return 10 % of the cost / 0.5 s cooldown [U-177]

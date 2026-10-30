@@ -15,6 +15,7 @@ int main(int argc, char** argv) {
     const int minutes = argc > 1 ? std::atoi(argv[1]) : 60;
     MatchConfig cfg;
     cfg.seed = argc > 2 ? std::uint32_t(std::atoi(argv[2])) : 1;
+    if (const char* rs = std::getenv("EM_RULESET")) cfg.ruleset = std::uint8_t(std::atoi(rs));  // [U-416] 1 LoL-like, 2 Dota-like
     World w(cfg);
     const bool profile = argc > 3 && std::string_view(argv[3]) == "--profile";  // [U-287]
     w.profile = profile;

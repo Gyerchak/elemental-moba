@@ -43,6 +43,9 @@ struct ItemDef {
     // [U-261] build path like LoL: the parts this item is made of (names). `cost` = the FULL price;
     // recipe price = cost − the parts. Buying uses the parts you carry and you pay only the rest.
     std::array<std::string_view, 3> from{};
+    // [U-416] classic rule sets (LoL- / Dota-like): vamp + healing reduction; such items are sold only there
+    std::int32_t lifesteal = 0, omnivamp = 0, grievous_on_hit = 0;
+    bool classic_only = false;
 };
 
 inline constexpr std::array kItems = {
@@ -119,6 +122,14 @@ inline constexpr std::array kItems = {
     ItemDef{.name = "Siege Maul", .cost = 1'000, .attack = 1'500, .wall_damage = 5'000, .from = {"Long Spear"}},
     ItemDef{.name = "Lodestone", .cost = 750, .elemental_power = 1'500, .wall_damage_metal = 8'000},
     ItemDef{.name = "Quarry Gloves", .cost = 650, .health = 8'000, .wall_damage_stone = 8'000},
+    // [U-416] classic rule sets only (LoL- / Dota-like): lifesteal, omnivamp, healing reduction (appended: numbers stay)
+    ItemDef{.name = "Leech Fang", .cost = 900, .attack = 1'000, .lifesteal = 1'000, .classic_only = true},
+    ItemDef{.name = "Bloodthirst Blade", .cost = 3'200, .attack = 4'000, .limit = BuyLimit::One, .from = {"Leech Fang", "Long Spear"},
+            .lifesteal = 1'800, .classic_only = true},
+    ItemDef{.name = "Spirit Drinker", .cost = 2'600, .health = 20'000, .elemental_power = 3'000, .limit = BuyLimit::One,
+            .from = {"Spirit Pearl", "Ruby Heart"}, .omnivamp = 1'000, .classic_only = true},
+    ItemDef{.name = "Thorned Chain", .cost = 800, .attack = 1'500, .grievous_on_hit = 4'000, .classic_only = true},
+    ItemDef{.name = "Withering Charm", .cost = 800, .elemental_power = 2'000, .grievous_on_hit = 4'000, .classic_only = true},
 };
 inline constexpr std::int32_t kMaxElementResist = 6'000;  // [X-74] 60 %
 inline constexpr std::int32_t kMaxSlowResist = 8'000;     // [U-218] 80 %
@@ -215,6 +226,9 @@ constexpr void add_item(Stats& s, const ItemDef& i) {
     s.slow_resist = std::min(kMaxSlowResist, s.slow_resist + i.slow_resist);            // [U-218]
     s.slow_resist_ice = std::min(kMaxSlowResist, s.slow_resist_ice + i.slow_resist_ice);
     s.move_speed_pct += i.move_speed_pct;
+    s.lifesteal += i.lifesteal;  // [U-416]
+    s.omnivamp += i.omnivamp;
+    s.grievous_on_hit = std::max(s.grievous_on_hit, i.grievous_on_hit);
     s.wall_damage += i.wall_damage;  // [U-288]
     s.wall_damage_stone += i.wall_damage_stone;
     s.wall_damage_ice += i.wall_damage_ice;

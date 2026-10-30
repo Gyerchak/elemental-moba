@@ -16,7 +16,7 @@
 
 namespace em::net {
 
-inline constexpr std::uint16_t kProtocol = 10;  // 7: ten item slots [U-322]; 8: cast sources [U-340]; 9: camps, jungle buffs [U-364..U-366]; 10: bounties, companions [U-407][U-413]
+inline constexpr std::uint16_t kProtocol = 11;  // 11: rule sets, own emotes [U-414][U-416]  // 7: ten item slots [U-322]; 8: cast sources [U-340]; 9: camps, jungle buffs [U-364..U-366]; 10: bounties, companions [U-407][U-413]
 inline constexpr std::string_view kVersion = "official-0.1";  // [U-95][X-14]
 inline constexpr std::uint16_t kDefaultPort = 7777;
 inline constexpr int kMaxPlayers = 32;  // [U-09]
@@ -27,6 +27,7 @@ enum class Msg : std::uint8_t {
     StatusQuery,   // [U-212] server list ping: answered with StatusReply, no join
     Ban,           // [U-181] ban one champion in the ban phase
     SkinUpload,    // [U-200] my skin image for this match (Minecraft-like)
+    EmoteUpload,   // [U-414] one of my own emotes (picture + optional sound), separate from skins
     // server → client
     Welcome = 64, Reject, Lobby, MatchStart, Cells, Snapshot, Feed, GameOver, ChatLine, Notice,
     StatusReply,   // [U-212]
@@ -35,7 +36,12 @@ enum class Msg : std::uint8_t {
     Announce,      // [U-263] kill / multikill / objective announcement
     DeathRecap,    // [U-262] what killed you (only to the dead player)
     CustomChampions,  // [U-277] the server's own champion files (sent on joining)
+    EmoteData,     // [U-414] another player's own emote (only when the server allows own emotes)
 };
+
+// [U-414] own emotes: up to 4 per player, a PNG ≤ 96 KB (≤ 256 × 256) + an optional WAV ≤ 256 KB; emote slots 6…9
+inline constexpr int kOwnEmotes = 4, kOwnEmoteSlot0 = 6;
+inline constexpr std::uint32_t kOwnEmotePngMax = 96 * 1024, kOwnEmoteWavMax = 256 * 1024;
 
 // [U-213] platforms; a server may allow only some (default all)
 enum Platform : std::uint8_t { kLinux = 1, kWindows = 2, kMacOS = 4, kAllPlatforms = 7 };

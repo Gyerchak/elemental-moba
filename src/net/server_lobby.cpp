@@ -21,6 +21,7 @@ void Server::receive(int pid, Reader& r) {
         case Msg::Ban: on_ban(p, r); break;
         case Msg::Chat: on_chat(p, r); break;
         case Msg::SkinUpload: on_skin(p, r); break;
+        case Msg::EmoteUpload: on_emote(p, r); break;  // [U-414]
         case Msg::StartMatch:
             // [U-383] only the host starts; a server without a host secret starts when every player in the lobby is ready to
             // pick (at least 2 players, or practice)
@@ -110,6 +111,8 @@ void Server::on_hello(int pid, Reader& r) {
         w.put<std::uint8_t>(to.slot.host);
         w.str(cfg_.name);
         w.str(cfg_.motd);
+        w.put<std::uint8_t>(cfg_.ruleset);                  // [U-416]
+        w.put<std::uint8_t>(cfg_.allow_own_emotes ? 1 : 0); // [U-414]
         send(to.peer, w, true);
         send_custom_champions(to);  // [U-277] before any lobby state that names champions
     };
@@ -256,6 +259,27 @@ void Server::on_skin(Player& p, Reader& r) {
     p.skin = std::move(bytes);
     p.slot.has_skin = true;
     send_lobby();
+}
+
+// ---------------------------------------------------------------- own emotes [U-414] (separate from skins)
+// A small PNG (≤ 256 × 256, checked in the header) + an optional WAV (RIFF). Kept even when the server does not pass
+// them on; send_own_emotes() decides at the match start.
+void Server::on_emote(Player& p, Reader& r) {
+    const std::uint8_t idx = r.get<std::uint8_t>();
+    const std::uint32_t np = r.get<std::uint32_t>();
+    if (r.bad() || idx >= kOwnEmotes || np < 33 || np > kOwnEmotePngMax) return;
+    std::vector<std::uint8_t> png(np);
+    for (auto& b : png) b = r.get<std::uint8_t>();
+    const std::uint32_t nw = r.get<std::uint32_t>();
+    if (r.bad() || nw > kOwnEmoteWavMax) return;
+    std::vector<std::uint8_t> wav(nw);
+    for (auto& b : wav) b = r.get<std::uint8_t>();
+    if (r.bad() || png[0] != 0x89 || png[1] != 'P' || png[2] != 'N' || png[3] != 'G') return;
+    auto be32 = [&](std::size_t o) { return std::uint32_t(png[o]) << 24 | std::uint32_t(png[o + 1]) << 16 | std::uint32_t(png[o + 2]) << 8 | png[o + 3]; };
+    const std::uint32_t w = be32(16), h = be32(20);  // IHDR
+    if (w == 0 || h == 0 || w > 256 || h > 256) return;
+    if (!wav.empty() && (wav.size() < 44 || wav[0] != 'R' || wav[1] != 'I' || wav[2] != 'F' || wav[3] != 'F')) wav.clear();
+    p.emotes[idx] = {std::move(png), std::move(wav)};
 }
 
 // ---------------------------------------------------------------- lobby state for everyone

@@ -238,6 +238,7 @@ struct Unit {
     std::int32_t death_streak = 0;      // [U-413] deaths without a kill (lowers the bounty)
     CompanionKind companion = CompanionKind::SkyBison;  // [U-407] chosen travel animal
     bool riding = false;                // [U-407] carried home by the companion: no moving, casting or attacking
+    std::int64_t proc_ready_ms = 0;     // [U-416] the passive's own cooldown (procs)
     std::uint8_t steer_slot = 0;        // [U-402] steering this skill's projectiles …
     std::int32_t steer_x = 0, steer_y = 0;
     std::int64_t steer_until = 0;       // … while the key is held (refreshed by every Steer command)
@@ -423,7 +424,14 @@ struct MatchConfig {
     bool practice = false;                       // [U-100] cheats allowed
     std::uint32_t seed = 1;
     bool classic_recall = false;                 // [U-407] true = the old 6 s recall channel instead of a companion
+    // [U-416] rule set: Elemental (this game) or a classic one that switches on what LoL / Dota have and this game
+    // leaves out: lifesteal, omnivamp, healing reduction (both), denying own minions (Dota)
+    std::uint8_t ruleset = 0;                    // RuleSet
 };
+enum class RuleSet : std::uint8_t { Elemental, LeagueLike, DotaLike, Count };
+inline constexpr const char* kRuleSetNames[] = {"Elemental", "LoL-like", "Dota-like"};
+[[nodiscard]] constexpr bool classic_rules(std::uint8_t r) { return r == std::uint8_t(RuleSet::LeagueLike) || r == std::uint8_t(RuleSet::DotaLike); }
+[[nodiscard]] constexpr bool denies_allowed(std::uint8_t r) { return r == std::uint8_t(RuleSet::DotaLike); }
 
 // [U-407] Travel companions: recall calls the chosen animal from the base; it runs to the champion and carries them
 // home. Cannot be interrupted or cancelled; the rider can be hit and killed on the way.
@@ -626,6 +634,7 @@ public:
     void interrupt(Unit& u, std::uint32_t event);  // [U-337] break the cast / channel if its rules say so
     void update_attack(Unit& u);
     void update_attack_wall(Unit& u);  // [U-393]
+    void passive_proc(Unit& u, Unit* target, std::uint8_t trigger);  // [U-416] the champion passive's proc (with its cooldown)
     void fire_auto(Unit& u, Unit& target);
     void auto_extras(Unit& u, Unit& primary, std::int32_t dmg, SubElement sub, bool physical);
     void attack_on_the_move(Unit& u);

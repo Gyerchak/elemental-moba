@@ -35,9 +35,19 @@ inline constexpr int kActions = int(Action::Count);
 [[nodiscard]] const char* action_id(Action a);  // name in settings.cfg
 
 // ---------------------------------------------------------------- saved things
-struct SavedSetup {     // [U-178] a full loadout with a name
+struct BuildStep {      // [U-323] one step of the build creator: an item + a short text ("why / when")
+    std::int16_t item = -1;
+    std::string text;
+};
+inline constexpr int kMaxBuildSteps = 12;
+struct SavedSetup {     // [U-178] everything prepared before a game: runes, masteries, keystone, build, levelling
     std::string name;
     Loadout loadout;
+    std::vector<BuildStep> build;  // [U-323] in buying order (≤ kMaxBuildSteps)
+    // [U-324] auto-levelling: 0 = priority list (the ultimate whenever allowed, then these skills), 1 = exact order
+    int level_mode = 0;
+    std::array<std::int8_t, 6> level_prio{1, 2, 3, 4, 5, 6};  // Slot values Q W E R T Y, most wanted first
+    std::array<std::int8_t, 18> level_exact{-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};  // Slot per level-up
 };
 struct ChampPrefs {     // [U-178][U-180] per champion (by name, so the roster order can change)
     std::string champ;
@@ -68,10 +78,15 @@ struct Settings {
     // ---- controls
     bool quick_cast_all = false;           // [U-163] LoL "quick cast all"
     std::array<bool, kSkillSlots> quick_cast{};  // [U-163] per ability slot P…G
+    bool auto_buy = false;                 // [U-323] buy the next item of my setup's build when I stand in the shop
+    bool auto_level = false;               // [U-324] spend skill points by my setup's levelling order
     bool auto_attack = true;               // [U-158] idle champion hits enemies in range
     bool champs_only_toggle = true;        // X: true = press to switch on / off (default since U-289), false = hold
     bool show_attack_range = false;        // [U-289] Ctrl + ` : the autoattack range circle always on
-    int companion = 0;                     // [U-407] CompanionKind of my travel animal (recall)
+    int companion = 0;
+    int ruleset = 0;                       // [U-416] practice / hosting: 0 Elemental, 1 LoL-like, 2 Dota-like
+    bool show_other_emotes = true;         // [U-414] show other players' own emotes (pictures + sounds)
+    std::vector<std::string> own_emotes;   // [U-414] my own emotes in the wheel (folders in custom_emotes/), max 4                     // [U-407] CompanionKind of my travel animal (recall)
     bool attack_move_cursor = false;       // [U-303] attack-move picks the enemy nearest the CURSOR (false = nearest me)
     bool both_buttons_center = true;       // [U-164] left + right click together = camera on me
     std::array<SDL_Scancode, kActions> keys{};

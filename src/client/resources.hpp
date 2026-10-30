@@ -44,6 +44,7 @@ public:
     [[nodiscard]] static std::string slug(std::string_view name);  // "Fire Lord's Mantle" → "fire_lords_mantle"
     [[nodiscard]] std::string file(const std::string& relative) const { return find(relative); }  // path in the pack (or default), "" = none
     SDL_Texture* texture_from_bmp(std::uint32_t key, const std::vector<std::uint8_t>& bytes);  // network skins
+    const Sound* sound_from_wav(std::uint32_t key, const std::vector<std::uint8_t>& bytes);     // [U-414] network emotes
     [[nodiscard]] std::vector<std::uint8_t> skin_upload(int champ, const std::string& skin) const;  // [U-200]
     const Sound* sound(const std::string& name);  // "sounds/<name>.wav"
     const Sound* music(const std::string& name);  // "music/<name>.wav"

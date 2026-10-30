@@ -499,7 +499,10 @@ void World::command(std::uint32_t id, const Cmd& c) {
             break;
         case CmdKind::Attack: {
             const Unit* t = find(c.target);
-            if (t && t->team != u.team && visible_to(u.team, *t)) u.order = {OrderKind::Attack, c.target};
+            // [U-416] Dota-like: an own minion under 50 % HP may be attacked (a deny: no gold, less XP for the enemy)
+            const bool deny = t && t->team == u.team && t->kind == UnitKind::Minion && denies_allowed(cfg.ruleset) &&
+                              t->hp * 2 < t->stats.health.total();
+            if (t && (t->team != u.team || deny) && visible_to(u.team, *t)) u.order = {OrderKind::Attack, c.target};
             else refuse(u, "can't attack that (not visible / ally)");
             break;
         }
@@ -554,7 +557,7 @@ void World::command(std::uint32_t id, const Cmd& c) {
             u.order = {};
             break;
         case CmdKind::Emote:  // [U-246] the animation / sound plays on every client that sees me
-            if (c.slot < std::uint8_t(EmoteId::Count)) {
+            if (c.slot < std::uint8_t(EmoteId::Count) + 4) {  // [U-414] 6…9 = the player's own emotes
                 u.emote = c.slot;
                 u.emote_until = now_ms + 3'000;
                 u.order = {};

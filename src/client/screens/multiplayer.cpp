@@ -152,6 +152,11 @@ void App::host(bool dedicated) {
     else toggle(tr("Unique nicknames with registration + login"), registration_);
     toggle(tr("Ban phase (draft)"), bans_);
     toggle(tr("Soft level cap after 30"), soft_cap_);
+    // [U-416] the rule set: this game's own, or one that adds what LoL / Dota have (vamp, healing reduction, denies)
+    if (button(ren_, ui_, x, y, 640, 26, std::format("{}: {}", tr("Rule set"), tr(kRuleSetNames[std::clamp(set_.ruleset, 0, 2)])), false))
+        set_.ruleset = (set_.ruleset + 1) % int(RuleSet::Count), set_.save();
+    y += 30;
+    toggle(tr("Players' own emotes are passed on (separate from skins)"), own_emotes_);  // [U-414]
     toggle(tr("Ranked: MMR + LP after every match"), ranked_);  // [U-276]
     if (ranked_) toggle(tr("Skill-based matchmaking (balanced teams)"), matchmaking_);
     if (dedicated) toggle(tr("Pick timer 90 s (no pick = lobby disbanded)"), pick_timer_);
@@ -175,6 +180,8 @@ void App::host(bool dedicated) {
         c.allow_duplicate_names = dup_names_;
         c.registration = registration_;
         c.soft_cap = soft_cap_;
+        c.ruleset = std::uint8_t(std::clamp(set_.ruleset, 0, 2));  // [U-416]
+        c.allow_own_emotes = own_emotes_;                          // [U-414]
         c.bans = bans_;
         c.ranked = ranked_;
         c.matchmaking = ranked_ && matchmaking_;

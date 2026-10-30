@@ -78,7 +78,7 @@ void App::setups_screen() {
     int w = 0, h = 0;
     SDL_GetRenderOutputSize(ren_, &w, &h);
     const float H = float(h);
-    text(ren_, 20, 14, tr("Loadout setups — runes, specialisation trees, keystones"), {255, 200, 120}, 2.5f);
+    text(ren_, 20, 14, tr("Setups — runes, masteries, keystone, build, levelling"), {255, 200, 120}, 2.5f);
     float y = 60;
     for (int i = 0; i < int(set_.setups.size()); ++i, y += 30)
         if (button(ren_, ui_, 20, y, 300, 26, set_.setups[std::size_t(i)].name, setup_selected_ == i)) setup_selected_ = i;
@@ -90,35 +90,8 @@ void App::setups_screen() {
     if (setup_selected_ >= 0 && setup_selected_ < int(set_.setups.size())) {
         SavedSetup& s = set_.setups[std::size_t(setup_selected_)];
         if (text_field(ren_, ui_, 81, 360, 72, 340, s.name, tr("Name"))) set_.save();
-        const Loadout before = s.loadout;
-        draw_loadout_editor(360, 130, s.loadout, true);
-        if (!(before == s.loadout)) set_.save();
-        // what it gives in total
-        Stats st;
-        apply_loadout(st, s.loadout);
-        float ly = 290;
-        text(ren_, 360, ly, tr("Gives in total:"), {255, 220, 140});
-        ly += 16;
-        auto line = [&](std::string_view n, std::int32_t v, bool pct = false) {
-            if (!v) return;
-            text(ren_, 360, ly, std::format("{:+.0f}{} {}", v / 100.0, pct ? "%" : "", tr(n)), {220, 220, 230});
-            ly += 14;
-        };
-        line("health", st.health.bonus);
-        line("attack", st.attack.bonus);
-        line("elemental power", st.elemental_power.bonus);
-        line("defence", st.defence.bonus);
-        line("elemental defence", st.elemental_defence.bonus);
-        line("attack speed", st.attack_speed.bonus, true);
-        line("move speed", st.move_speed.bonus);
-        line("elemental haste", st.elemental_haste);
-        line("tenacity", st.tenacity, true);
-        line("cast speed", st.cast_speed);
-        line("skill range", st.skill_range);
-        line("model size", st.model_size, true);
-        line("elemental penetration", st.elemental_penetration, true);
-        if (s.loadout.keystone >= 0) text(ren_, 360, ly + 6, std::string(kKeystones[std::size_t(s.loadout.keystone)].desc), {255, 230, 150});
-        if (button(ren_, ui_, 360, H - 100, 200, 30, tr("Delete setup"))) {
+        setup_editor(360, 110, float(w) - 380, H - 110 - 70, s);  // [U-318][U-319][U-323][U-324]
+        if (button(ren_, ui_, 360, H - 52, 200, 30, tr("Delete setup"))) {
             set_.setups.erase(set_.setups.begin() + setup_selected_);
             setup_selected_ = 0;
             set_.save();

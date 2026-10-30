@@ -28,6 +28,7 @@ enum class StatusKind : std::uint8_t {
     WaterRide, // [U-189] riding a water column: raised above melee / ground skills, casts freely
     Redirect,  // [U-185] lightning redirection window is open
     Wet,       // [U-241] soaked: lightning +25 %; fire or waterbending dries it
+    Grievous,  // [U-416] healing reduced by `value` % (classic rule sets only)
     Count
 };
 

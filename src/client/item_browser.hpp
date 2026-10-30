@@ -25,7 +25,8 @@ struct ItemBrowser {
     int selected = -1;           // clicked item
     int tier = -1;               // [U-261] −1 all, 0 basic, 1 epic, 2 legendary
     std::string search;
-    const Bag* bag = nullptr;  // [U-261] my items (in the match): prices count the parts I carry
+    const Bag* bag = nullptr;
+    bool classic = true;        // [U-416] show the classic-only items (LoL- / Dota-like rule sets; menus show all)  // [U-261] my items (in the match): prices count the parts I carry
 
     // Draws the browser in (x, y, w, h). `action` is the button under the tooltip ("Buy", "Add to build");
     // `can` says if it is allowed now; returns the item when the button is pressed, else −1.

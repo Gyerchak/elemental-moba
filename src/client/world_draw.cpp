@@ -331,6 +331,17 @@ void GameView::draw_units(NetClient& net, double now_s) {
             es = u.emote;
             if (u.emote < std::size(kEmoteNames))
                 audio_.play(res_.sound("emote_" + std::string(kEmoteNames[u.emote])), SoundCat::Ui, 0.8f);  // sounds/emote_<name>.wav
+            else if (u.emote >= net::kOwnEmoteSlot0 && u.emote < net::kOwnEmoteSlot0 + net::kOwnEmotes) {  // [U-414] its own sound
+                const int oi = u.emote - net::kOwnEmoteSlot0;
+                const Sound* snd = nullptr;
+                if (u.id == net.my_unit) {
+                    if (oi < int(my_emotes_.size())) snd = res_.sound_from_wav(0xE0000000u + std::uint32_t(6 + oi), my_emotes_[std::size_t(oi)].wav);
+                } else if (set_.show_other_emotes) {
+                    if (auto it = net.own_emotes.find(u.id); it != net.own_emotes.end())
+                        snd = res_.sound_from_wav(u.id * 8u + std::uint32_t(oi), it->second[std::size_t(oi)].second);
+                }
+                if (snd) audio_.play(snd, SoundCat::Ui, 0.8f);
+            }
         }
         am.was_casting = u.casting != 0;
         if (!u.alive && kind == UnitKind::Champion && now_s - am.died > 2.0) continue;
@@ -498,7 +509,21 @@ void GameView::draw_units(NetClient& net, double now_s) {
                         text(r_, hx_s - 4, hy_s - 26 * z, "...", {200, 120, 255});
                         break;
                     case AnimSlot::Emote:
-                        if (u.emote < std::size(kEmoteNames)) {
+                        if (u.emote >= net::kOwnEmoteSlot0 && u.emote < net::kOwnEmoteSlot0 + net::kOwnEmotes) {  // [U-414] an own emote
+                            const int oi = u.emote - net::kOwnEmoteSlot0;
+                            SDL_Texture* pic = nullptr;
+                            if (u.id == net.my_unit) {
+                                if (oi < int(my_emotes_.size())) pic = res_.texture_from_bmp(0xE0000000u + std::uint32_t(6 + oi), my_emotes_[std::size_t(oi)].png);
+                            } else if (set_.show_other_emotes) {
+                                if (auto it = net.own_emotes.find(u.id); it != net.own_emotes.end() && !it->second[std::size_t(oi)].first.empty())
+                                    pic = res_.texture_from_bmp(u.id * 8u + std::uint32_t(oi), it->second[std::size_t(oi)].first);
+                            }
+                            if (pic) {
+                                const float s2 = 56 * std::max(0.6f, z);
+                                const SDL_FRect d{std::round(hx_s - s2 / 2), std::round(hy_s - 40 * z - s2), s2, s2};
+                                SDL_RenderTexture(r_, pic, nullptr, &d);
+                            }
+                        } else if (u.emote < std::size(kEmoteNames)) {
                             // [U-414] the emote's picture from the resource pack (emotes/<name>/emote.png; a pack can reskin it),
                             // else its name in a bubble
                             const std::string id(kEmoteNames[u.emote]);
@@ -931,11 +956,23 @@ void GameView::draw_world(NetClient& net, double now_s) {
         const float cx = ping_x_, cy = ping_y_;
         fill_circle(r_, cx, cy, 120, {0, 0, 0, 110}, 40);
         const float dx = ui_->mx - cx, dy = ui_->my - cy;
-        const int pick = dx * dx + dy * dy > 30 * 30 ? (int(std::lround(std::atan2(dx, -dy) / 1.0472f)) % 6 + 6) % 6 : -1;
-        for (int k = 0; k < 6; ++k) {
-            const float a = float(k) * 1.0472f, ox = cx + std::sin(a) * 85, oy = cy - std::cos(a) * 85;
+        const int n = wheel_count();
+        const float step = 6.2831853f / float(n);
+        const int pick = dx * dx + dy * dy > 30 * 30 ? (int(std::lround(std::atan2(dx, -dy) / step)) % n + n) % n : -1;
+        for (int k = 0; k < n; ++k) {
+            const float a = float(k) * step, ox = cx + std::sin(a) * 85, oy = cy - std::cos(a) * 85;
             const bool lit = pick == k;
             fill_circle(r_, ox, oy, lit ? 30.f : 24.f, lit ? Rgba{255, 230, 120, 230} : Rgba{60, 60, 80, 200}, 20);
+            if (k >= 6) {  // [U-414] my own emotes after the official ones
+                const OwnEmote& oe = my_emotes_[std::size_t(k - 6)];
+                if (SDL_Texture* pic = res_.texture_from_bmp(0xE0000000u + std::uint32_t(k), oe.png)) {
+                    const SDL_FRect d{ox - 20, oy - 20, 40, 40};
+                    SDL_RenderTexture(r_, pic, nullptr, &d);
+                } else {
+                    outlined(r_, ox - text_w(oe.name) / 2, oy - 5, oe.name, {255, 255, 255, 255}, 1);
+                }
+                continue;
+            }
             const std::string id(kEmoteNames[std::size_t(k)]);
             if (SDL_Texture* pic = res_.texture("emotes/" + id + "/icon.png")) {
                 const SDL_FRect d{ox - 20, oy - 20, 40, 40};

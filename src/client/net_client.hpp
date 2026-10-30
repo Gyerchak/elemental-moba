@@ -141,7 +141,12 @@ public:
     std::int64_t last_break_ms = -1;
     DeathRecapView recap;                    // [U-262] the last death
     bool reload_own_champions = false;      // [U-415] set on disconnect after a server sent its own champions
-    int custom_from_server = -1;             // [U-277] own champions taken from the server (−1 = none sent)
+    int custom_from_server = -1;
+    std::uint8_t ruleset = 0;               // [U-416] the server's rule set (RuleSet)
+    // [U-414] other players' own emotes: unit → 4 × (PNG, WAV)
+    std::unordered_map<std::uint32_t, std::array<std::pair<std::vector<std::uint8_t>, std::vector<std::uint8_t>>, 4>> own_emotes;
+    void send_own_emote(std::uint8_t idx, const std::vector<std::uint8_t>& png, const std::vector<std::uint8_t>& wav);
+    bool own_emotes_allowed = false;        // [U-414] the server passes players' own emotes on             // [U-277] own champions taken from the server (−1 = none sent)
     bool back_in_lobby = false;              // server returned to the lobby after the match
     std::string notice;           // last "why nothing happened" from the server
     int notice_seq = 0;

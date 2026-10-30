@@ -33,6 +33,7 @@ void World::regen(Unit& u) {
         --u.flask_revive;
         u.flask_next_ms = now_ms + 1'000;
     }
+    if (u.kind == UnitKind::Champion) passive_proc(u, nullptr, 3);  // [U-416] passives on a timer (e.g. a heal every N s)
     // [U-339] the Avatar's small water pool: refills slowly, fast next to water, full on pole ice
     if (u.water_max > 0) {
         const int big = big_water_near(u);

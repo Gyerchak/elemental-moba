@@ -1,5 +1,6 @@
 // In-match view. See game_view.hpp.
 #include "client/game_view.hpp"
+#include "client/auto_play.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -145,6 +146,7 @@ void GameView::reset() {
     sky_banners_.clear();
     anim_mem_.clear();
     sent_companion_ = -1;
+    my_emotes_ = load_own_emotes(), my_emotes_loaded_ = true;  // [U-414]
     // [U-389] nothing of the last match may leak into the next one
     companion_last_x_.clear(), companion_last_y_.clear(), companion_dir_.clear();
     cc_max_.clear(), cc_last_.clear(), fx_born_.clear(), pings_seen_.clear();
@@ -513,10 +515,11 @@ void GameView::handle_event(const SDL_Event& e, NetClient& net) {
         emote_wheel_ = false;
         if (ui_) ui_->rclicked = false;
         const float dx = e.button.x - ping_x_, dy = e.button.y - ping_y_;
-        if (dx * dx + dy * dy > 30 * 30) {  // 6 sectors of 60°, the first one straight up, clockwise
+        if (dx * dx + dy * dy > 30 * 30) {  // N sectors (6 official + my own), the first one straight up, clockwise
+            const int n = wheel_count();
             const float a = std::atan2(dx, -dy);  // 0 = up
-            const int k = (int(std::lround(a / 1.0472f)) % 6 + 6) % 6;
-            net.send_cmd({.kind = CmdKind::Emote, .slot = std::uint8_t(k)});
+            const int k = (int(std::lround(a / (6.2831853f / float(n)))) % n + n) % n;
+            net.send_cmd({.kind = CmdKind::Emote, .slot = std::uint8_t(k < 6 ? k : net::kOwnEmoteSlot0 + (k - 6))});
         }
         return;
     }
@@ -640,6 +643,7 @@ void GameView::frame(NetClient& net, double now_s, Ui& ui) {
         return;
     }
     update_controls(net, now_s);  // [U-402]
+    run_auto_play(net, set_, now_s);  // [U-323][U-324] auto-buy / auto-levelling from my setup (Options: off by default)
     if (sent_companion_ != set_.companion) {  // [U-407] my travel companion (again whenever the option changes)
         net.send_cmd({.kind = CmdKind::SetCompanion, .slot = std::uint8_t(set_.companion)});
         sent_companion_ = set_.companion;
@@ -1070,6 +1074,7 @@ void GameView::draw_hud(NetClient& net, double now_s, Ui& ui) {
         Bag bag{};
         for (int i = 0; i < kItemSlots; ++i) bag[std::size_t(i)] = me.items[i];
         shop_.bag = &bag;
+        shop_.classic = classic_rules(net.ruleset);  // [U-416]
         const int bought = shop_.draw(r_, ui, shop_x_, shop_y_, sw, sh, me.can_shop ? tr("Buy") : tr("Stand in the shop ring to buy"),
                                       [&](int it2) { return me.can_shop && me.gold >= plan_buy(bag, it2).price; }, me.gold);
         shop_.bag = nullptr;

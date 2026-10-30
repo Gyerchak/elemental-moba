@@ -14,6 +14,7 @@
 #include "client/sprites.hpp"
 #include "client/item_browser.hpp"
 #include "client/net_client.hpp"
+#include "client/own_emotes.hpp"
 #include "client/anim.hpp"
 #include "client/audio.hpp"
 #include "client/resources.hpp"
@@ -153,6 +154,9 @@ private:
     bool mouse_on_hud_ = false;
     bool ping_wheel_ = false, swallow_click_ = false;  // [U-246]
     bool emote_wheel_ = false;                         // [U-414]
+    std::vector<OwnEmote> my_emotes_;                  // [U-414] my own emotes (custom_emotes/), loaded per match
+    bool my_emotes_loaded_ = false;
+    [[nodiscard]] int wheel_count() const { return 6 + int(my_emotes_.size()); }
     std::unordered_map<std::uint32_t, std::uint8_t> emote_seen_;  // [U-414] last emote per unit (its sound once)
     float ping_x_ = 0, ping_y_ = 0;
     std::vector<std::pair<std::uint32_t, std::int64_t>> pings_seen_;

@@ -44,6 +44,7 @@ void Server::start_match() {
     mc.soft_cap = cfg_.soft_cap;
     mc.start_ms = cfg_.start_ms;
     mc.first_wave_ms = cfg_.first_wave_ms;
+    mc.ruleset = cfg_.ruleset;  // [U-416]
     mc.seed = std::uint32_t(std::chrono::steady_clock::now().time_since_epoch().count() | 1);
     world_ = std::make_unique<World>(mc);
     // [U-276] skill-based matchmaking: humans are split into two teams of equal strength (snake draft by MMR)
@@ -98,6 +99,7 @@ void Server::start_match() {
     for (Player& p : players_)
         if (p.connected && p.joined) send_match_start(p);
     send_skins();
+    if (cfg_.allow_own_emotes) send_own_emotes();  // [U-414] a server option, separate from skins
     send_lobby();
 }
 
@@ -505,6 +507,27 @@ void Server::send_skins() {
         for (std::uint8_t b : from.skin) w.put(b);
         for (Player& to : players_)
             if (to.connected && to.joined && (to.allow_skins || &to == &from)) send(to.peer, w, true);
+    }
+}
+
+// [U-414] every player's own emotes go to everybody (each client decides if it shows them: Options)
+void Server::send_own_emotes() {
+    for (const Player& from : players_) {
+        if (!from.connected || !from.joined || !from.unit) continue;
+        for (std::uint8_t i = 0; i < kOwnEmotes; ++i) {
+            const auto& [png, wav] = from.emotes[i];
+            if (png.empty()) continue;
+            Writer w;
+            w.put(Msg::EmoteData);
+            w.put(from.unit);
+            w.put(i);
+            w.put<std::uint32_t>(std::uint32_t(png.size()));
+            for (std::uint8_t b : png) w.put(b);
+            w.put<std::uint32_t>(std::uint32_t(wav.size()));
+            for (std::uint8_t b : wav) w.put(b);
+            for (Player& to : players_)
+                if (to.connected && to.joined) send(to.peer, w, true);
+        }
     }
 }
 

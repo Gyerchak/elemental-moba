@@ -7,6 +7,8 @@
 #include <fstream>
 #include <sstream>
 
+#include "core/items.hpp"
+
 namespace em {
 
 namespace {
@@ -115,6 +117,11 @@ bool Settings::load(const std::string& path) {
         else if (k == "show_attack_range") show_attack_range = b;
         else if (k == "attack_move_cursor") attack_move_cursor = b;
         else if (k == "companion") companion = std::clamp(to_int(v, 0), 0, 5);
+        else if (k == "ruleset") ruleset = std::clamp(to_int(v, 0), 0, 2);
+        else if (k == "show_other_emotes") show_other_emotes = b;
+        else if (k == "auto_buy") auto_buy = b;      // [U-323]
+        else if (k == "auto_level") auto_level = b;  // [U-324]
+        else if (k == "own_emote" && own_emotes.size() < 4) own_emotes.push_back(v);
         else if (k == "both_buttons_center") both_buttons_center = b;
         else if (k == "window") window = WindowMode(std::clamp(to_int(v, 0), 0, 2));
         else if (k == "confine_mouse") confine_mouse = b;
@@ -158,6 +165,43 @@ bool Settings::load(const std::string& path) {
                 for (int i = 0; i < 3; ++i) s.loadout.runes[std::size_t(i)] = std::int8_t(to_int(p[6 + std::size_t(i)]));
                 s.loadout = validated(s.loadout);
                 setups.push_back(s);
+            }
+        } else if (k == "setup_runes") {  // [U-318] idx | 15 counts | 3 quintessences
+            const auto p = split(v, '|');
+            const int i = p.empty() ? -1 : to_int(p[0]);
+            if (p.size() == 19 && i >= 0 && i < int(setups.size())) {
+                Loadout& l = setups[std::size_t(i)].loadout;
+                for (int n = 0; n < kClassicSections * kClassicKinds; ++n)
+                    l.classic[std::size_t(n / kClassicKinds)][std::size_t(n % kClassicKinds)] = std::uint8_t(std::clamp(to_int(p[1 + std::size_t(n)], 0), 0, 9));
+                for (int n = 0; n < kQuintSlots; ++n) l.quints[std::size_t(n)] = std::int8_t(to_int(p[16 + std::size_t(n)]));
+                l = validated(l);
+            }
+        } else if (k == "setup_mast") {  // [U-319] idx | one rank per mastery
+            const auto p = split(v, '|');
+            const int i = p.empty() ? -1 : to_int(p[0]);
+            if (p.size() == 1 + std::size_t(kMasteryTrees * kMasteryTreeSize) && i >= 0 && i < int(setups.size())) {
+                Loadout& l = setups[std::size_t(i)].loadout;
+                for (std::size_t n = 0; n < l.masteries.size(); ++n) l.masteries[n] = std::uint8_t(std::clamp(to_int(p[1 + n], 0), 0, 9));
+                l = validated(l);
+            }
+        } else if (k == "setup_build") {  // [U-323] idx | item | text
+            const auto p = split(v, '|');
+            const int i = p.empty() ? -1 : to_int(p[0]);
+            if (p.size() >= 2 && i >= 0 && i < int(setups.size()) && int(setups[std::size_t(i)].build.size()) < kMaxBuildSteps) {
+                const int it = to_int(p[1]);
+                if (it >= 0 && it < int(kItems.size())) setups[std::size_t(i)].build.push_back({std::int16_t(it), p.size() > 2 ? p[2] : std::string()});
+            }
+        } else if (k == "setup_level") {  // [U-324] idx | mode | 6 priorities | 18 exact steps
+            const auto p = split(v, '|');
+            const int i = p.empty() ? -1 : to_int(p[0]);
+            if (p.size() == 26 && i >= 0 && i < int(setups.size())) {
+                SavedSetup& s = setups[std::size_t(i)];
+                s.level_mode = std::clamp(to_int(p[1], 0), 0, 1);
+                for (std::size_t n = 0; n < 6; ++n) s.level_prio[n] = std::int8_t(std::clamp(to_int(p[2 + n], 1), 1, 6));
+                for (std::size_t n = 0; n < 18; ++n) {
+                    const int sl = to_int(p[8 + n]);
+                    s.level_exact[n] = std::int8_t(sl >= 1 && sl <= 6 ? sl : -1);
+                }
             }
         } else if (k == "champ") {
             const auto p = split(v, '|');
@@ -226,7 +270,9 @@ void Settings::save(const std::string& path) const {
     out << "# ---- controls\nquick_cast_all=" << quick_cast_all << '\n';
     for (int s = 0; s < kSkillSlots; ++s) out << "quick_cast_" << s << '=' << quick_cast[std::size_t(s)] << '\n';
     out << "auto_attack=" << auto_attack << "\nchamps_only_toggle=" << champs_only_toggle
-        << "\nboth_buttons_center=" << both_buttons_center << "\nshow_attack_range=" << show_attack_range << "\nattack_move_cursor=" << attack_move_cursor << "\ncompanion=" << companion << '\n';
+        << "\nboth_buttons_center=" << both_buttons_center << "\nshow_attack_range=" << show_attack_range << "\nattack_move_cursor=" << attack_move_cursor << "\ncompanion=" << companion << "\nruleset=" << ruleset << "\nshow_other_emotes=" << show_other_emotes
+        << "\nauto_buy=" << auto_buy << "\nauto_level=" << auto_level << '\n';
+    for (const auto& e : own_emotes) out << "own_emote=" << e << '\n';
     for (int i = 0; i < kActions; ++i) out << "key_" << kInfo[i].id << '=' << SDL_GetScancodeName(keys[std::size_t(i)]) << '\n';
     out << "# ---- window\nwindow=" << int(window) << "\nconfine_mouse=" << confine_mouse << "\nvsync=" << vsync << '\n';
     out << "# ---- graphics\ndev_mode=" << dev_mode << "\nhitbox_opacity=" << hitbox_opacity << "\nsmooth_fog=" << smooth_fog
@@ -244,6 +290,26 @@ void Settings::save(const std::string& path) const {
         out << "setup=" << s.name << '|' << int(s.loadout.keystone) << '|' << int(s.loadout.tree);
         for (auto n : s.loadout.nodes) out << '|' << int(n);
         for (auto r : s.loadout.runes) out << '|' << int(r);
+        out << '\n';
+    }
+    for (std::size_t i = 0; i < setups.size(); ++i) {  // [U-318][U-319][U-323][U-324]
+        const SavedSetup& s = setups[i];
+        out << "setup_runes=" << i;
+        for (const auto& sec : s.loadout.classic)
+            for (auto n : sec) out << '|' << int(n);
+        for (auto q : s.loadout.quints) out << '|' << int(q);
+        out << "\nsetup_mast=" << i;
+        for (auto r : s.loadout.masteries) out << '|' << int(r);
+        out << '\n';
+        for (const BuildStep& st : s.build) {
+            std::string t = st.text;
+            for (char& c : t)
+                if (c == '|' || c == '\n' || c == '\r') c = '/';
+            out << "setup_build=" << i << '|' << st.item << '|' << t << '\n';
+        }
+        out << "setup_level=" << i << '|' << s.level_mode;
+        for (auto n : s.level_prio) out << '|' << int(n);
+        for (auto n : s.level_exact) out << '|' << int(n);
         out << '\n';
     }
     for (const auto& c : champs)

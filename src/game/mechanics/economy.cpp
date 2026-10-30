@@ -53,6 +53,7 @@ void World::buy(Unit& u, int item) {
     if (item < 0 || item >= int(kItems.size())) return;
     if (!in_base(u) && u.alive) return refuse(u, "stand inside the shop ring at your fountain");  // [X-100]
     const ItemDef& d = kItems[std::size_t(item)];
+    if (d.classic_only && !classic_rules(cfg.ruleset)) return refuse(u, "this item exists only in the LoL- / Dota-like rule sets");  // [U-416]
     // [U-261] parts I carry are used up; I pay only the rest
     const BuyPlan plan = plan_buy(u.items, item);
     if (u.gold < plan.price) return refuse(u, "not enough gold");

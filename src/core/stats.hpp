@@ -58,6 +58,10 @@ struct Stats {
     std::int32_t move_speed_pct = 0;                    // [U-219] bonus % move speed, 100 = 1 %
     // [U-288] extra damage against player-made walls, 100 = 1 %: all walls / only one kind (they add up)
     std::int32_t wall_damage = 0, wall_damage_stone = 0, wall_damage_ice = 0, wall_damage_metal = 0;
+    // [U-416] classic rule sets only (LoL- / Dota-like; the elemental rules ignore them [U-316]), 100 = 1 %
+    std::int32_t lifesteal = 0;       // heal by this % of autoattack damage dealt
+    std::int32_t omnivamp = 0;        // heal by this % of ALL damage dealt
+    std::int32_t grievous_on_hit = 0; // hits put "grievous wounds" on the target: its healing −this % for 3 s
     Range range = Range::Melee;
     ResourceKind resource = ResourceKind::None;
 };

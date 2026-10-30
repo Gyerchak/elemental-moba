@@ -31,7 +31,7 @@ constexpr std::string_view kKinds[] = {"None", "Bolt", "Wave", "Burst", "Field",
 constexpr std::string_view kSubs[] = {"Water", "Ice", "Wood", "Blood", "Mud", "Steam", "Air", "Earth", "Lava", "Metal", "EarthArmor",
                                       "MetalArmor", "Fire", "BlueFire", "Lightning", "Combustion", "Physical"};
 constexpr std::string_view kStatuses[] = {"Stun", "Root", "Slow", "Silence", "Mute", "Airborne", "Frozen", "Blind", "Burn", "Shield",
-                                          "Haste", "Flying", "Bloodbound", "Channel", "Swimming", "WaterRide", "Redirect", "Wet", "None"};
+                                          "Haste", "Flying", "Bloodbound", "Channel", "Swimming", "WaterRide", "Redirect", "Wet", "Grievous", "None"};
 constexpr std::string_view kElements[] = {"Water", "Earth", "Fire", "Air", "None"};
 constexpr std::string_view kResources[] = {"Water", "Fuel", "None", "Ammo", "Energy", "Rage"};
 constexpr std::string_view kRoles[] = {"Mage", "Marksman", "Fighter", "Tank", "Assassin", "Support"};
@@ -220,6 +220,21 @@ std::string parse_text(const std::string& text, ChampionDef& out) {
             else if (f == "wall_hp_rank") ok = num(sk.wall_hp_rank, 0, 30'000);
             else if (f == "wall_segs") ok = num(sk.wall_segs, 0, 20);
             else if (f == "control") ok = num(sk.control, 0, 2);
+            // [U-416] passive procs with their own cooldown
+            else if (f == "proc") ok = num(sk.proc, 0, 4);
+            else if (f == "proc_cd_ms") ok = num(sk.proc_cd_ms, 0, 600'000);
+            else if (f == "proc_dmg") ok = num(sk.proc_dmg, 0, 100'000);
+            else if (f == "proc_pct_max_hp") ok = num(sk.proc_pct_max_hp, 0, 10'000);
+            else if (f == "proc_heal_pct") ok = num(sk.proc_heal_pct, 0, 1'000);
+            else if (f == "proc_heal_max_hp") ok = num(sk.proc_heal_max_hp, 0, 10'000);
+            else if (f == "proc_hp_pct") ok = num(sk.proc_hp_pct, 1, 100);
+            else if (f == "proc_shield") ok = num(sk.proc_shield, 0, 100'000);
+            else if (f == "proc_cc_ms") ok = num(sk.proc_cc_ms, 0, 20'000);
+            else if (f == "proc_cc") {
+                const int e2 = enum_of(kStatuses, v);
+                if (e2 < 0) return std::format("line {}: unknown crowd control '{}'", n, v);
+                sk.proc_cc = v == "None" ? StatusKind::Count : StatusKind(e2);
+            }
             else if (f == "steer_turn") ok = num(sk.steer_turn, 0, 16'000);
             else if (f == "source_first") ok = num(sk.source_first, -1, 1);
             else if (f == "pierce" || f == "targeted" || f == "ally" || f == "group" || f == "melee" || f == "ground" || f == "through_walls" ||

@@ -602,5 +602,12 @@ Additions outside the plan live in `ENGINE-EXTRAS.md`, never here.
 - [U-414] **Pings and emotes** must work as the system asked for (wheels, own emotes / sounds).
 - [U-415] **Own champions get full graphics and models** (a complete champion add).
 
+## 35. Round 13 (2026-10-30)
+
+- [U-416] **LoL / Dota systems under a flag**: a rule set (Elemental / LoL-like / Dota-like) switches on what those games have and this one leaves out — passives with cooldowns (procs), lifesteal, omnivamp, healing reduction (grievous wounds), denies — so copied champions can work.
+- [U-417] **Other players' own emotes**, separate from skins: a server option (on / off) and a player option to show them.
+- [U-418] **Setup expansion** with better visualisation: classic runes, masteries 30 / 30 / 30, build creator + auto-buy, auto-levelling.
+- [U-419] **PyFLP** on the PC and **sound effects made with FL Studio**.
+
 ---
 *Hubert continues editing the plan later — new ideas get the next free `[U-xx]` number.*

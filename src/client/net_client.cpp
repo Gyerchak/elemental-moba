@@ -170,6 +170,17 @@ void NetClient::send_skin(const std::vector<std::uint8_t>& bmp) {
     send_raw(w, true);
 }
 
+void NetClient::send_own_emote(std::uint8_t idx, const std::vector<std::uint8_t>& png, const std::vector<std::uint8_t>& wav) {
+    Writer w;  // [U-414]
+    w.put(Msg::EmoteUpload);
+    w.put(idx);
+    w.put<std::uint32_t>(std::uint32_t(png.size()));
+    for (std::uint8_t b : png) w.put(b);
+    w.put<std::uint32_t>(std::uint32_t(wav.size()));
+    for (std::uint8_t b : wav) w.put(b);
+    send_raw(w, true);
+}
+
 void NetClient::poll(double now_s) {
     std::deque<Packet> got;
     {
@@ -213,6 +224,8 @@ void NetClient::handle(const std::uint8_t* data, std::size_t n, double now_s) {
             is_host = r.get<std::uint8_t>() != 0;
             server_name = r.str();
             server_motd = r.str();
+            ruleset = r.get<std::uint8_t>();          // [U-416]
+            own_emotes_allowed = r.get<std::uint8_t>() != 0;  // [U-414]
             if (state != State::Match) state = State::Lobby;
             break;
         case Msg::Reject:
@@ -432,6 +445,20 @@ void NetClient::handle(const std::uint8_t* data, std::size_t n, double now_s) {
             std::vector<std::uint8_t> b(sz);
             for (auto& x : b) x = r.get<std::uint8_t>();
             if (!r.bad()) skins[unit] = std::move(b);
+            break;
+        }
+        case Msg::EmoteData: {  // [U-414]
+            const std::uint32_t unit = r.get<std::uint32_t>();
+            const std::uint8_t idx = r.get<std::uint8_t>();
+            const std::uint32_t np = r.get<std::uint32_t>();
+            if (idx >= kOwnEmotes || np > kOwnEmotePngMax) return;
+            std::vector<std::uint8_t> png(np);
+            for (auto& x : png) x = r.get<std::uint8_t>();
+            const std::uint32_t nw = r.get<std::uint32_t>();
+            if (nw > kOwnEmoteWavMax) return;
+            std::vector<std::uint8_t> wav(nw);
+            for (auto& x : wav) x = r.get<std::uint8_t>();
+            if (!r.bad()) own_emotes[unit][idx] = {std::move(png), std::move(wav)};
             break;
         }
         case Msg::Notice:

@@ -5,6 +5,7 @@
 #include <format>
 
 #include "client/app.hpp"
+#include "client/own_emotes.hpp"
 #include "client/locale.hpp"
 
 namespace em {
@@ -378,6 +379,8 @@ void App::champ_select() {
         if (ready_ && pick_champ_ >= 0) {
             const auto skin = res_.skin_upload(pick_champ_, set_.prefs(roster[std::size_t(pick_champ_)].name).skin);
             if (!skin.empty()) net_.send_skin(skin);  // [U-200] Minecraft-like: my skin goes to the server
+            const auto mine = load_own_emotes();       // [U-414] my own emotes (separate from the skin)
+            for (std::size_t i = 0; i < mine.size(); ++i) net_.send_own_emote(std::uint8_t(i), mine[i].png, mine[i].wav);
         }
         send_pick();
         set_.save();

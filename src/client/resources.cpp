@@ -159,6 +159,31 @@ const Sound* Resources::load_sound(const std::string& path) {
     return p;
 }
 
+// [U-414] a WAV received over the network (another player's own emote)
+const Sound* Resources::sound_from_wav(std::uint32_t key, const std::vector<std::uint8_t>& bytes) {
+    if (bytes.empty()) return nullptr;
+    const std::string id = "net:" + std::to_string(key) + ":" + std::to_string(bytes.size());
+    if (auto it = sounds_.find(id); it != sounds_.end()) return it->second.get();
+    std::unique_ptr<Sound> snd;
+    SDL_AudioSpec spec{};
+    Uint8* buf = nullptr;
+    Uint32 len = 0;
+    if (SDL_IOStream* io = SDL_IOFromConstMem(bytes.data(), bytes.size()); io && SDL_LoadWAV_IO(io, true, &spec, &buf, &len)) {
+        const SDL_AudioSpec want{SDL_AUDIO_F32, 1, 44'100};
+        Uint8* out = nullptr;
+        int out_len = 0;
+        if (SDL_ConvertAudioSamples(&spec, buf, int(len), &want, &out, &out_len)) {
+            snd = std::make_unique<Sound>();
+            snd->samples.assign(reinterpret_cast<float*>(out), reinterpret_cast<float*>(out) + std::min(out_len / 4, 44'100 * 4));  // ≤ 4 s
+            SDL_free(out);
+        }
+        SDL_free(buf);
+    }
+    const Sound* p = snd.get();
+    sounds_[id] = std::move(snd);
+    return p;
+}
+
 const Sound* Resources::sound(const std::string& name) { return load_sound(find("sounds/" + name + ".wav")); }
 const Sound* Resources::music(const std::string& name) { return load_sound(find("music/" + name + ".wav")); }
 

@@ -7,6 +7,7 @@
 //   server_lobby.cpp  hello, lobby, draft + bans, chat channels, skins, server-list ping
 //   server_match.cpp  match start, snapshots, terrain diffs, final statistics, back to the lobby
 #include "net/ranking.hpp"
+#include <array>
 #include <atomic>
 #include <cstdint>
 #include <memory>
@@ -52,6 +53,8 @@ struct ServerConfig {
     bool force_server_textures = false;   // [U-102]
     bool allow_custom_champions = true;   // [U-210][U-277] own champions; their files are sent to every player who joins
     bool players_are_bots = false;        // test / autoplay: bots drive the human slots too
+    std::uint8_t ruleset = 0;             // [U-416] RuleSet: 0 Elemental, 1 LoL-like, 2 Dota-like
+    bool allow_own_emotes = true;         // [U-414] players' own emotes are sent to everyone (separate from skins)
 };
 
 class Server {
@@ -86,6 +89,7 @@ private:
         std::uint64_t secret = 0;   // [U-276] identifies the player for the ranking
         std::uint64_t lights_sent_tick = ~0ull;  // [U-280]
         std::vector<std::uint8_t> skin;  // [U-200] BMP bytes
+        std::array<std::pair<std::vector<std::uint8_t>, std::vector<std::uint8_t>>, 4> emotes;  // [U-414] PNG + WAV
     };
     // server.cpp
     void send(_ENetPeer* p, const Writer& w, bool reliable);
@@ -110,6 +114,8 @@ private:
     void start_match();
     void send_match_start(Player& p);
     void send_skins();
+    void send_own_emotes();  // [U-414]
+    void on_emote(Player& p, Reader& r);
     void send_snapshot(Player& p);
     void send_all_cells(Player& p);
     void finish_match();  // final statistics, then back to the lobby

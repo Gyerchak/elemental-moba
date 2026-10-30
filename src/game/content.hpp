@@ -154,7 +154,17 @@ struct SkillDef {
     // speed steer_turn, Q14 per tick); 2 = draw — the wall follows the mouse path, raised when the key is released
     // (max length = width). Casting locks (rooted / slowed / free) stay per skill (`move`).
     std::uint8_t control = 0;
-    std::int16_t steer_turn = 900;    // [U-406] Boulder: lift the stone right beside the caster (not at the cursor)  // [U-388] segments in a line wall (0 = from the width; metal: 1 — metal is rare)
+    std::int16_t steer_turn = 900;
+    // [U-416] a PASSIVE with a trigger and its own cooldown (works in every rule set; LoL-like passives):
+    //   proc 1 = the next autoattack hit, 2 = a skill hit, 3 = every proc_cd_ms by itself, 4 = HP falls under proc_hp_pct
+    //   effect: + proc_dmg (+ proc_pct_max_hp of the target's max HP, 100 = 1 %), heal proc_heal_pct % of that damage
+    //   (+ proc_heal_max_hp % of my max HP), a shield of proc_shield, a crowd control (proc_cc for proc_cc_ms)
+    std::uint8_t proc = 0;
+    std::int32_t proc_cd_ms = 0, proc_dmg = 0;
+    std::int16_t proc_pct_max_hp = 0, proc_heal_pct = 0, proc_heal_max_hp = 0, proc_hp_pct = 30;
+    std::int32_t proc_shield = 0;
+    StatusKind proc_cc = StatusKind::Count;
+    std::int32_t proc_cc_ms = 0;    // [U-406] Boulder: lift the stone right beside the caster (not at the cursor)  // [U-388] segments in a line wall (0 = from the width; metal: 1 — metal is rare)
 };
 
 // [U-340] does this skill ask for a source first?

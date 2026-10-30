@@ -31,6 +31,7 @@ void App::menu() {
         c.version = set_.version;  // [U-95]
         c.port = std::uint16_t(7790 + std::random_device{}() % 200);
         c.practice = true;
+        c.ruleset = std::uint8_t(set_.ruleset);  // [U-416] Options → Game
         c.loopback_only = true;
         c.host_secret = secret_;
         std::string err;

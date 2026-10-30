@@ -148,7 +148,7 @@ int ItemBrowser::draw(SDL_Renderer* r, Ui& ui, float x, float y, float w, float 
     // grid
     std::vector<int> list;
     for (int i = 0; i < int(kItems.size()); ++i)
-        if (in_category(kItems[std::size_t(i)], ItemCategory(category)) && (tier < 0 || int(item_tier(kItems[std::size_t(i)])) == tier) &&
+        if ((classic || !kItems[std::size_t(i)].classic_only) && in_category(kItems[std::size_t(i)], ItemCategory(category)) && (tier < 0 || int(item_tier(kItems[std::size_t(i)])) == tier) &&
             (search.empty() || lower(kItems[std::size_t(i)].name).find(lower(search)) != std::string::npos))
             list.push_back(i);
     if (sort == 0) std::ranges::sort(list, {}, [](int i) { return kItems[std::size_t(i)].name; });

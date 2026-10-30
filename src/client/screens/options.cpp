@@ -43,6 +43,12 @@ void App::options(bool in_game) {
                     set_.companion = (set_.companion + 1) % int(CompanionKind::Count), changed = true;
                 y += 30;
             }
+            if (button(ren_, ui_, x, y, 640, 26, std::format("{}: {}", tr("Rule set (practice / hosting)"), tr(kRuleSetNames[std::clamp(set_.ruleset, 0, 2)])), false))
+                set_.ruleset = (set_.ruleset + 1) % int(RuleSet::Count), changed = true;  // [U-416]
+            y += 30;
+            toggle(tr("Show other players' own emotes"), set_.show_other_emotes);  // [U-414]
+            toggle(tr("Auto-buy: buy my setup's build in the shop"), set_.auto_buy);          // [U-323]
+            toggle(tr("Auto-levelling: spend skill points by my setup's order"), set_.auto_level);  // [U-324]
             toggle(tr("Show gold / XP gains on kills"), set_.show_rewards);
             toggle(tr("Show nicknames"), set_.show_names);
             toggle(tr("Chat"), set_.show_chat);
