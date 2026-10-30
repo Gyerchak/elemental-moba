@@ -79,3 +79,7 @@ THERE SHOULD BE ANOTHER CHARACTER MAGE TYPES WHICH IS AVATAR, THOSE SHOULD BE RE
 | [?-47] | U-377 | "2 × the full moon" — power only or every bonus? | Every bonus doubled: power +100 %, sizes +50 %, cooldowns −20 %. |
 | [?-48] | U-378 | Taliyah W style: rock picked first, then where it goes — for earth bolts / waves only so far. Also for walls / pillars? | Only bolts / waves for now. |
 | [?-49] | U-380 | Lava / thrown single rocks are not "wall skills": they keep per-cell HP (stone 140). | Assumed. |
+| [?-50] | U-405 | The two copied champions: the .champ format can't set passives (PassiveId) or shapes like pulls / wall riding — approximations are listed in each file. Their files + pictures stay local (.gitignore). | Assumed: local test only. |
+| [?-51] | U-392 | Sounds "with FL Studio": FL Studio has no command line render without a .flp project, and making .flp files needs PyFLP (not installed; installing software is off in this box). Sounds stay generated with scipy. | To use FL: install PyFLP in a box venv, or export sounds from FL by hand into resourcepacks/<pack>/sounds/. |
+| [?-52] | U-414 | Own emotes of OTHER players (sent like skins) are not networked yet; emote pictures / sounds are replaceable per resource pack (= emote skins). | Next round. |
+| [?-53] | U-384 | Setup expansion (classic runes, masteries 30/30/30, build creator, auto-levelling) — Hubert then said the systems are fine for now. | Postponed. |
