@@ -50,6 +50,7 @@ inline constexpr std::array<CellPt, 2> kBuffCamps{{{150, 300}, {174, 442}}};  //
 // [U-364] epic monsters on islands in the sea (one each, not mirrored), reached by a shallow ford
 inline constexpr CellPt kLionTurtleCell{170, 170};
 inline constexpr CellPt kDragonsCell{341, 341};
+inline constexpr CellPt kFaceStealerCell{299, 299};  // [U-404] its own sea island (was on the mid lane); on the diagonal = fair
 // [U-401] dark spirits around each spirit portal (NW; SE = mirror)
 inline constexpr std::array<CellPt, 2> kDarkSpiritCells{{{26, 14}, {14, 26}}};
 

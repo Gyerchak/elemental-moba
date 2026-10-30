@@ -113,6 +113,7 @@ bool Settings::load(const std::string& path) {
         else if (k == "champs_only_toggle") champs_only_toggle = b;
         else if (k == "show_attack_range") show_attack_range = b;
         else if (k == "attack_move_cursor") attack_move_cursor = b;
+        else if (k == "companion") companion = std::clamp(to_int(v, 0), 0, 5);
         else if (k == "both_buttons_center") both_buttons_center = b;
         else if (k == "window") window = WindowMode(std::clamp(to_int(v, 0), 0, 2));
         else if (k == "confine_mouse") confine_mouse = b;
@@ -216,7 +217,7 @@ void Settings::save(const std::string& path) const {
     out << "# ---- controls\nquick_cast_all=" << quick_cast_all << '\n';
     for (int s = 0; s < kSkillSlots; ++s) out << "quick_cast_" << s << '=' << quick_cast[std::size_t(s)] << '\n';
     out << "auto_attack=" << auto_attack << "\nchamps_only_toggle=" << champs_only_toggle
-        << "\nboth_buttons_center=" << both_buttons_center << "\nshow_attack_range=" << show_attack_range << "\nattack_move_cursor=" << attack_move_cursor << '\n';
+        << "\nboth_buttons_center=" << both_buttons_center << "\nshow_attack_range=" << show_attack_range << "\nattack_move_cursor=" << attack_move_cursor << "\ncompanion=" << companion << '\n';
     for (int i = 0; i < kActions; ++i) out << "key_" << kInfo[i].id << '=' << SDL_GetScancodeName(keys[std::size_t(i)]) << '\n';
     out << "# ---- window\nwindow=" << int(window) << "\nconfine_mouse=" << confine_mouse << "\nvsync=" << vsync << '\n';
     out << "# ---- graphics\ndev_mode=" << dev_mode << "\nhitbox_opacity=" << hitbox_opacity << "\nsmooth_fog=" << smooth_fog

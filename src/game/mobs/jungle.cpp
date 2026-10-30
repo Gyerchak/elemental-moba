@@ -75,7 +75,7 @@ void World::spawn_jungle() {
     for (CellPt c : kDarkSpiritCells)  // [U-401] dark spirits at both portals
         for (CellPt p : {c, mirror(c)}) spawn_unit(make_monster("Dark Spirit", cell_mid(p.first), cell_mid(p.second)));
     // [X-55] Face Stealer on the spirit island [X-86]
-    spawn_unit(make_monster("Face Stealer", cell_mid(kSpiritIsland.first + 14), cell_mid(kSpiritIsland.second + 14)));
+    spawn_unit(make_monster("Face Stealer", cell_mid(kFaceStealerCell.first), cell_mid(kFaceStealerCell.second)));  // [U-404]
     // [U-364] epic monsters: they appear later (first_spawn_ms)
     spawn_unit(make_monster("Lion Turtle", cell_mid(kLionTurtleCell.first), cell_mid(kLionTurtleCell.second)));
     spawn_unit(make_monster("Sun Dragons", cell_mid(kDragonsCell.first), cell_mid(kDragonsCell.second)));

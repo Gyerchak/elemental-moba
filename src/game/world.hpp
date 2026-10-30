@@ -37,8 +37,15 @@ enum class CmdKind : std::uint8_t {
     Ping,           // slot = PingKind, x / y = where [U-246]
     CancelCast,     // [U-265] Z: cancel the cast / channel (S does not)
     SourceForm,     // [U-293] waterbenders: slot 0 = take water from sources as water, 1 = as ice
+    SetCompanion,   // [U-407] slot = CompanionKind
+    Steer,          // [U-402] slot = skill, x / y = cursor (sent while the key is held)
+    DrawPoint,      // [U-402] slot = skill, x / y = a point of the drawn path; item = 1 → the first point (clears)
     AttackWall,     // [U-393] x / y = a wall cell to hit with autoattacks (champions whose autos have hits_walls)
 };
+
+// [U-407] travel companions (see struct Companion)
+enum class CompanionKind : std::uint8_t { SkyBison, PolarBearDog, MonkeyCat, Shirshu, Badgermole, Dragon, Count };
+inline constexpr const char* kCompanionNames[] = {"Sky Bison", "Polar Bear-Dog", "Monkey-Cat", "Shirshu", "Badgermole", "Dragon"};
 
 // [U-246] emotes (Ctrl+1…6) and pings (like LoL + the bait ping)
 enum class EmoteId : std::uint8_t { Laugh, Taunt, Dance, Joke, Wave, Cheer, Count };
@@ -228,6 +235,14 @@ struct Unit {
     std::uint32_t burn_src = 0;
     std::int64_t burn_flush_ms = 0;
     std::int32_t spree = 0, multi = 0;  // [U-263] kills without dying / kills in a row (10 s each)
+    std::int32_t death_streak = 0;      // [U-413] deaths without a kill (lowers the bounty)
+    CompanionKind companion = CompanionKind::SkyBison;  // [U-407] chosen travel animal
+    bool riding = false;                // [U-407] carried home by the companion: no moving, casting or attacking
+    std::uint8_t steer_slot = 0;        // [U-402] steering this skill's projectiles …
+    std::int32_t steer_x = 0, steer_y = 0;
+    std::int64_t steer_until = 0;       // … while the key is held (refreshed by every Steer command)
+    std::vector<std::pair<std::int32_t, std::int32_t>> draw_pts;  // [U-402] the drawn wall path (max 40 points)
+    std::uint8_t draw_slot = 0;
     bool rage_boost = false;           // [U-268] the skill being cast was paid with rage
     std::int64_t avatar_until = 0;     // [U-279] Avatar State
     std::uint8_t cycle_mask = 0;       // [U-279] Elemental Cycle: elements used (bit per element)
@@ -407,6 +422,17 @@ struct MatchConfig {
     std::int64_t start_ms = 0;                   // practice: start later in the day/moon cycle
     bool practice = false;                       // [U-100] cheats allowed
     std::uint32_t seed = 1;
+    bool classic_recall = false;                 // [U-407] true = the old 6 s recall channel instead of a companion
+};
+
+// [U-407] Travel companions: recall calls the chosen animal from the base; it runs to the champion and carries them
+// home. Cannot be interrupted or cancelled; the rider can be hit and killed on the way.
+inline constexpr std::int32_t kCompanionSpeed = 1'000;  // units / s, both ways
+struct Companion {
+    std::uint32_t owner = 0;
+    CompanionKind kind = CompanionKind::SkyBison;
+    std::int32_t x = 0, y = 0;  // game units
+    bool carrying = false;      // false: on the way to the champion; true: carrying them home
 };
 
 // The terrain timers: walls collapse [U-24], trees regrow [U-14], lava cools [X-56], fog clears [X-57].
@@ -536,7 +562,10 @@ public:
     std::unordered_map<std::uint32_t, std::size_t> index;
     std::vector<CellTimer> cell_timers;
     std::int64_t lava_melt_next_ = 0;  // [U-356]
-    std::array<std::int32_t, 2> lion_stacks{};  // [U-364] Lion Turtle stacks per team (permanent)
+    std::array<std::int32_t, 2> lion_stacks{};
+    std::vector<Companion> companions;          // [U-407]
+    void step_companions();
+    void call_companion(Unit& u);  // [U-364] Lion Turtle stacks per team (permanent)
     void apply_monster_growth(Unit& m);         // [U-365] stats for its respawn count
     [[nodiscard]] bool natural_wall(int cx, int cy) const;  // [U-360] a map rock (no timer brings it down)
     void lava_melts_walls();

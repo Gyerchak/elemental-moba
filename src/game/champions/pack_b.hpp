@@ -25,7 +25,7 @@ inline constexpr ChampionDef kCairnMason{.name = "Cairn Mason", .element = Eleme
  .p = {.name = "Rooted", .kind = K::Passive, .passive = PassiveId::Rooted, .desc = "+20 % tenacity"},
  .colour = 0x8c7a5a, .role = Role::Tank,
  .autos = {.hits_walls = true, .wall_pct = 150},
- .q_pool = {"Heavy Stone", "Rock Throw", "Iron Cleave"}};
+ .q_pool = {"Lift and Throw", "Raise Stone", "Stone Push"}};
 
 // Dune Reaver (earth, sand assassin): blinds with sand and rushes through the blind.
 // Fast, fragile, hits hard in a narrow cone tip.
@@ -44,7 +44,7 @@ inline constexpr ChampionDef kDuneReaver{.name = "Dune Reaver", .element = Eleme
        .env_bend = true, .ultimate = true},
  .p = {.name = "Light Feet", .kind = K::Passive, .passive = PassiveId::LightFeet, .desc = "+15 move speed"},
  .colour = 0xd8b868, .role = Role::Assassin,
- .q_pool = {"Rock Throw", "Magma Spit", "Iron Cleave"}};
+ .q_pool = {"Lift and Throw", "Raise Stone", "Stone Push"}};
 
 // Tremor Sage (earth, seismic support): feels everything through the ground and protects a team.
 // Pillars lift allies out of danger, shields cover friends, a small quake slows chasers.
@@ -63,7 +63,7 @@ inline constexpr ChampionDef kTremorSage{.name = "Tremor Sage", .element = Eleme
        .cast_ms = 600, .cd_ms = 100'000, .ally = true, .desc = "The earth mends allies in a wide area", .ultimate = true},
  .p = {.name = "Seismic Sense", .kind = K::Passive, .passive = PassiveId::SeismicSense, .desc = "Feels steps through the ground"},
  .colour = 0x9a8a60, .role = Role::Support,
- .q_pool = {"Rock Throw", "Heavy Stone", "Lava Glob"}};
+ .q_pool = {"Lift and Throw", "Raise Stone", "Stone Push"}};
 
 // Ashen Smith (lava, bruiser): melts the ground and burns what stays on it.
 // Lava ground with % current HP burn, a lava lunge, and a molten wall that cools.
@@ -122,7 +122,7 @@ inline constexpr ChampionDef kRillQuarrier{.name = "Rill Quarrier", .element = E
  .p = {.name = "Chi Flow", .kind = K::Passive, .passive = PassiveId::ChiFlow, .desc = "Hits refill energy"},
  .colour = 0xa89070, .role = Role::Marksman,
  .autos = {.move_while_attacking = true, .hits_walls = true, .wall_pct = 100},
- .q_pool = {"Rock Throw", "Heavy Stone", "Metal Cable"}};
+ .q_pool = {"Lift and Throw", "Raise Stone", "Stone Push"}};
 
 // Gantry Warden (metal, rare - fighter): drags and pins with steel cables, then slams a steel gate.
 // Few, tough pieces of metal; hits hard on a pinned target.
@@ -240,7 +240,7 @@ inline constexpr ChampionDef kBasaltHermit{.name = "Basalt Hermit", .element = E
        .ultimate = true, .wall_thick = 2, .wall_level = 2, .wall_hp = 450, .wall_hp_rank = 120},
  .p = {.name = "Seismic Sense", .kind = K::Passive, .passive = PassiveId::SeismicSense, .desc = "Feels steps through the ground"},
  .colour = 0x4a4a52, .role = Role::Mage,
- .q_pool = {"Rock Throw", "Heavy Stone", "Magma Spit"}};
+ .q_pool = {"Lift and Throw", "Raise Stone", "Stone Push"}};
 
 // Oathless Duelist (non-bender, fighter): a plain swordsman with disciplined chi and no tricks.
 // Parry window as a haste burst, lunge, and an execute that hits for % missing health.

@@ -16,7 +16,7 @@
 
 namespace em::net {
 
-inline constexpr std::uint16_t kProtocol = 9;  // 7: ten item slots [U-322]; 8: cast sources [U-340]; 9: camps, jungle buffs [U-364..U-366]
+inline constexpr std::uint16_t kProtocol = 10;  // 7: ten item slots [U-322]; 8: cast sources [U-340]; 9: camps, jungle buffs [U-364..U-366]; 10: bounties, companions [U-407][U-413]
 inline constexpr std::string_view kVersion = "official-0.1";  // [U-95][X-14]
 inline constexpr std::uint16_t kDefaultPort = 7777;
 inline constexpr int kMaxPlayers = 32;  // [U-09]
@@ -211,7 +211,7 @@ struct NetUnit {
     std::uint8_t casting;  // 0 none, else slot + 1
     std::uint8_t name_id;  // monsters: index into kMobNames
     std::int32_t shield;   // shield HP points [U-155]
-    std::uint8_t shield_sub, pad2;
+    std::uint8_t shield_sub, riding;  // [U-407] riding = on the companion's back
     std::int16_t atk, def, edef, range;  // for the info panel [U-161]
     std::uint8_t cc_kind, emote;         // strongest crowd control now [U-193] (255 = none); emote [U-246]
     std::uint16_t cc_left_cs;            // … time left in 1/100 s
@@ -271,6 +271,7 @@ struct NetScore {
     std::uint8_t rank[kSkillSlots];
     std::int32_t cd_total[kSkillSlots], cd_left[kSkillSlots], dmg[kSkillSlots];
     std::int16_t attack, ep, def, edef, ms, as100x, range, size;
+    std::int16_t bounty, pad_b;  // [U-413] gold for killing this champion (above 300 = shutdown)
 };
 
 struct NetReward {  // [U-159]
@@ -313,6 +314,13 @@ struct NetMe {
     std::int32_t jbuff_ms;        // … time left
     std::int32_t water, water_max;  // [U-339] the Avatar's carried water
     std::int16_t lion_stacks[2];    // [U-364] Lion Turtle stacks per team
+};
+
+// [U-407] a travel companion on its way (or carrying its rider home)
+struct NetCompanion {
+    std::uint32_t owner;
+    std::int32_t x, y;
+    std::uint8_t kind, carrying, pad[2];
 };
 
 // [U-365] every jungle camp: where, what, alive or the respawn time (public, like LoL timers)

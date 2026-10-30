@@ -306,6 +306,7 @@ bool World::can_cast_now(const Unit& u, Slot s, std::string* why, std::int32_t s
     };
     const SkillDef* d = u.skill[std::size_t(s)];
     if (!u.alive) return no("dead");
+    if (u.riding) return no("riding home");  // [U-407]
     if (!d || d->kind == SkillKind::Passive || d->kind == SkillKind::None) return no("no active");
     const AbilityRt& a = u.ab[std::size_t(s)];
     if (a.rank == 0) return no("not learned");
@@ -450,6 +451,10 @@ void World::command(std::uint32_t id, const Cmd& c) {
     if (!up) return;
     Unit& u = *up;
     if (u.kind != UnitKind::Champion) return;
+    // [U-407] on the companion's back: only talking / pinging / emotes / settings; nothing cancels the ride
+    if (u.riding && c.kind != CmdKind::Ping && c.kind != CmdKind::Emote && c.kind != CmdKind::SetCompanion &&
+        c.kind != CmdKind::SetAutoAttack && c.kind != CmdKind::SourceForm)
+        return;
     // [X-24] the server validates everything; bad input is ignored
     switch (c.kind) {
         case CmdKind::Buy: buy(u, c.item); return;
@@ -582,7 +587,22 @@ void World::command(std::uint32_t id, const Cmd& c) {
             }
             break;
         }
-        case CmdKind::Recall:  // [X-87] 8 s channel home
+        case CmdKind::Steer:  // [U-402]
+            u.steer_slot = c.slot, u.steer_x = c.x, u.steer_y = c.y, u.steer_until = now_ms + 200;
+            break;
+        case CmdKind::DrawPoint:  // [U-402]
+            if (c.item == 1 || c.slot != u.draw_slot) u.draw_pts.clear();
+            u.draw_slot = c.slot;
+            if (u.draw_pts.size() < 40) u.draw_pts.push_back({std::clamp(c.x, 0, kMapUnits - 1), std::clamp(c.y, 0, kMapUnits - 1)});
+            break;
+        case CmdKind::SetCompanion:  // [U-407]
+            u.companion = CompanionKind(std::min<int>(c.slot, int(CompanionKind::Count) - 1));
+            break;
+        case CmdKind::Recall:  // [X-87] 6 s channel home — [U-407] by default the companion comes instead
+            if (!cfg.classic_recall) {
+                call_companion(u);
+                break;
+            }
             u.order = {OrderKind::Recall};
             u.path.clear();
             u.channel_end_ms = now_ms + kRecallMs;
@@ -623,6 +643,7 @@ void World::step() {
     if (clearance_dirty && tick % 8 == 0) rebuild_collision_maps();  // [X-94]
     lap(2);
     step_units();
+    step_companions();  // [U-407]
     separate_minions();  // [U-299]
     lap(3);
     step_effects();

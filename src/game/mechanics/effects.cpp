@@ -225,6 +225,21 @@ void World::step_effects() {
             e.nhit = 0;
         }
         const std::int32_t step = std::int32_t(isqrt(std::int64_t(e.vx) * e.vx + std::int64_t(e.vy) * e.vy));
+        // [U-402] steered skills turn towards their caster's cursor while the cast key is held
+        if (e.def && e.def->control == 1 && step > 0 && e.travel_left > 0)
+            if (const Unit* so = find(e.owner); so && so->steer_until > now_ms && so->steer_slot < so->skill.size() && so->skill[so->steer_slot] == e.def) {
+                const Dir want = dir_of(std::int64_t(so->steer_x) - e.ux(), std::int64_t(so->steer_y) - e.uy());
+                const std::int64_t dot = (std::int64_t(e.dir.x) * want.x + std::int64_t(e.dir.y) * want.y) / kOne;
+                if (dot < kOne - e.def->steer_turn / 8) {
+                    const std::int64_t cross = std::int64_t(e.dir.x) * want.y - std::int64_t(e.dir.y) * want.x;
+                    const std::int64_t s = cross >= 0 ? e.def->steer_turn : -e.def->steer_turn, c = kOne - s * s / (2 * kOne);
+                    e.dir = dir_of((e.dir.x * c - e.dir.y * s) / kOne, (e.dir.x * s + e.dir.y * c) / kOne);
+                } else {
+                    e.dir = want;
+                }
+                e.vx = e.dir.x * step / kOne;
+                e.vy = e.dir.y * step / kOne;
+            }
         // [U-388] metal attracts lightning: the bolt bends towards the nearest metal wall cell within kMetalPull
         if (e.sub == SubElement::Lightning && (e.kind == FxKind::Bolt || e.kind == FxKind::Wave) && step > 0 && e.travel_left > 0) {
             const int r = kMetalPull / kCellUnits, ccx = e.ux() / kCellUnits, ccy = e.uy() / kCellUnits;

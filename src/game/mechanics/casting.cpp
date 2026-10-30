@@ -241,7 +241,26 @@ void World::cast_skill(Unit& u, Slot slot, std::int32_t tx, std::int32_t ty, std
                               .hp = (d.wall_hp ? d.wall_hp : d.sub == SubElement::Ice ? kIceWallSegHp : metal ? kMetalSegHp : kWallSegHp) +
                                     d.wall_hp_rank * (rank - 1)};
             const std::int32_t wall_len = d.wall_segs ? d.wall_segs * kWallSegLen : metal ? kWallSegLen : std::int32_t(r.width);
-            if (d.radius > 0) {  // ring [Iron Prison]
+            if (d.control == 2 && u.draw_pts.size() >= 2 && u.draw_slot == std::uint8_t(slot)) {  // [U-402] the drawn path
+                const std::int32_t life = wall_kind_of(d.sub) == Wall::Metal ? dur_ms * kMetalWallLifePct / 100 : dur_ms;
+                std::int64_t left = r.width, carry = kWallSegLen / 2;  // a segment centre every 100 units of the path
+                for (std::size_t i = 1; i < u.draw_pts.size() && left > 0; ++i) {
+                    const auto [ax, ay] = u.draw_pts[i - 1];
+                    const auto [bx, by] = u.draw_pts[i];
+                    const std::int64_t len = isqrt(dist2(ax, ay, bx, by));
+                    if (len == 0) continue;
+                    const Dir along = dir_of(std::int64_t(bx) - ax, std::int64_t(by) - ay);
+                    std::int64_t at = carry;
+                    for (; at <= len && left > 0; at += kWallSegLen) {
+                        const std::int32_t cx = ax + std::int32_t((bx - ax) * at / len), cy = ay + std::int32_t((by - ay) * at / len);
+                        if (dist2(cx, cy, u.ux(), u.uy()) <= (r.range + 50) * (r.range + 50))  // only within reach
+                            raise_segment(cx, cy, along, wall_kind_of(d.sub), life, u.team, base_element(d.sub) == Element::Earth, ws);
+                        left -= kWallSegLen;
+                    }
+                    carry = at - len;  // how far into the next piece of the path the next centre lies
+                }
+                u.draw_pts.clear();
+            } else if (d.radius > 0) {  // ring [Iron Prison]
                 raise_ring(px, py, std::int32_t(r.radius), wall_kind_of(d.sub) == Wall::Metal ? dur_ms * kMetalWallLifePct / 100 : dur_ms, u.team,
                            wall_kind_of(d.sub), ws);
                 e.kind = FxKind::Burst;
@@ -370,7 +389,11 @@ void World::cast_skill(Unit& u, Slot slot, std::int32_t tx, std::int32_t ty, std
             Effect* rock = nullptr;
             for (Effect& f : fx)
                 if (f.id == a.boulder && !f.dead) rock = &f;
-            if (!rock) {
+            if (!rock || d.casts <= 1) {  // [U-406] a one-cast lift only raises (others push it)
+                if (d.lift_beside) {
+                    px = u.ux() + std::int32_t(std::int64_t(dir.x) * (body_reach(*u.body, size_pct(u)) + r.width / 2 + 8) / kOne);
+                    py = u.uy() + std::int32_t(std::int64_t(dir.y) * (body_reach(*u.body, size_pct(u)) + r.width / 2 + 8) / kOne);
+                }
                 e.kind = FxKind::Boulder;
                 e.x = px * kSub;
                 e.y = py * kSub;
@@ -401,6 +424,37 @@ void World::cast_skill(Unit& u, Slot slot, std::int32_t tx, std::int32_t ty, std
             u.st.add(StatusKind::WaterRide, now_ms + dur_ms, 0, u.id);
             u.st.add(StatusKind::Haste, now_ms + dur_ms, d.cc_val, u.id);
             break;
+        case SkillKind::StonePush: {  // [U-406] push a lifted stone: the chosen one, else the nearest within range
+            Effect* rock = nullptr;
+            std::int64_t best = -1;
+            const bool chosen = u.cast.sx >= 0 && u.cast.slot == std::uint8_t(slot);
+            for (Effect& f : fx) {
+                if (f.dead || f.kind != FxKind::Boulder || f.vx != 0 || f.vy != 0) continue;
+                const std::int64_t to_me = dist2(f.ux(), f.uy(), u.ux(), u.uy());
+                if (to_me > std::int64_t(d.range) * d.range) continue;
+                const std::int64_t d2 = chosen ? dist2(f.ux(), f.uy(), u.cast.sx, u.cast.sy) : to_me;
+                if (chosen && d2 > 120LL * 120) continue;
+                if (best < 0 || d2 < best) best = d2, rock = &f;
+            }
+            if (!rock) {
+                refuse(u, std::format("{}: no lifted stone in reach", d.name));
+                u.ab[std::size_t(slot)].cd_end_ms = now_ms + 1'000;
+                break;
+            }
+            // the stone flies with THIS skill (its damage, its cc, its owner); the old resting one is gone
+            const Dir pd = dir_of(std::int64_t(tx) - rock->ux(), std::int64_t(ty) - rock->uy());
+            e.kind = FxKind::Boulder;
+            e.x = rock->x, e.y = rock->y;
+            e.radius = rock->radius;
+            e.dir = pd;
+            e.vx = pd.x * speed_sub / kOne;
+            e.vy = pd.y * speed_sub / kOne;
+            e.travel_left = std::int32_t(r.range * kSub);
+            e.end_ms = now_ms + 5'000;
+            rock->dead = true;
+            spawn_fx(e);  // (rock may dangle after this push_back — not used any more)
+            break;
+        }
         case SkillKind::MoveWater: {  // [U-398] the water is MOVED: taken from the source, laid down at the target
             const std::int32_t rad = std::int32_t(std::max<std::int64_t>(48, r.radius));
             const std::int32_t life = dur_ms > 0 ? dur_ms : std::int32_t(elements::kPuddleMs);

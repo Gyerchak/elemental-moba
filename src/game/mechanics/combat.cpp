@@ -500,16 +500,35 @@ void World::on_kill(Unit* killer, Unit& dead) {
                 dead.taken.clear();
             }
             // [U-263] kill announcements: first blood, multikills (next kill within 10 s), sprees, shutdowns, ace
-            const bool shutdown = dead.spree >= 3;
+            const bool shutdown = dead.bounty > rules::kBaseBounty;  // [U-413] a bounty above the base = a shutdown
+            const std::int32_t bounty = dead.bounty;
             dead.spree = 0;
             dead.multi = 0;
+            ++dead.death_streak;
+            dead.bounty = rules::champion_bounty(0, dead.death_streak);
+            // [U-410] XP: split between the killer, the assisters and allies nearby
+            {
+                std::vector<Unit*> share = champs_near(kt, dead.ux(), dead.uy(), rules::kXpRange);
+                for (Unit* x : helpers)
+                    if (std::ranges::find(share, x) == share.end()) share.push_back(x);
+                if (k && k->kind == UnitKind::Champion && std::ranges::find(share, k) == share.end()) share.push_back(k);
+                const std::int64_t each = rules::champion_kill_xp(dead.level) / std::int64_t(std::max<std::size_t>(1, share.size()));
+                for (Unit* x : share) reward(*x, dead, 0, each);
+            }
             if (k && k->kind == UnitKind::Champion) {
                 ++k->kills;
-                reward(*k, dead, dead.bounty + (shutdown ? 150 : 0), 100 + 25LL * dead.level);
-                add_feed(std::format("{} slew {}", k->name, dead.name));
+                reward(*k, dead, bounty, 0);
+                std::string names;  // [U-410] assists in the kill feed
+                for (Unit* h : helpers)
+                    if (h != k) names += (names.empty() ? "" : ", ") + h->name;
+                add_feed(names.empty() ? std::format("{} slew {}{}", k->name, dead.name, shutdown ? std::format(" (shutdown {} g)", bounty) : "")
+                                       : std::format("{} slew {} — assists: {}{}", k->name, dead.name, names,
+                                                     shutdown ? std::format(" (shutdown {} g)", bounty) : ""));
                 k->multi = now_ms - k->last_kill_ms <= 10'000 ? k->multi + 1 : 1;
                 k->last_kill_ms = now_ms;
                 ++k->spree;
+                k->death_streak = 0;
+                k->bounty = rules::champion_bounty(k->spree, 0);  // [U-413]
                 if (!first_blood) {
                     first_blood = true;
                     announce(AnnounceKind::FirstBlood, k->id, dead.id, k->team);
@@ -530,9 +549,9 @@ void World::on_kill(Unit* killer, Unit& dead) {
                     if (o.kind == UnitKind::Champion && o.team == dead.team && o.alive) all_dead = false;
                 if (all_dead) announce(AnnounceKind::Ace, 0, 0, kt);
             }
-            for (Unit* h : helpers) {
+            for (Unit* h : helpers) {  // [U-410] assisters share half of the bounty (the XP was shared above)
                 ++h->assists;
-                reward(*h, dead, 150 / std::int32_t(std::max<std::size_t>(1, helpers.size())), (100 + 25LL * dead.level) / 2);
+                reward(*h, dead, bounty * rules::kAssistGoldPct / 100 / std::int32_t(std::max<std::size_t>(1, helpers.size())), 0);
             }
             dead.assist_by = {};
             break;

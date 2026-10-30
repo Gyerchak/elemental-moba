@@ -187,6 +187,7 @@ void Server::send_snapshot(Player& p) {
         for (int k = 0; k < u.st.size(); ++k)
             if (u.st[k].kind == StatusKind::Shield) n.shield += u.st[k].value / 100;
         n.shield_sub = u.shield_sub;
+        n.riding = u.riding;
         n.atk = std::int16_t(std::min(32'000, u.stats.attack.total() / 100));
         n.def = std::int16_t(std::min(32'000, u.stats.defence.total() / 100));
         n.edef = std::int16_t(std::min(32'000, u.stats.elemental_defence.total() / 100));
@@ -353,10 +354,23 @@ void Server::send_snapshot(Player& p) {
             s.as100x = std::int16_t(100'000 / std::max(1, W.attack_period_ms(u)));
             s.range = std::int16_t(u.attack_range);
             s.size = std::int16_t(W.size_pct(u));
+            s.bounty = std::int16_t(u.bounty);  // [U-413]
             sc.push_back(s);
         }
     w.put<std::uint8_t>(std::uint8_t(sc.size()));
     for (const NetScore& s : sc) w.put(s);
+    {  // [U-407] companions: of my team always, the others where my team sees
+        std::vector<NetCompanion> cs;
+        const VisionMap& vm = W.vision[std::size_t(p.slot.team & 1)];
+        for (const Companion& c : W.companions) {
+            const Unit* o = W.find(c.owner);
+            const bool mine = o && std::uint8_t(o->team) == p.slot.team;
+            if (!mine && !vm.cell(c.x / kCellUnits, c.y / kCellUnits)) continue;
+            if (cs.size() < 40) cs.push_back({c.owner, c.x, c.y, std::uint8_t(c.kind), std::uint8_t(c.carrying), {}});
+        }
+        w.put<std::uint8_t>(std::uint8_t(cs.size()));
+        for (const NetCompanion& c : cs) w.put(c);
+    }
     {  // [U-365] camp timers
         std::vector<NetCamp> cp;
         for (const Unit& u : W.units)

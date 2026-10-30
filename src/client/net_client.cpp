@@ -335,6 +335,8 @@ void NetClient::handle(const std::uint8_t* data, std::size_t n, double now_s) {
             for (auto& p : s.pings) p = r.get<NetPing>();
             s.scores.resize(r.get<std::uint8_t>());
             for (auto& sc : s.scores) sc = r.get<NetScore>();
+            s.companions.resize(r.get<std::uint8_t>());  // [U-407]
+            for (auto& c : s.companions) c = r.get<NetCompanion>();
             s.camps.resize(r.get<std::uint8_t>());  // [U-365]
             for (auto& c : s.camps) c = r.get<NetCamp>();
             s.me = r.get<NetMe>();

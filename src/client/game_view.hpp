@@ -57,7 +57,7 @@ private:
     void play_sounds(NetClient& net);  // [U-201]
     void draw_hud(NetClient& net, double now_s, gfx::Ui& ui);
     void draw_indicator(NetClient& net);
-    void cast_key(NetClient& net, int slot);
+    void cast_key(NetClient& net, int slot, bool from_click = false);  // [U-408] a click on the icon never quick-casts
     void on_action(Action a, bool ctrl, NetClient& net);
     void self_cast(NetClient& net, int slot);  // [U-243]
     [[nodiscard]] bool champs_only() const;
@@ -160,7 +160,14 @@ private:
         bool was_alive = true, was_casting = false;
     };
     std::unordered_map<std::uint32_t, AnimMem> anim_mem_;
-    std::unordered_map<std::uint32_t, double> fx_born_;  // [U-399] when an effect was first seen (rise animations)
+    std::unordered_map<std::uint32_t, double> fx_born_;
+    int sent_companion_ = -1;  // [U-407]
+    // [U-402] mouse control while a cast key is held
+    int drawing_slot_ = -1;                       // a wall being drawn (control 2)
+    std::vector<std::pair<float, float>> draw_path_;
+    double steer_sent_ = 0;
+    void update_controls(NetClient& net, double now_s);
+    void draw_companions(NetClient& net, double now_s);  // [U-399] when an effect was first seen (rise animations)
     // [U-259] my events → sounds
     int snd_level_ = 0, snd_items_ = -1, snd_gold_ = 0, snd_notice_ = -1;
     bool snd_recall_ = false, snd_welcome_ = false, snd_end_ = false;

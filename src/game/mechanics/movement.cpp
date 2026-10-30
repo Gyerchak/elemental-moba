@@ -276,6 +276,7 @@ void World::step_units() {
             default: break;
         }
         if (u.is_structure() || u.kind == UnitKind::Inhibitor) continue;
+        if (u.riding) continue;  // [U-407] the companion moves the rider
 
         // channels
         if (u.channel_end_ms) {

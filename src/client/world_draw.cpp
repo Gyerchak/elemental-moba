@@ -290,6 +290,7 @@ void GameView::draw_units(NetClient& net, double now_s) {
     };
     const SkyState sky = WorldClock::at_ms(net.start_ms + net.cur.now_ms);
     if (anim_mem_.size() > 3'000) anim_mem_.clear();  // old minions / monsters (ids are never reused)
+    if (fx_born_.size() > 2'000) fx_born_.clear();  // [U-399]
     for (const LocalHit& h : net.hits)  // [U-258] who just autoattacked → attack animation
         if (h.h.is_auto) {
             AnimMem& am = anim_mem_[h.h.src];
@@ -316,6 +317,7 @@ void GameView::draw_units(NetClient& net, double now_s) {
         float H = height_of(u) * float(u.size_pct) / 100.f;
         float lift = anim == AnimSlot::FlySelf ? 60.f : anim == AnimSlot::FlyEnemy ? 40.f : 0.f;
         if (anim == AnimSlot::Swim) H *= 0.45f;                                                        // half under water
+        if (u.riding) lift += 45.f;  // [U-407] on the companion's back
         if (anim == AnimSlot::Emote && u.emote == 2) lift += 8.f * float(std::abs(std::sin(now_s * 9)));  // dance bob
         const Rgba edge = kind == UnitKind::Champion ? (u.id == net.my_unit ? Rgba{255, 230, 80} : Rgba{20, 20, 20}) : Rgba{30, 30, 30, 200};
         const SpriteSheet* sheet = nullptr;
@@ -579,6 +581,60 @@ void GameView::draw_paths(NetClient& net) {
 }
 
 // ---------------------------------------------------------------- pings [U-246]
+// [U-407] travel companions: a simple drawn animal per kind (placeholder until the models are made); the rider
+// stands on its back while it carries them home
+void GameView::draw_companions(NetClient& net, double now_s) {
+    const float z = view_.zoom;
+    for (const auto& c : net.cur.companions) {
+        const float wx = float(c.x), wy = float(c.y);
+        const float sx = view_.sx(wx), gy = view_.sy(wy);
+        if (sx < -200 || gy < -200 || sx > view_.sw + 200 || gy > view_.sh + 200) continue;
+        const float bob = float(std::sin(now_s * 10)) * 3 * z;
+        const CompanionKind k = CompanionKind(std::min<int>(c.kind, int(CompanionKind::Count) - 1));
+        const bool flies = k == CompanionKind::SkyBison || k == CompanionKind::Dragon;
+        const float h = flies ? 70.f : 0.f, top = view_.sy_h(wy, h) + bob;
+        ground_fill(r_, view_, wx, wy, flies ? 60.f : 40.f, {0, 0, 0, 70}, 18);  // shadow
+        switch (k) {
+            case CompanionKind::SkyBison:  // big white body, brown arrow, six legs
+                fill_ellipse(r_, sx, top, 58 * z, 30 * z, {245, 240, 230, 255}, 24);
+                fill_ellipse(r_, sx + 46 * z, top - 8 * z, 20 * z, 16 * z, {240, 235, 225, 255}, 16);
+                fill_rect(r_, sx - 30 * z, top - 26 * z, 70 * z, 6 * z, {150, 100, 60, 255});
+                for (int l = 0; l < 3; ++l) fill_rect(r_, sx - 30 * z + float(l) * 26 * z, top + 20 * z, 8 * z, 12 * z, {230, 225, 215, 255});
+                break;
+            case CompanionKind::PolarBearDog:
+                fill_ellipse(r_, sx, top - 22 * z, 40 * z, 22 * z, {250, 250, 252, 255}, 20);
+                fill_ellipse(r_, sx + 34 * z, top - 34 * z, 15 * z, 13 * z, {250, 250, 252, 255}, 14);
+                for (int l = 0; l < 4; ++l) fill_rect(r_, sx - 28 * z + float(l) * 17 * z, top - 6 * z, 7 * z, 10 * z, {235, 235, 240, 255});
+                break;
+            case CompanionKind::MonkeyCat:
+                fill_ellipse(r_, sx, top - 16 * z, 22 * z, 14 * z, {200, 140, 70, 255}, 16);
+                fill_circle(r_, sx + 18 * z, top - 26 * z, 10 * z, {210, 150, 80, 255}, 12);
+                line(r_, sx - 20 * z, top - 18 * z, sx - 36 * z, top - 36 * z + bob, {190, 130, 60, 255});
+                break;
+            case CompanionKind::Shirshu:  // long low body, no eyes, a long tongue
+                fill_ellipse(r_, sx, top - 16 * z, 46 * z, 15 * z, {120, 105, 140, 255}, 20);
+                fill_ellipse(r_, sx + 42 * z, top - 18 * z, 13 * z, 10 * z, {135, 120, 150, 255}, 14);
+                line(r_, sx + 54 * z, top - 16 * z, sx + 68 * z, top - 12 * z + bob, {220, 90, 120, 255});
+                break;
+            case CompanionKind::Badgermole:  // digs: a mound of earth moving with it
+                fill_ellipse(r_, sx, top - 10 * z, 40 * z, 18 * z, {110, 90, 70, 255}, 20);
+                fill_ellipse(r_, sx + 30 * z, top - 18 * z, 14 * z, 11 * z, {90, 75, 60, 255}, 14);
+                for (int d = 0; d < 4; ++d) fill_circle(r_, sx - 30 * z - float(d) * 10 * z, gy - float(d % 2) * 4 * z, 4 * z, {130, 110, 85, 200}, 6);
+                break;
+            default:  // Dragon: long red body with gold, wings
+                fill_ellipse(r_, sx, top, 54 * z, 14 * z, {190, 40, 30, 255}, 22);
+                fill_ellipse(r_, sx + 50 * z, top - 6 * z, 15 * z, 11 * z, {200, 50, 35, 255}, 14);
+                line(r_, sx - 10 * z, top, sx - 30 * z, top - 40 * z + bob * 3, {230, 180, 60, 255});
+                line(r_, sx + 10 * z, top, sx - 4 * z, top - 42 * z + bob * 3, {230, 180, 60, 255});
+                break;
+        }
+        if (!c.carrying) {  // coming: the name over it
+            const std::string n = tr(kCompanionNames[std::size_t(k)]);
+            text(r_, sx - text_w(n, 0.8f) / 2, top - 50 * z, n, {230, 230, 230}, 0.8f);
+        }
+    }
+}
+
 // [U-365] a dead camp shows its respawn time on the ground where it comes back
 void GameView::draw_camp_timers(NetClient& net) {
     for (const auto& c : net.cur.camps) {
@@ -750,14 +806,25 @@ void GameView::draw_world(NetClient& net, double now_s) {
                 h = -20.f + 60.f * up;
                 if (up < 1.f) ground_fill(r_, view_, float(f.x), float(f.y), float(f.radius) * (1.3f - 0.3f * up), {110, 90, 70, std::uint8_t(160 * (1 - up))}, 18);
             }
-            fill_circle(r_, view_.sx(float(f.x)), view_.sy_h(float(f.y), h), std::max(3.f, float(f.radius) * z * 0.7f),
-                        with_alpha(mixc(col, {255, 255, 255, 255}, 25), 230), 14);
+            if (k == FxKind::Boulder) {  // [U-406] a lifted stone: shadow on the ground, a lumpy rock above it
+                const float rr = std::max(4.f, float(f.radius) * z), bx = view_.sx(float(f.x)), by = view_.sy_h(float(f.y), h);
+                ground_fill(r_, view_, float(f.x), float(f.y), float(f.radius) * 0.9f, {0, 0, 0, 80}, 16);
+                const Rgba stone = f.sub == std::uint8_t(SubElement::Lava) ? Rgba{120, 60, 40, 255} : f.sub == std::uint8_t(SubElement::Metal) ? Rgba{150, 155, 165, 255}
+                                                                                                                                              : Rgba{118, 100, 82, 255};
+                fill_circle(r_, bx, by, rr, mixc(stone, {0, 0, 0, 255}, 25), 12);
+                fill_circle(r_, bx - rr * 0.35f, by - rr * 0.2f, rr * 0.7f, stone, 10);
+                fill_circle(r_, bx + rr * 0.3f, by - rr * 0.35f, rr * 0.5f, mixc(stone, {255, 255, 255, 255}, 18), 9);
+                fill_circle(r_, bx - rr * 0.45f, by - rr * 0.5f, rr * 0.22f, mixc(stone, {255, 255, 255, 255}, 40), 6);
+            } else {
+                fill_circle(r_, view_.sx(float(f.x)), view_.sy_h(float(f.y), h), std::max(3.f, float(f.radius) * z * 0.7f),
+                            with_alpha(mixc(col, {255, 255, 255, 255}, 25), 230), 14);
+            }
         }
     }
     draw_ghosts(net);
+    draw_companions(net, now_s);  // [U-407] under the riders
     draw_units(net, now_s);
     draw_paths(net);
-    draw_camp_timers(net);
     draw_pings(net);
     draw_waves(net, now_s);
     draw_hits(net, now_s);

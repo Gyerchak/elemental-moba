@@ -39,6 +39,7 @@ enum class SkillKind : std::uint8_t {
     Redirect,    // [U-185] lightning redirection: a well-timed window sends incoming lightning to your cursor
     AvatarState, // [U-279] fly + power + size for dur_ms
     MagicStance, // [U-264] non-benders: physical skills + autos become this skill's element (magic) for dur_ms
+    StonePush,   // [U-406] push a LIFTED stone (own or anyone's boulder): click the stone, then where it flies — stronger
     MoveWater,   // [U-398] move water on the ground: from a chosen source (river / sea / puddle — it is taken from there)
                  // or from carried water, a puddle of `radius` appears at the target for dur_ms (cc / dmg hit there)
 };
@@ -147,7 +148,13 @@ struct SkillDef {
     //   wall_hp per segment (0 = 300; ice 100), + wall_hp_rank per rank above 1
     std::uint8_t wall_thick = 0, wall_level = 0;
     std::int16_t wall_hp = 0, wall_hp_rank = 0;
-    std::uint8_t wall_segs = 0;  // [U-388] segments in a line wall (0 = from the width; metal: 1 — metal is rare)
+    std::uint8_t wall_segs = 0;
+    bool lift_beside = false;
+    // [U-402] mouse control while the cast key is HELD: 1 = steer — the projectile turns towards the cursor (turn
+    // speed steer_turn, Q14 per tick); 2 = draw — the wall follows the mouse path, raised when the key is released
+    // (max length = width). Casting locks (rooted / slowed / free) stay per skill (`move`).
+    std::uint8_t control = 0;
+    std::int16_t steer_turn = 900;    // [U-406] Boulder: lift the stone right beside the caster (not at the cursor)  // [U-388] segments in a line wall (0 = from the width; metal: 1 — metal is rare)
 };
 
 // [U-340] does this skill ask for a source first?
@@ -156,6 +163,7 @@ struct SkillDef {
     const bool water = d.sub == SubElement::Water || d.sub == SubElement::Ice;
     if (d.sub == SubElement::Earth && (d.kind == SkillKind::Bolt || d.kind == SkillKind::Wave)) return true;  // [U-378] rock bending
     if (d.kind == SkillKind::MoveWater) return true;  // [U-398] pick the water, then where it goes
+    if (d.kind == SkillKind::StonePush) return true;  // [U-406] pick the lifted stone, then where it flies
     return water && (d.kind == SkillKind::Bolt || d.kind == SkillKind::Wave || d.kind == SkillKind::Cone || d.kind == SkillKind::Wall);
 }
 

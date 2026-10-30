@@ -40,7 +40,7 @@ void prepare_match_grid(Grid& g) {
         clear_disc(mirror(c), 7, Surface::Land, false);
     }
     // [U-364] epic islands in the sea + a shallow ford across the sea to each (wade, no swimming)
-    for (CellPt c : {kLionTurtleCell, kDragonsCell}) {
+    for (CellPt c : {kLionTurtleCell, kDragonsCell, kFaceStealerCell}) {
         for (int t = -48; t <= 48; t += 2) clear_disc({c.first + t, c.second - t}, 3, Surface::Water, true);
         clear_disc(c, 11, Surface::Land, true);
     }

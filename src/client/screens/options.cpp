@@ -38,6 +38,11 @@ void App::options(bool in_game) {
             toggle(tr("Left + right click together = camera on me"), set_.both_buttons_center);
             toggle(tr("Champions-only key switches on / off (off = hold)"), set_.champs_only_toggle);
             toggle(tr("Attack-move: the enemy nearest the cursor (off = nearest to me)"), set_.attack_move_cursor);  // [U-303]
+            {  // [U-407] the travel companion that comes when you recall (B)
+                if (button(ren_, ui_, x, y, 640, 26, std::format("{}: {}", tr("Travel companion (recall)"), tr(kCompanionNames[std::size_t(set_.companion)])), false))
+                    set_.companion = (set_.companion + 1) % int(CompanionKind::Count), changed = true;
+                y += 30;
+            }
             toggle(tr("Show gold / XP gains on kills"), set_.show_rewards);
             toggle(tr("Show nicknames"), set_.show_names);
             toggle(tr("Chat"), set_.show_chat);

@@ -137,7 +137,7 @@ bool World::walkable_at(const Unit& u, std::int32_t xs, std::int32_t ys) const {
 }
 
 void World::resolve_overlaps(Unit& u) {
-    if (u.is_structure() || u.kind == UnitKind::Inhibitor || u.flying() || !u.alive) return;
+    if (u.is_structure() || u.kind == UnitKind::Inhibitor || u.flying() || !u.alive || u.riding) return;
     const std::int64_t reach = body_reach(*u.body, size_pct(u));
     const Shape me = hitbox(u);
     for (Unit& o : units) {

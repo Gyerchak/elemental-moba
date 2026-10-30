@@ -144,6 +144,7 @@ void GameView::reset() {
     sky_seen_once_ = false;
     sky_banners_.clear();
     anim_mem_.clear();
+    sent_companion_ = -1;
     show_recap_ = show_events_ = false;
 }
 
@@ -296,6 +297,12 @@ void GameView::cast_at_cursor(NetClient& net, int slot) {
 // [U-340] is there water to bend at this point? (river / sea / glacier, an ice wall, a puddle / ice patch)
 bool GameView::source_at(const NetClient& net, float wx, float wy, const SkillDef* d) const {
     const int cx = int(wx) / kCellUnits, cy = int(wy) / kCellUnits;
+    if (d && d->kind == SkillKind::StonePush) {  // [U-406] a lifted stone (a boulder) near the cursor
+        for (const auto& f : net.cur.fx)
+            if (f.kind == std::uint8_t(FxKind::Boulder) && (float(f.x) - wx) * (float(f.x) - wx) + (float(f.y) - wy) * (float(f.y) - wy) <= 100.f * 100.f)
+                return true;
+        return false;
+    }
     if (d && d->sub == SubElement::Earth)  // [U-378] earth: a rock (any stone wall)
         return wx >= 0 && wy >= 0 && Grid::in_bounds(cx, cy) && net.seen.at(cx, cy).wall() == Wall::Stone;
     if (wx >= 0 && wy >= 0 && Grid::in_bounds(cx, cy)) {
@@ -310,12 +317,44 @@ bool GameView::source_at(const NetClient& net, float wx, float wy, const SkillDe
     return false;
 }
 
+// [U-402] steering (control 1): while the key of a steerable skill is held, the cursor goes to the server ~20× a
+// second. Drawing (control 2): the mouse path is recorded while the key is held and sent on release, then cast.
+void GameView::update_controls(NetClient& net, double now_s) {
+    if (!ui_) return;
+    const bool* ks = SDL_GetKeyboardState(nullptr);
+    const float wx = view_.wx(ui_->mx), wy = view_.wy(ui_->my);
+    auto held = [&](int slot) { return slot >= 1 && slot <= 8 && ks[set_.keys[std::size_t(Action(slot - 1))]] && !chat_open_; };
+    if (drawing_slot_ >= 0) {
+        if (held(drawing_slot_)) {
+            const auto [lx, ly] = draw_path_.back();
+            if ((wx - lx) * (wx - lx) + (wy - ly) * (wy - ly) >= 24.f * 24.f && draw_path_.size() < 40) draw_path_.push_back({wx, wy});
+        } else {  // released: send the path, then cast at its end
+            for (std::size_t i = 0; i < draw_path_.size(); ++i)
+                net.send_cmd({.kind = CmdKind::DrawPoint, .slot = std::uint8_t(drawing_slot_), .item = std::int16_t(i == 0 ? 1 : 0),
+                              .x = std::int32_t(draw_path_[i].first), .y = std::int32_t(draw_path_[i].second)});
+            net.send_cmd({.kind = CmdKind::Cast, .slot = std::uint8_t(drawing_slot_), .x = std::int32_t(draw_path_.back().first),
+                          .y = std::int32_t(draw_path_.back().second)});
+            drawing_slot_ = -1;
+            draw_path_.clear();
+        }
+    }
+    if (now_s - steer_sent_ < 0.05) return;
+    for (int sl = 1; sl <= 8; ++sl) {
+        const SkillDef* d = skill_of(net, sl);
+        if (d && d->control == 1 && held(sl)) {
+            net.send_cmd({.kind = CmdKind::Steer, .slot = std::uint8_t(sl), .x = std::int32_t(wx), .y = std::int32_t(wy)});
+            steer_sent_ = now_s;
+            break;
+        }
+    }
+}
+
 void GameView::hint(std::string h) {
     hint_ = std::move(h);
     hint_t_ = last_frame_;
 }
 
-void GameView::cast_key(NetClient& net, int slot) {
+void GameView::cast_key(NetClient& net, int slot, bool from_click) {
     const SkillDef* d = skill_of(net, slot);
     if (!d) return;
     src_x_ = src_y_ = -1;
@@ -335,11 +374,18 @@ void GameView::cast_key(NetClient& net, int slot) {
     const bool self = d->kind == SkillKind::Shield || d->kind == SkillKind::Haste || d->kind == SkillKind::Flight ||
                       d->kind == SkillKind::SelfFreeze || d->kind == SkillKind::WindSense ||
                       (d->kind == SkillKind::Burst && d->range == 0) || (d->kind == SkillKind::Heal && d->range == 0);
-    if (source_first(*d) && set_.quick(slot) && ui_ && source_at(net, view_.wx(ui_->mx), view_.wy(ui_->my), d)) {
+    const bool quick = set_.quick(slot) && !from_click;
+    if (d->control == 2 && !from_click && ui_) {  // [U-402] hold the key and move the mouse: the wall follows the path
+        drawing_slot_ = slot;
+        draw_path_ = {{view_.wx(ui_->mx), view_.wy(ui_->my)}};
+        pending_ = -1;
+        return hint(std::format("{}: hold the key and draw with the mouse, release to raise", d->name));
+    }
+    if (source_first(*d) && quick && ui_ && source_at(net, view_.wx(ui_->mx), view_.wy(ui_->my), d)) {
         src_x_ = std::int32_t(view_.wx(ui_->mx)), src_y_ = std::int32_t(view_.wy(ui_->my));  // [U-340] quick cast on water: source picked
         pending_ = slot;
         hint(std::format("{}: source picked, now click where it goes", d->name));
-    } else if (self || set_.quick(slot)) {  // [U-163] quick cast per ability / all
+    } else if (self || quick) {  // [U-163] quick cast per ability / all
         cast_at_cursor(net, slot);
         pending_ = -1;
     } else {
@@ -570,6 +616,11 @@ void GameView::frame(NetClient& net, double now_s, Ui& ui) {
         text(r_, float(w) / 2 - 160, float(h) / 2, "Waiting for the server...", {230, 230, 230}, 2);
         return;
     }
+    update_controls(net, now_s);  // [U-402]
+    if (sent_companion_ != set_.companion) {  // [U-407] my travel companion (again whenever the option changes)
+        net.send_cmd({.kind = CmdKind::SetCompanion, .slot = std::uint8_t(set_.companion)});
+        sent_companion_ = set_.companion;
+    }
     const Snapshot& cur = net.cur;
     // [X-02][U-338] interpolation: positions are drawn 50 ms in the past, between the two snapshots around that moment.
     // A late packet then never shows as a freeze-and-jump (the old way blended only the last two and waited).
@@ -694,6 +745,10 @@ void GameView::frame(NetClient& net, double now_s, Ui& ui) {
 }
 
 void GameView::draw_indicator(NetClient& net) {
+    if (drawing_slot_ >= 0)  // [U-402] the wall being drawn
+        for (std::size_t i = 1; i < draw_path_.size(); ++i)
+            line(r_, view_.sx(draw_path_[i - 1].first), view_.sy(draw_path_[i - 1].second), view_.sx(draw_path_[i].first),
+                 view_.sy(draw_path_[i].second), {255, 230, 140, 230});
     // [U-289] my autoattack range like LoL: hold ` ; Ctrl + ` keeps it on. Edge-to-edge range → from my body's edge.
     {
         const bool* ks = SDL_GetKeyboardState(nullptr);
@@ -910,7 +965,8 @@ void GameView::draw_hud(NetClient& net, double now_s, Ui& ui) {
             rect(r_, mmx(du.x) - s2 / 2 - 1, mmy(du.y) - s2 / 2 - 1, s2 + 2, s2 + 2,
                  du.u.id == net.my_unit ? Rgba{255, 230, 60} : du.u.team == net.my_team ? Rgba{90, 200, 255} : Rgba{230, 70, 60});
         }
-        for (const auto& c : cur.camps) {  // [U-365] camp timers: dead camps show the seconds left, epics are gold
+        for (const auto& c : cur.camps) {  // [U-365][U-411] camp timers on the minimap only, and only while Tab is held
+            if (!show_score_) break;
             const float cx = mmx(float(c.x * kCellUnits + 16)), cy = mmy(float(c.y * kCellUnits + 16));
             if (c.respawn_s == 0) {
                 if (c.epic) circle(r_, cx, cy, 5, {255, 210, 80, 230}, 12);
@@ -969,9 +1025,19 @@ void GameView::draw_hud(NetClient& net, double now_s, Ui& ui) {
     }
     // scoreboard
     if (show_score_ || net.winner >= 0) {
-        const float sx = W / 2 - 330, sy = 90;
-        fill_rect(r_, sx, sy, 660, 40 + 10 * 22.f, {0, 0, 0, 220});
-        text(r_, sx + 10, sy + 8, "Champion            Lvl  K / D / A   CS   items", {255, 255, 255});
+        const float sx = W / 2 - 360, sy = 90;
+        // [U-411] epic monster timers at the top (like other MOBAs); Lion Turtle stacks per team
+        std::string epics;
+        for (const auto& c : cur.camps)
+            if (c.epic) {
+                const char* nm = net::kMobNames[std::min<int>(c.name_id, int(std::size(net::kMobNames)) - 1)];
+                epics += c.respawn_s == 0 ? std::format("{}: {}    ", tr(nm), tr("up")) : std::format("{}: {}:{:02}    ", tr(nm), c.respawn_s / 60, c.respawn_s % 60);
+            }
+        epics += std::format("{} {} / {}", tr("Lion Turtle stacks"), me.lion_stacks[0], me.lion_stacks[1]);
+        fill_rect(r_, sx, sy - 26, 720, 22, {0, 0, 0, 220});
+        text(r_, sx + 10, sy - 22, epics, {255, 210, 80});
+        fill_rect(r_, sx, sy, 720, 40 + 10 * 22.f, {0, 0, 0, 220});
+        text(r_, sx + 10, sy + 8, tr("Champion            Lvl  K / D / A   CS   items   bounty"), {255, 255, 255});
         float ry = sy + 28;
         for (int team = 0; team < 2; ++team)
             for (const auto& s : cur.scores) {
@@ -979,20 +1045,16 @@ void GameView::draw_hud(NetClient& net, double now_s, Ui& ui) {
                 if (r == net.roster.end() || r->second.team != team) continue;
                 int items = 0;
                 for (auto i : s.items) items += i >= 0;
-                text(r_, sx + 10, ry, std::format("{:<18}  {:>3}  {:>2} / {:>2} / {:>2}  {:>4}   {}  {}", r->second.name.substr(0, 18), s.level, s.kills, s.deaths, s.assists, s.cs, items,
-                                                  s.alive ? "" : std::format("respawn {}s", s.respawn_ms / 1000)), team_colour(team));
+                text(r_, sx + 10, ry, std::format("{:<18}  {:>3}  {:>2} / {:>2} / {:>2}  {:>4}   {:>2}", r->second.name.substr(0, 18), s.level, s.kills, s.deaths,
+                                                  s.assists, s.cs, items), team_colour(team));
+                // [U-413] the bounty: gold when it is a shutdown (above 300), grey when lowered by deaths
+                const Rgba bc = s.bounty > 300 ? Rgba{255, 200, 60} : s.bounty < 300 ? Rgba{150, 150, 150} : Rgba{220, 220, 220};
+                const std::string bs = s.bounty > 300 ? std::format("{} g  SHUTDOWN", s.bounty) : std::format("{} g", s.bounty);
+                if (s.bounty > 300) fill_rect(r_, sx + 486, ry - 2, text_w(bs) + 8, 16, {90, 60, 0, 200});
+                text(r_, sx + 490, ry, bs, bc);
+                if (!s.alive) text(r_, sx + 630, ry, std::format("{} {}s", tr("respawn"), s.respawn_ms / 1000), {200, 200, 200});
                 ry += 20;
             }
-        // [U-364][U-365] epic monsters: alive or the respawn timer; Lion Turtle stacks per team
-        std::string epics;
-        for (const auto& c : cur.camps)
-            if (c.epic) {
-                const char* nm = net::kMobNames[std::min<int>(c.name_id, int(std::size(net::kMobNames)) - 1)];
-                epics += c.respawn_s == 0 ? std::format("{}: {}   ", tr(nm), tr("up")) : std::format("{}: {}:{:02}   ", tr(nm), c.respawn_s / 60, c.respawn_s % 60);
-            }
-        epics += std::format("{} {} / {}", tr("Lion Turtle stacks"), me.lion_stacks[0], me.lion_stacks[1]);
-        fill_rect(r_, sx, ry + 4, 660, 22, {0, 0, 0, 220});
-        text(r_, sx + 10, ry + 8, epics, {255, 210, 80});
     }
     // death / end
     if (mu && !mu->alive && net.winner < 0) {

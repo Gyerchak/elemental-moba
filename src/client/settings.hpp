@@ -71,6 +71,7 @@ struct Settings {
     bool auto_attack = true;               // [U-158] idle champion hits enemies in range
     bool champs_only_toggle = true;        // X: true = press to switch on / off (default since U-289), false = hold
     bool show_attack_range = false;        // [U-289] Ctrl + ` : the autoattack range circle always on
+    int companion = 0;                     // [U-407] CompanionKind of my travel animal (recall)
     bool attack_move_cursor = false;       // [U-303] attack-move picks the enemy nearest the CURSOR (false = nearest me)
     bool both_buttons_center = true;       // [U-164] left + right click together = camera on me
     std::array<SDL_Scancode, kActions> keys{};

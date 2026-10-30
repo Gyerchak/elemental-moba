@@ -350,6 +350,10 @@ void GameView::draw_bottom_panel(NetClient& net, double now_s, Ui& ui) {
         if (d && me.s_cost[i] > 0 && me.res < me.s_cost[i] * 100 && cd.resource != ResourceKind::Rage)  // no resource
             fill_rect(r_, sx, sy, 50, 50, cd.resource == ResourceKind::Fuel ? Rgba{140, 30, 30, 90} : Rgba{20, 40, 140, 90});  // fuel: HP pays
         rect(r_, sx, sy, 50, 50, pending_ == i ? Rgba{255, 255, 255} : Rgba{95, 95, 125});
+        if (ui.clicked && hover(ui, sx, sy, 50, 50) && d) {  // [U-408] click the icon = press its key (aim with the next click)
+            ui.clicked = false;
+            cast_key(net, i, true);
+        }
         text(r_, sx + 2, sy + 2, kKeys[i], {255, 220, 120});
         for (int p = 0; p < std::min<int>(me.rank[i], 6) && i > 0; ++p) fill_rect(r_, sx + 4 + float(p) * 7, sy + 46, 5, 3, {255, 210, 90});
         // [U-297][U-301] a "+" for every rankable skill (Q … Y, the ultimate too); a blocked one is grey and only says why

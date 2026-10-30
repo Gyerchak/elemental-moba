@@ -24,6 +24,19 @@ static_assert(jungle_killer_xp(300, 2) == 200 && jungle_helper_xp(300, 2) == 100
 static_assert(jungle_killer_xp(500, 3) == 300 && jungle_helper_xp(500, 3) == 100);
 static_assert(jungle_killer_xp(100, 1) == 100);
 
+// ---------------------------------------------------------------- champion kills [U-410][U-413]
+// Bounty (the gold for killing a champion): 300; every kill in a row after the 1st adds 100 (max 1 000) — the
+// part above 300 is the SHUTDOWN; every death in a row takes 50 (min 100). Assisters share 50 % of the bounty.
+// XP: 140 + 30 × the victim's level, split evenly between the killer, the assisters and allies within kXpRange.
+inline constexpr std::int32_t kBaseBounty = 300, kBountyPerKill = 100, kMaxBounty = 1'000, kBountyPerDeath = 50, kMinBounty = 100;
+inline constexpr std::int32_t kAssistGoldPct = 50;
+[[nodiscard]] constexpr std::int32_t champion_bounty(int spree, int death_streak) {
+    const std::int32_t b = kBaseBounty + kBountyPerKill * (spree > 1 ? spree - 1 : 0) - kBountyPerDeath * death_streak;
+    return b < kMinBounty ? kMinBounty : b > kMaxBounty ? kMaxBounty : b;
+}
+[[nodiscard]] constexpr std::int64_t champion_kill_xp(int victim_level) { return 140 + 30LL * victim_level; }
+static_assert(champion_bounty(0, 0) == 300 && champion_bounty(4, 0) == 600 && champion_bounty(0, 3) == 150 && champion_bounty(20, 0) == 1'000);
+
 // ---------------------------------------------------------------- minions (LoL 2016 style) [U-194]
 struct MinionRules {
     std::int32_t acquire_range = 650;      // look for targets this far

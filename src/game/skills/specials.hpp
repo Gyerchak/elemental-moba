@@ -110,6 +110,14 @@ constexpr SpecialRow kSpecialRows[] = {
                       .cd_ms = 12'000, .cost = 40, .dur_ms = 15'000,
                       .desc = "Pick water (river, sea, puddle, ice), then a place: the water flows there as a puddle source for 15 s. "
                               "Without a source it uses 40 carried water"}},
+    // [U-402] mouse-controlled skills (appended at the end)
+    {Element::Earth, {.name = "Drawn Wall", .kind = K::Wall, .sub = S::Earth, .range = 700, .width = 500, .cast_ms = 0, .cd_ms = 24'000,
+                      .dur_ms = 4'000, .desc = "Hold the key and draw with the mouse: up to 5 wall pieces follow your line, raised when you let go",
+                      .wall_level = 1, .control = 2}},
+    {Element::Water, {.name = "Guided Stream", .kind = K::Bolt, .sub = S::Water, .dmg = 80, .dmg_rank = 40, .ep = 55, .range = 1'300,
+                      .width = 80, .speed = 900, .cast_ms = 200, .cd_ms = 11'000, .cost = 50, .cc = C::Slow, .cc_ms = 1'000, .cc_val = 30,
+                      .move = CastMove::Free, .desc = "A stream that follows your cursor while you hold the key (you can walk meanwhile)",
+                      .control = 1}},
 };
 
 }  // namespace em::data

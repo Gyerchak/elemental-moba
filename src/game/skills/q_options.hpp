@@ -96,6 +96,18 @@ inline constexpr QOptionRow kQOptions[] = {
     {Element::None, {.name = "Bolas Throw", .kind = K::Bolt, .dmg = 45, .dmg_rank = 25, .ad = 70, .range = 750, .width = 70,
         .speed = 1'600, .cast_ms = 200, .cd_ms = 9'000, .cost = 45, .cc = C::Slow, .cc_ms = 1'500, .cc_val = 35,
         .desc = "Spinning bolas: slows 35 % for 1.5 s"}},
+    // [U-406] the three basic earthbending Qs: lift + throw (alone, weaker), raise a stone (for a later push — yours or
+    // an ally's), push a lifted stone (team play, the strongest). A lifted stone is the smallest wall: it blocks walking.
+    {Element::Earth, {.name = "Lift and Throw", .kind = K::Boulder, .sub = S::Earth, .dmg = 70, .dmg_rank = 35, .ep = 40, .ad = 20,
+        .range = 650, .width = 66, .speed = 1'100, .cast_ms = 300, .cd_ms = 8'000, .cc = C::Slow, .cc_ms = 800, .cc_val = 25,
+        .casts = 2, .recast_ms = 4'000, .desc = "Cast 1 lifts a stone out of the ground beside you, cast 2 throws it (alone: weaker)",
+        .lift_beside = true}},
+    {Element::Earth, {.name = "Raise Stone", .kind = K::Boulder, .sub = S::Earth, .dmg = 20, .dmg_rank = 10, .ep = 15, .ad = 10,
+        .range = 700, .width = 66, .cast_ms = 250, .cd_ms = 6'000, .dur_ms = 8'000, .recast_ms = 8'000,
+        .desc = "Lift a stone at a spot for 8 s: it blocks the way; you or an ally earthbender can push it with Stone Push"}},
+    {Element::Earth, {.name = "Stone Push", .kind = K::StonePush, .sub = S::Earth, .dmg = 120, .dmg_rank = 55, .ep = 60, .ad = 30,
+        .range = 900, .width = 66, .speed = 1'400, .cast_ms = 200, .cd_ms = 7'000, .cc = C::Stun, .cc_ms = 900,
+        .desc = "Click a lifted stone (yours or anyone's), then where it flies: a strong hit + stun. Needs a lifted stone nearby"}},
 };
 
 }  // namespace em::data
