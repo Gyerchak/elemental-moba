@@ -61,6 +61,20 @@ def manifest():
         # [U-304] built from its hitbox (the beast body) — the game scales it with its +60 % size
         {"id": "face_stealer", "kind": "hitbox", "body": "beast", "colour": "202028", "accent": "ffffff",
          "px": 160, "ortho": 5.0, "anchor": 0.62, "anims": MOB},
+        # [U-364][U-366][U-401] new jungle monsters
+        {"id": "platypus_bear", "kind": "quad", "size": 1.4, "colour": "6b5a3a", "accent": "e0a040", "px": 128, "ortho": 3.2, "anims": MOB},
+        {"id": "knowledge_seeker", "kind": "quad", "size": 0.9, "colour": "2a2a30", "accent": "f0f0f0", "px": 112, "ortho": 2.4, "anims": MOB},
+        {"id": "lion_turtle", "kind": "quad", "size": 2.6, "colour": "6f7a5a", "accent": "d8c890", "px": 192, "ortho": 6.0, "anchor": 0.7, "anims": MOB},
+        {"id": "sun_dragons", "kind": "quad", "size": 2.0, "colour": "b02a20", "accent": "3060d0", "px": 176, "ortho": 5.0, "anchor": 0.7, "anims": MOB},
+        {"id": "dark_spirit", "kind": "humanoid", "body": "slim", "height": 1.8, "colour": "1a1020", "accent": "8030c0",
+         "px": 112, "ortho": 2.6, "anims": MOB},
+        # [U-407] travel companions (sky bison, polar bear-dog, monkey-cat, shirshu, badgermole, dragon)
+        {"id": "companion_sky_bison", "kind": "quad", "size": 2.2, "colour": "f0ece0", "accent": "8a5a30", "px": 176, "ortho": 5.0, "anchor": 0.7, "anims": ["idle", "walk"]},
+        {"id": "companion_polar_bear_dog", "kind": "quad", "size": 1.6, "colour": "f6f6f8", "accent": "202020", "px": 144, "ortho": 3.6, "anims": ["idle", "walk"]},
+        {"id": "companion_monkey_cat", "kind": "quad", "size": 0.9, "colour": "c88a48", "accent": "f0d0a0", "px": 112, "ortho": 2.4, "anims": ["idle", "walk"]},
+        {"id": "companion_shirshu", "kind": "quad", "size": 1.7, "colour": "7a6a90", "accent": "e05080", "px": 144, "ortho": 3.8, "anims": ["idle", "walk"]},
+        {"id": "companion_badgermole", "kind": "quad", "size": 1.5, "colour": "6a5440", "accent": "e8e0d0", "px": 144, "ortho": 3.6, "anims": ["idle", "walk"]},
+        {"id": "companion_dragon", "kind": "quad", "size": 2.1, "colour": "c02818", "accent": "e8b030", "px": 176, "ortho": 5.0, "anchor": 0.7, "anims": ["idle", "walk"]},
         # structures + nature (1 direction, 1 frame)
         {"id": "turret", "kind": "turret", "colour": "8a8a90", "accent": "c8a050", "px": 256, "ortho": 6.0, "anchor": 0.85, "dirs": 1, "anims": ["idle", "death"]},
         {"id": "inhibitor", "kind": "inhibitor", "colour": "707078", "accent": "60d0ff", "px": 192, "ortho": 3.6, "anchor": 0.8, "dirs": 1, "anims": ["idle", "death"]},
@@ -107,6 +121,11 @@ def pack(m):
 def main():
     WORK.mkdir(parents=True, exist_ok=True)
     ms = manifest()
+    if os.environ.get("EM_MODELS_NEW"):  # only models that have no sprite sheet yet
+        ms = [m for m in ms if not (PACK / m["id"] / "sheet.png").exists()]
+        print(len(ms), "new models", flush=True)
+        if not ms:
+            return
     mf = WORK / "manifest.json"
     mf.write_text(json.dumps(ms))
     subprocess.run(["blender", "-b", "--factory-startup", "-P", str(ROOT / "tools" / "art" / "blender_models.py"), "--", str(mf), str(WORK)],

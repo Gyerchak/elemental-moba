@@ -162,6 +162,7 @@ private:
     std::unordered_map<std::uint32_t, AnimMem> anim_mem_;
     std::unordered_map<std::uint32_t, double> fx_born_;
     int sent_companion_ = -1;  // [U-407]
+    std::unordered_map<std::uint32_t, float> companion_last_x_, companion_last_y_;  // facing of the companion models
     // [U-402] mouse control while a cast key is held
     int drawing_slot_ = -1;                       // a wall being drawn (control 2)
     std::vector<std::pair<float, float>> draw_path_;

@@ -594,6 +594,15 @@ void GameView::draw_companions(NetClient& net, double now_s) {
         const bool flies = k == CompanionKind::SkyBison || k == CompanionKind::Dragon;
         const float h = flies ? 70.f : 0.f, top = view_.sy_h(wy, h) + bob;
         ground_fill(r_, view_, wx, wy, flies ? 60.f : 40.f, {0, 0, 0, 70}, 18);  // shadow
+        // the model (tools/art/make_models.py: companion_<name>) — the drawn shapes below are the fallback
+        static const char* kModel[] = {"companion_sky_bison", "companion_polar_bear_dog", "companion_monkey_cat", "companion_shirshu",
+                                       "companion_badgermole", "companion_dragon"};
+        if (const SpriteSheet* sh = view_.hz > 0 ? sprites_.get(kModel[std::size_t(k)]) : nullptr) {
+            Sprites::draw(r_, *sh, "walk", now_s, sprite_dir(float(c.x) - companion_last_x_[c.owner], float(c.y) - companion_last_y_[c.owner], view_.flip), sx,
+                          view_.sy_h(wy, h), z, {255, 255, 255, 255}, false);
+            companion_last_x_[c.owner] = float(c.x), companion_last_y_[c.owner] = float(c.y);
+            continue;
+        }
         switch (k) {
             case CompanionKind::SkyBison:  // big white body, brown arrow, six legs
                 fill_ellipse(r_, sx, top, 58 * z, 30 * z, {245, 240, 230, 255}, 24);
