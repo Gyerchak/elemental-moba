@@ -10,7 +10,7 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 add_compile_options(-Wall -Wextra -Wpedantic)
 
-add_library(em_core STATIC src/map/default_map.cpp)
+add_library(em_core STATIC src/map/default_map.cpp src/map/twisted_grove.cpp)
 target_include_directories(em_core PUBLIC src)
 
 file(GLOB_RECURSE EM_GAME_SRC CONFIGURE_DEPENDS src/game/*.cpp)

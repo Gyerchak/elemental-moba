@@ -85,6 +85,7 @@ struct Settings {
     bool show_attack_range = false;        // [U-289] Ctrl + ` : the autoattack range circle always on
     int companion = 0;
     int ruleset = 0;                       // [U-416] practice / hosting: 0 Elemental, 1 LoL-like, 2 Dota-like
+    int map = 0;                           // [U-420] practice / hosting: index in maps()
     bool show_other_emotes = true;         // [U-414] show other players' own emotes (pictures + sounds)
     std::vector<std::string> own_emotes;   // [U-414] my own emotes in the wheel (folders in custom_emotes/), max 4                     // [U-407] CompanionKind of my travel animal (recall)
     bool attack_move_cursor = false;       // [U-303] attack-move picks the enemy nearest the CURSOR (false = nearest me)

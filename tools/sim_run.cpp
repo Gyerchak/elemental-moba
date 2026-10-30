@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "game/world.hpp"
+#include "game/match/maps.hpp"
 
 int main(int argc, char** argv) {
     using namespace em;
@@ -16,6 +17,7 @@ int main(int argc, char** argv) {
     MatchConfig cfg;
     cfg.seed = argc > 2 ? std::uint32_t(std::atoi(argv[2])) : 1;
     if (const char* rs = std::getenv("EM_RULESET")) cfg.ruleset = std::uint8_t(std::atoi(rs));  // [U-416] 1 LoL-like, 2 Dota-like
+    if (const char* mp = std::getenv("EM_MAP")) cfg.map = std::uint8_t(std::max(0, map_index(mp)));  // [U-420] e.g. twisted_grove
     World w(cfg);
     const bool profile = argc > 3 && std::string_view(argv[3]) == "--profile";  // [U-287]
     w.profile = profile;
@@ -26,8 +28,9 @@ int main(int argc, char** argv) {
     };
     std::vector<Slow> slow;
     std::array<double, World::kProfParts> total{};
-    for (int i = 0; i < 10; ++i)
-        w.add_champion(i < 5 ? Team::FireNation : Team::EarthNation, i, int(i % 2), -1, -1, true, -1, "");
+    const int ts = cur_map().team_size;  // [U-420] 5 v 5, 3 v 3 …
+    for (int i = 0; i < 2 * ts; ++i)
+        w.add_champion(i < ts ? Team::FireNation : Team::EarthNation, i, int(i % 2), -1, -1, true, -1, "");
     const auto t0 = std::chrono::steady_clock::now();
     std::size_t feed_seen = 0;
     while (!w.over && w.now_ms < std::int64_t(minutes) * 60'000) {

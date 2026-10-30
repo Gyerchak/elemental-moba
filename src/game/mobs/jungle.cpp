@@ -1,6 +1,7 @@
 // Jungle monsters [U-82][U-147][X-55][X-97]: camps and behaviour.
 #include <algorithm>
 #include "game/match/layout.hpp"
+#include "game/match/maps.hpp"
 #include "game/mobs/monsters.hpp"
 #include "game/mobs/rules.hpp"
 #include "game/world.hpp"
@@ -52,13 +53,13 @@ void World::apply_monster_growth(Unit& m) {
 void World::spawn_jungle() {
     for (int side = 0; side < 2; ++side) {
         auto P = [&](CellPt c) { return side == 0 ? c : mirror(c); };
-        for (std::size_t i = 0; i < kCamps.size(); ++i) {  // [U-82] jungle spirits and animals
-            const CellPt c = P(kCamps[i]);
+        for (std::size_t i = 0; i < cur_map().camps.size(); ++i) {  // [U-82] jungle spirits and animals
+            const CellPt c = P(cur_map().camps[i]);
             spawn_unit(make_monster(i % 2 ? "Spirit Wolf" : "Wandering Spirit", cell_mid(c.first), cell_mid(c.second)));
         }
         // [X-97] aggressive jungle: cursed spirit (ranged curse), angry beast (body-blocks [X-96]), bandit pair
-        for (std::size_t i = 0; i < kAggroCamps.size(); ++i) {
-            const CellPt c = P(kAggroCamps[i]);
+        for (std::size_t i = 0; i < cur_map().aggro_camps.size(); ++i) {
+            const CellPt c = P(cur_map().aggro_camps[i]);
             if (i == 2) {
                 spawn_unit(make_monster("Bandit", cell_mid(c.first), cell_mid(c.second)));
                 spawn_unit(make_monster("Bandit Archer", cell_mid(c.first) + 50 * kSub, cell_mid(c.second)));
@@ -68,17 +69,14 @@ void World::spawn_jungle() {
         }
     }
     for (int side = 0; side < 2; ++side)  // [U-366] buff camps
-        for (std::size_t i = 0; i < kBuffCamps.size(); ++i) {
-            const CellPt c = side == 0 ? kBuffCamps[i] : mirror(kBuffCamps[i]);
+        for (std::size_t i = 0; i < cur_map().buff_camps.size(); ++i) {
+            const CellPt c = side == 0 ? cur_map().buff_camps[i] : mirror(cur_map().buff_camps[i]);
             spawn_unit(make_monster(i == 0 ? "Platypus Bear" : "Knowledge Seeker", cell_mid(c.first), cell_mid(c.second)));
         }
-    for (CellPt c : kDarkSpiritCells)  // [U-401] dark spirits at both portals
+    for (CellPt c : cur_map().dark_spirits)  // [U-401] dark spirits at both portals
         for (CellPt p : {c, mirror(c)}) spawn_unit(make_monster("Dark Spirit", cell_mid(p.first), cell_mid(p.second)));
-    // [X-55] Face Stealer on the spirit island [X-86]
-    spawn_unit(make_monster("Face Stealer", cell_mid(kFaceStealerCell.first), cell_mid(kFaceStealerCell.second)));  // [U-404]
-    // [U-364] epic monsters: they appear later (first_spawn_ms)
-    spawn_unit(make_monster("Lion Turtle", cell_mid(kLionTurtleCell.first), cell_mid(kLionTurtleCell.second)));
-    spawn_unit(make_monster("Sun Dragons", cell_mid(kDragonsCell.first), cell_mid(kDragonsCell.second)));
+    // [X-55][U-364][U-404][U-420] the map's epic monsters (some appear later: first_spawn_ms)
+    for (const EpicSpot& e : cur_map().epics) spawn_unit(make_monster(e.monster, cell_mid(e.cell.first), cell_mid(e.cell.second)));
     for (Unit& u : units)
         if (u.mob >= 0 && kMonsters[std::size_t(u.mob)].first_spawn_ms > 0 && u.alive && u.respawn_ms == 0) {
             u.alive = false;

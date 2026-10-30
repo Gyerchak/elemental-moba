@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <fstream>
 #include "client/net_client.hpp"
+#include "game/match/maps.hpp"
 
 #include <enet/enet.h>
 
@@ -13,6 +14,16 @@
 namespace em {
 
 using namespace net;
+
+// [U-420] the server's map: the same terrain here (and its resource pack, see Resources::map_pack)
+void NetClient::use_map(int index) {
+    set_map(index);
+    map = cur_map().id;
+    grid = cur_map().make();
+    prepare_match_grid(grid);
+    seen = grid;
+    grid_dirty = true;
+}
 
 NetClient::NetClient() : grid(make_default_map()) {
     prepare_match_grid(grid);
@@ -24,6 +35,7 @@ NetClient::~NetClient() { disconnect(); }
 bool NetClient::connect(const std::string& host, std::uint16_t port, const std::string& name, std::uint64_t secret,
                         std::string version, bool allow_skins) {
     disconnect();
+    address = host, this->port = port;  // [U-422] for invites
     host_ = enet_host_create(nullptr, 1, 2, 0, 0);
     if (host_) enet_host_compress_with_range_coder(host_);  // [U-280] must match the server
     if (!host_) return false;
@@ -43,7 +55,7 @@ bool NetClient::connect(const std::string& host, std::uint16_t port, const std::
     allow_skins_ = allow_skins;
     client_version = std::move(version);
     state = State::Connecting;
-    grid = make_default_map();
+    grid = cur_map().make();
     prepare_match_grid(grid);
     seen = grid;
     have_snapshot = false;
@@ -181,6 +193,25 @@ void NetClient::send_own_emote(std::uint8_t idx, const std::vector<std::uint8_t>
     send_raw(w, true);
 }
 
+void NetClient::send_lobby_config(int map_index, int rules) {
+    Writer w;
+    w.put(Msg::LobbyConfig);
+    w.put(std::uint8_t(map_index)), w.put(std::uint8_t(rules));
+    send_raw(w, true);
+}
+void NetClient::send_transfer_owner(std::uint8_t slot_id) {
+    Writer w;
+    w.put(Msg::TransferOwner);
+    w.put(slot_id);
+    send_raw(w, true);
+}
+void NetClient::send_queue(bool on, int map_index, int rules) {
+    Writer w;
+    w.put(Msg::Queue);
+    w.put(std::uint8_t(on)), w.put(std::uint8_t(map_index)), w.put(std::uint8_t(rules));
+    send_raw(w, true);
+}
+
 void NetClient::poll(double now_s) {
     std::deque<Packet> got;
     {
@@ -226,6 +257,7 @@ void NetClient::handle(const std::uint8_t* data, std::size_t n, double now_s) {
             server_motd = r.str();
             ruleset = r.get<std::uint8_t>();          // [U-416]
             own_emotes_allowed = r.get<std::uint8_t>() != 0;  // [U-414]
+            use_map(r.get<std::uint8_t>());                   // [U-420]
             if (state != State::Match) state = State::Lobby;
             break;
         case Msg::Reject:
@@ -253,6 +285,8 @@ void NetClient::handle(const std::uint8_t* data, std::size_t n, double now_s) {
                 s.platform = r.get<std::uint8_t>();
                 s.has_skin = r.get<std::uint8_t>() != 0;
                 s.lp = r.get<std::int32_t>();
+                s.queued = r.get<std::uint8_t>() != 0, s.q_map = r.get<std::uint8_t>(), s.q_rules = r.get<std::uint8_t>();  // [U-423]
+                s.plays = r.get<std::uint8_t>() != 0;
                 lobby.push_back(std::move(s));
             }
             lobby_in_match = r.get<std::uint8_t>() != 0;
@@ -260,6 +294,12 @@ void NetClient::handle(const std::uint8_t* data, std::size_t n, double now_s) {
             bans_enabled = r.get<std::uint8_t>() != 0;
             lobby_timer_s = r.get<std::uint16_t>();  // [U-276]
             lobby_timer_at = now_s;
+            {  // [U-420][U-422][U-423] the lobby's map / rules / queue mode (the owner may change them)
+                const std::uint8_t m = r.get<std::uint8_t>();
+                ruleset = r.get<std::uint8_t>();
+                queue_mode = r.get<std::uint8_t>() != 0;
+                if (!r.bad() && state != State::Match && maps()[std::min<std::size_t>(m, maps().size() - 1)].id != map) use_map(m);
+            }
             if (state == State::Match && !lobby_in_match && winner >= 0) back_in_lobby = true;
             break;
         }

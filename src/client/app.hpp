@@ -93,6 +93,7 @@ private:
     void champion_info();
     void custom_champions();
     void interactions();  // [U-397]
+    int queue_map_ = 0, queue_rules_ = 0;  // [U-423] my queue choice
     float interactions_scroll_ = 0;
     // ---- shared
     void ingame_menu();  // Esc in a match: live options, leave [U-207]
@@ -117,6 +118,7 @@ private:
     std::string port_ = "7777", tick_ = "128", host_name_ = "My elemental-moba game", host_motd_ = "Have fun!";
     bool force_tex_ = false, dup_names_ = false, registration_ = false, soft_cap_ = false, bans_ = false;
     bool own_emotes_ = true;  // [U-414] host option: pass players' own emotes on
+    bool queue_mode_ = false; // [U-423] dedicated server option
     bool ranked_ = true, matchmaking_ = true, pick_timer_ = true;  // [U-276]
     std::uint8_t platforms_ = net::kAllPlatforms;
     std::string direct_addr_ = "127.0.0.1:7777", edit_name_, edit_addr_;

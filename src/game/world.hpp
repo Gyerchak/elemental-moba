@@ -115,7 +115,7 @@ inline constexpr std::uint16_t kAllCategories = 0x1ff;
 inline constexpr std::uint16_t kMinionCategories = cat_bit(UnitCategory::Minion) | cat_bit(UnitCategory::SiegeMinion) | cat_bit(UnitCategory::SuperMinion);
 
 // [U-302] named monsters (the order = the network name id; net::kMobNames is the same list)
-inline constexpr const char* kMobNameList[] = {"", "Spirit Wolf", "Wandering Spirit", "Cursed Spirit", "Angry Beast", "Bandit", "Face Stealer", "Bandit Archer", "Platypus Bear", "Knowledge Seeker", "Lion Turtle", "Sun Dragons", "Dark Spirit"};
+inline constexpr const char* kMobNameList[] = {"", "Spirit Wolf", "Wandering Spirit", "Cursed Spirit", "Angry Beast", "Bandit", "Face Stealer", "Bandit Archer", "Platypus Bear", "Knowledge Seeker", "Lion Turtle", "Sun Dragons", "Dark Spirit", "Canyon Crawler Queen"};
 struct TakenHit {
     std::int64_t ms = 0;
     std::uint32_t src = 0;
@@ -427,6 +427,7 @@ struct MatchConfig {
     // [U-416] rule set: Elemental (this game) or a classic one that switches on what LoL / Dota have and this game
     // leaves out: lifesteal, omnivamp, healing reduction (both), denying own minions (Dota)
     std::uint8_t ruleset = 0;                    // RuleSet
+    std::uint8_t map = 0;                        // [U-420] index in maps() (game/match/maps.hpp)
 };
 enum class RuleSet : std::uint8_t { Elemental, LeagueLike, DotaLike, Count };
 inline constexpr const char* kRuleSetNames[] = {"Elemental", "LoL-like", "Dota-like"};

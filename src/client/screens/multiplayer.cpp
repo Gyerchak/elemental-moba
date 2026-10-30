@@ -5,6 +5,7 @@
 #include <format>
 
 #include "client/app.hpp"
+#include "game/match/maps.hpp"
 #include "client/locale.hpp"
 
 namespace em {
@@ -157,6 +158,11 @@ void App::host(bool dedicated) {
         set_.ruleset = (set_.ruleset + 1) % int(RuleSet::Count), set_.save();
     y += 30;
     toggle(tr("Players' own emotes are passed on (separate from skins)"), own_emotes_);  // [U-414]
+    // [U-420] the map (the lobby owner can still change it in the lobby)
+    if (button(ren_, ui_, x, y, 640, 26, std::format("{}: {}", tr("Map"), maps()[std::size_t(std::clamp(set_.map, 0, int(maps().size()) - 1))].name), false))
+        set_.map = (std::clamp(set_.map, 0, int(maps().size()) - 1) + 1) % int(maps().size()), set_.save();
+    y += 30;
+    if (dedicated) toggle(tr("Matchmaking queue: players queue for map + mode, random teams"), queue_mode_);  // [U-423]
     toggle(tr("Ranked: MMR + LP after every match"), ranked_);  // [U-276]
     if (ranked_) toggle(tr("Skill-based matchmaking (balanced teams)"), matchmaking_);
     if (dedicated) toggle(tr("Pick timer 90 s (no pick = lobby disbanded)"), pick_timer_);
@@ -181,6 +187,8 @@ void App::host(bool dedicated) {
         c.registration = registration_;
         c.soft_cap = soft_cap_;
         c.ruleset = std::uint8_t(std::clamp(set_.ruleset, 0, 2));  // [U-416]
+        c.map = std::clamp(set_.map, 0, int(maps().size()) - 1);   // [U-420]
+        c.queue_mode = dedicated && queue_mode_;                    // [U-423]
         c.allow_own_emotes = own_emotes_;                          // [U-414]
         c.bans = bans_;
         c.ranked = ranked_;
@@ -196,6 +204,7 @@ void App::host(bool dedicated) {
     if (button(ren_, ui_, x + 320, y, 200, 40, tr("Back"))) go(back_);
     if (!status_.empty()) text(ren_, x, y + 56, status_, {255, 160, 120}, 1.5f);
     text(ren_, x, y + 80, tr("Others join with your IP address and this port (open the UDP port in your router for the internet)."), {150, 150, 170});
+    text(ren_, x, y + 98, tr("LAN: players in your local network join with your LAN address (the Invite button in the lobby copies it)."), {150, 150, 170});
 }
 
 void App::server_running() {

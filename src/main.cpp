@@ -4,6 +4,7 @@
 //                  [--pick-seconds N (default 90, 0 = off)] [--unranked] [--no-matchmaking]           [U-276]
 //                  [--version <name>]  own game version from versions/<name>/version.txt                  [U-95]
 //   elemental_moba --autotest S --shot f.bmp [--champ i] [--start-min m] [--first-wave s] [--manual]
+#include "game/match/maps.hpp"
 #include <SDL3/SDL.h>
 #include <enet/enet.h>
 
@@ -58,6 +59,9 @@ int main(int argc, char** argv) {
         auto next = [&] { return i + 1 < argc ? std::string(argv[++i]) : std::string(); };
         if (a == "--server") dedicated = true, scfg.pick_seconds = 90;  // [U-276] dedicated: lobby timer on
         else if (a == "--pick-seconds") scfg.pick_seconds = std::atoi(next().c_str());
+        else if (a == "--map") scfg.map = std::max(0, em::map_index(next()));        // [U-420] e.g. --map twisted_grove
+        else if (a == "--queue") scfg.queue_mode = true;                              // [U-423] matchmaking queue
+        else if (a == "--queue-min") scfg.queue_min = std::max(1, std::atoi(next().c_str()));
         else if (a == "--unranked") scfg.ranked = false;            // [U-276] no MMR / LP
         else if (a == "--version") scfg.version = next();          // [U-95] own game version (versions/<name>/)
         else if (a == "--no-matchmaking") scfg.matchmaking = false;

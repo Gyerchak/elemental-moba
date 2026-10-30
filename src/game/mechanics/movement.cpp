@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include "game/match/layout.hpp"
+#include "game/match/maps.hpp"
 #include "game/mechanics/pathfind.hpp"
 #include "game/mechanics/element_rules.hpp"
 #include "game/world.hpp"
@@ -287,7 +288,7 @@ void World::step_units() {
                     u.x = fx_ * kSub;
                     u.y = fy_ * kSub;
                 } else if (u.order.kind == OrderKind::Portal) {  // [X-54]
-                    const CellPt n = kPortalCell, s = mirror(kPortalCell);
+                    const CellPt n = cur_map().portal, s = mirror(cur_map().portal);
                     const bool at_north = dist2(u.ux(), u.uy(), n.first * kCellUnits, n.second * kCellUnits) <
                                           dist2(u.ux(), u.uy(), s.first * kCellUnits, s.second * kCellUnits);
                     const CellPt to = at_north ? s : n;

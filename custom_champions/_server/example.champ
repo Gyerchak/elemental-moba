@@ -1,0 +1,11 @@
+# [U-210] An own champion. Copy this file, change it, then enable it in Menu → Own champions.
+# Any mistake = the file is ignored (the reason is shown in the menu).
+base = Ember Monk          # start from this champion
+name = Ash Monk            # a new, unique name
+hp = 560                   # health
+attack = 55
+move_speed = 340
+attack_range = 470         # edge to edge
+colour = cc7733
+w = Lava Pool              # any existing skill by its name
+y = Volcano                # Y = the ultimate (unlocks at 6). Rank rules per skill: y_unlock_level = 6, w_rank_cap = 2 …

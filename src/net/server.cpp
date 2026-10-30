@@ -60,10 +60,11 @@ std::int64_t Server::wall_ms() {
 // [U-276] the pick timer (servers with pick_seconds > 0): it starts when 2+ players are in the lobby. When it ends:
 // everybody picked → the match starts; somebody did not → the lobby is disbanded: they are sent away, picks reset.
 void Server::lobby_timer() {
-    if (cfg_.pick_seconds <= 0) return;
+    if (cfg_.pick_seconds <= 0 && !cfg_.queue_mode) return;
+    if (cfg_.queue_mode && lobby_deadline_ms_ < 0) return;  // [U-423] queue mode: the timer runs only after a queue popped
     int humans = 0;
-    for (const Player& p : players_) humans += p.connected && p.joined;
-    if (humans < 2) {
+    for (const Player& p : players_) humans += p.connected && p.joined && p.slot.plays;
+    if (humans < (cfg_.queue_mode ? 1 : 2)) {
         if (lobby_deadline_ms_ >= 0) {
             lobby_deadline_ms_ = -1;
             send_lobby();
@@ -80,13 +81,17 @@ void Server::lobby_timer() {
     lobby_deadline_ms_ = -1;
     bool all = true;
     for (const Player& p : players_)
-        if (p.connected && p.joined && p.slot.champ < 0) all = false;
+        if (p.connected && p.joined && p.slot.plays && p.slot.champ < 0) all = false;
     if (all) {
         start_match();
         return;
     }
     for (Player& p : players_) {
-        if (!p.connected || !p.joined) continue;
+        if (!p.connected || !p.joined || !p.slot.plays) continue;
+        if (cfg_.queue_mode) {  // [U-423] queue mode: nobody is sent away — back into the lobby (queue again)
+            p.slot.plays = false, p.slot.champ = -1, p.slot.ready = false;
+            continue;
+        }
         if (p.slot.champ < 0) {  // did not pick → sent away
             Writer w;
             w.put(Msg::Reject);
@@ -165,6 +170,7 @@ void Server::drop(int pid) {
         }
     }
     if (!world_) p = Player{};
+    if (pid == owner_) pick_owner();  // [U-422]
     send_lobby();
 }
 

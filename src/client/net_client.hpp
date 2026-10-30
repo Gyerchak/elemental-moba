@@ -143,6 +143,14 @@ public:
     bool reload_own_champions = false;      // [U-415] set on disconnect after a server sent its own champions
     int custom_from_server = -1;
     std::uint8_t ruleset = 0;               // [U-416] the server's rule set (RuleSet)
+    std::string_view map;                   // [U-420] the server's map id
+    bool queue_mode = false;                // [U-423] the server matches players by queue (map + mode)
+    std::string address;                    // [U-422] the server address I joined (for invites)
+    std::uint16_t port = 0;
+    void send_lobby_config(int map_index, int rules);  // [U-422] owner only
+    void send_transfer_owner(std::uint8_t slot_id);
+    void send_queue(bool on, int map_index, int rules);  // [U-423]
+    void use_map(int index);
     // [U-414] other players' own emotes: unit → 4 × (PNG, WAV)
     std::unordered_map<std::uint32_t, std::array<std::pair<std::vector<std::uint8_t>, std::vector<std::uint8_t>>, 4>> own_emotes;
     void send_own_emote(std::uint8_t idx, const std::vector<std::uint8_t>& png, const std::vector<std::uint8_t>& wav);

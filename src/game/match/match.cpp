@@ -3,6 +3,7 @@
 #include <algorithm>
 #include "game/match/layout.hpp"
 #include "game/world.hpp"
+#include "game/match/maps.hpp"
 
 namespace em {
 
@@ -27,7 +28,7 @@ void World::step_match() {
         }
     if (now_ms >= next_wave_ms) {
         spawn_wave();
-        next_wave_ms += cfg.wave_period_ms;
+        next_wave_ms += cur_map().minions.period_ms;  // [U-420] the map's minion config
     }
     // passive gold ~2 / s from 1:50 [X-11]
     if (now_ms >= 110'000 && tick % cfg.tick_hz == 0)

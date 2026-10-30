@@ -147,6 +147,11 @@ void GameView::reset() {
     anim_mem_.clear();
     sent_companion_ = -1;
     my_emotes_ = load_own_emotes(), my_emotes_loaded_ = true;  // [U-414]
+    for (std::size_t i = 0; i < ground_src_.size(); ++i) {  // [U-420] the ground textures of THIS map's pack
+        if (ground_src_[i]) SDL_DestroySurface(ground_src_[i]);
+        ground_src_[i] = nullptr;
+        ground_tried_[i] = false;
+    }
     // [U-389] nothing of the last match may leak into the next one
     companion_last_x_.clear(), companion_last_y_.clear(), companion_dir_.clear();
     cc_max_.clear(), cc_last_.clear(), fx_born_.clear(), pings_seen_.clear();

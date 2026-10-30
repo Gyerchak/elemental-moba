@@ -4,6 +4,7 @@
 #include "game/match/layout.hpp"
 #include "game/mobs/rules.hpp"
 #include "game/world.hpp"
+#include "game/match/maps.hpp"
 
 namespace em {
 
@@ -16,15 +17,16 @@ void World::spawn_wave() {
     if (wave_no == 1) announce(AnnounceKind::MinionsSpawned, 0, 0, Team::Neutral);  // [U-263]
     for (int side = 0; side < 2; ++side) {
         const Team t = side == 0 ? Team::FireNation : Team::EarthNation;
-        for (int lane = 0; lane < 3; ++lane) {
+        for (int lane = 0; lane < lane_count(); ++lane) {  // [U-420] the map's lanes
             // super minions when the enemy inhibitor of this lane is down
             bool super = false;
             for (const Unit& o : units)
                 if (o.kind == UnitKind::Inhibitor && o.team != t && o.lane == lane && !o.alive) super = true;
-            std::vector<MinionType> types{MinionType::Melee, MinionType::Melee, MinionType::Melee};
-            if (wave_no % 3 == 0) types.push_back(MinionType::Siege);
+            const MinionWaves& mw = cur_map().minions;  // [U-420] the map's wave
+            std::vector<MinionType> types(std::size_t(mw.melee), MinionType::Melee);
+            if (mw.siege_every > 0 && wave_no % mw.siege_every == 0) types.push_back(MinionType::Siege);
             if (super) types.push_back(MinionType::Super);
-            for (int k = 0; k < 3; ++k) types.push_back(MinionType::Ranged);
+            for (int k = 0; k < mw.ranged; ++k) types.push_back(MinionType::Ranged);
             const auto& path = lane_path(lane);
             const CellPt start = side == 0 ? path.front() : path.back();
             for (std::size_t k = 0; k < types.size(); ++k) {

@@ -4,6 +4,7 @@
 
 #include "game/versions.hpp"
 #include "client/app.hpp"
+#include "game/match/maps.hpp"
 #include "client/locale.hpp"
 
 namespace em {
@@ -32,6 +33,7 @@ void App::menu() {
         c.port = std::uint16_t(7790 + std::random_device{}() % 200);
         c.practice = true;
         c.ruleset = std::uint8_t(set_.ruleset);  // [U-416] Options → Game
+        c.map = std::clamp(set_.map, 0, int(maps().size()) - 1);  // [U-420]
         c.loopback_only = true;
         c.host_secret = secret_;
         std::string err;

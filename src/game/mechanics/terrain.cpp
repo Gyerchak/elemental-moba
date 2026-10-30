@@ -5,6 +5,7 @@
 #include <algorithm>
 
 #include "game/match/layout.hpp"
+#include "game/match/maps.hpp"
 #include "game/mechanics/element_rules.hpp"
 #include "game/world.hpp"
 
@@ -26,23 +27,25 @@ void prepare_match_grid(Grid& g) {
                 cell.set_elevation(0);  // [U-346] no rock hill inside a camp
             }
     };
-    for (CellPt c : kCamps) {
+    for (CellPt c : cur_map().camps) {
         clear_disc(c, 7, Surface::Land, false);
         clear_disc(mirror(c), 7, Surface::Land, false);
     }
-    for (CellPt c : kAggroCamps) {  // [X-97]
+    for (CellPt c : cur_map().aggro_camps) {  // [X-97]
         clear_disc(c, 8, Surface::Land, false);
         clear_disc(mirror(c), 8, Surface::Land, false);
     }
-    clear_disc(kSpiritIsland, 30, Surface::Land, true);  // [X-86]
-    for (CellPt c : kBuffCamps) {  // [U-366]
+    if (cur_map().spirit_island.first >= 0) clear_disc(cur_map().spirit_island, 30, Surface::Land, true);  // [X-86]
+    for (CellPt c : cur_map().buff_camps) {  // [U-366]
         clear_disc(c, 7, Surface::Land, false);
         clear_disc(mirror(c), 7, Surface::Land, false);
     }
     // [U-364] epic islands in the sea + a shallow ford across the sea to each (wade, no swimming)
-    for (CellPt c : {kLionTurtleCell, kDragonsCell, kFaceStealerCell}) {
-        for (int t = -48; t <= 48; t += 2) clear_disc({c.first + t, c.second - t}, 3, Surface::Water, true);
-        clear_disc(c, 11, Surface::Land, true);
+    for (const EpicSpot& e : cur_map().epics) {
+        const CellPt c = e.cell;
+        if (cur_map().epic_islands)
+            for (int t = -48; t <= 48; t += 2) clear_disc({c.first + t, c.second - t}, 3, Surface::Water, true);
+        clear_disc(c, cur_map().epic_islands ? 11 : 10, cur_map().epic_islands ? Surface::Land : Surface::Stone, true);  // [U-420] its pit
     }
     // [U-349] water fountains in both bases: a pond next to every inhibitor (towards the base) and one by the shrine,
     // so waterbenders have a source at home
@@ -50,14 +53,14 @@ void prepare_match_grid(Grid& g) {
         clear_disc(c, r, Surface::Water, true);
         clear_disc(mirror(c), r, Surface::Water, true);
     };
-    for (const LaneStructs& l : kLaneStructs) {
-        const int dx = kBaseCell.first - l.inhib.first, dy = kBaseCell.second - l.inhib.second;
+    for (const LaneStructs& l : cur_map().lane_structs) {
+        const int dx = cur_map().base.first - l.inhib.first, dy = cur_map().base.second - l.inhib.second;
         const double len = std::max(1.0, std::hypot(double(dx), double(dy)));
         pond({l.inhib.first + int(dx / len * 7), l.inhib.second + int(dy / len * 7)}, 3);
     }
-    pond({kNexusCell.first - 8, kNexusCell.second + 9}, 3);
-    for (int k = 0; k < 2; ++k) {  // portals: keep the pole centre open [X-54]
-        const CellPt p = k ? mirror(kPortalCell) : kPortalCell;
+    pond({cur_map().nexus.first - 8, cur_map().nexus.second + 9}, 3);
+    for (int k = 0; k < 2 && cur_map().portal.first >= 0; ++k) {  // portals: keep the pole centre open [X-54]
+        const CellPt p = k ? mirror(cur_map().portal) : cur_map().portal;
         clear_disc(p, 6, Surface::Glacier, true);
     }
 }

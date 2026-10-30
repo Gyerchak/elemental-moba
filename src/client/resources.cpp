@@ -1,5 +1,6 @@
 // Resource packs. See resources.hpp.
 #include "client/resources.hpp"
+#include "game/match/maps.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -32,7 +33,8 @@ std::string Resources::champion_id(int champ) {
 }
 
 std::string Resources::find(const std::string& relative) const {
-    for (const std::string& p : {pack_, std::string("default")}) {
+    // my chosen pack → the map's own pack [U-420] → the default pack
+    for (const std::string& p : {pack_, std::string(cur_map().pack), std::string("default")}) {
         const fs::path f = fs::path("resourcepacks") / p / relative;
         std::error_code ec;
         if (fs::exists(f, ec)) return f.string();
@@ -44,7 +46,7 @@ std::vector<std::string> Resources::packs() const {
     std::vector<std::string> out;
     std::error_code ec;
     for (const auto& e : fs::directory_iterator("resourcepacks", ec))
-        if (e.is_directory()) out.push_back(e.path().filename().string());
+        if (e.is_directory() && !e.path().filename().string().starts_with("map_")) out.push_back(e.path().filename().string());  // (map packs belong to their map [U-420])
     std::ranges::sort(out);
     return out;
 }
@@ -77,7 +79,7 @@ SDL_Texture* Resources::load_texture(const std::string& path) {
 // [U-257] an image may be .png (preferred, smaller) or .bmp — whatever the name asks for, both are tried
 std::string Resources::find_image(const std::string& relative) const {
     const std::string stem = relative.ends_with(".bmp") || relative.ends_with(".png") ? relative.substr(0, relative.size() - 4) : relative;
-    for (const std::string& p : {pack_, std::string("default")})
+    for (const std::string& p : {pack_, std::string(cur_map().pack), std::string("default")})  // [U-420] + the map's pack
         for (const char* ext : {".png", ".bmp"}) {
             const fs::path f = fs::path("resourcepacks") / p / (stem + ext);
             std::error_code ec;

@@ -609,5 +609,12 @@ Additions outside the plan live in `ENGINE-EXTRAS.md`, never here.
 - [U-418] **Setup expansion** with better visualisation: classic runes, masteries 30 / 30 / 30, build creator + auto-buy, auto-levelling.
 - [U-419] **PyFLP** on the PC and **sound effects made with FL Studio**.
 
+## 36. Round 14 (2026-10-30)
+
+- [U-420] **Map choice for the lobby**. All maps in the same format as the original; every map has its **own resource pack**, its own **minion paths and minion config** (same minion logic).
+- [U-421] A new map **like the deleted 3v3 two-lane map** of LoL (two lanes, a jungle between them, an epic monster at the top centre).
+- [U-422] **Lobby owner** chooses the map; **transfer the owner role** to a chosen player; **quit** the lobby; **invite** to the lobby.
+- [U-423] **Matchmaking on servers**: first pick the map / mode (like LoL), then queue with other people; the server makes random teams.
+
 ---
 *Hubert continues editing the plan later — new ideas get the next free `[U-xx]` number.*

@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include "game/match/layout.hpp"
+#include "game/match/maps.hpp"
 #include "game/world.hpp"
 
 namespace em {
@@ -13,7 +14,7 @@ std::uint8_t World::collide_mask(const Unit& u) const {
 }
 
 bool World::protected_cell(int cx, int cy) const {  // fountains + structures can never be bent [X-95]
-    for (CellPt f : {kFountainCell, mirror(kFountainCell)})
+    for (CellPt f : {cur_map().fountain, mirror(cur_map().fountain)})
         if ((cx - f.first) * (cx - f.first) + (cy - f.second) * (cy - f.second) < 8 * 8) return true;
     return Grid::in_bounds(cx, cy) && !struct_block.empty() && struct_block[std::size_t(cy) * kGridSize + std::size_t(cx)];
 }

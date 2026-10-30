@@ -10,5 +10,6 @@ enum class Team : std::uint8_t { FireNation, EarthNation, Neutral };  // [U-06] 
 [[nodiscard]] constexpr Team side_of(int x, int y) { return y > x ? Team::FireNation : Team::EarthNation; }
 
 [[nodiscard]] Grid make_default_map();
+[[nodiscard]] Grid make_twisted_grove();  // [U-421] the 3 v 3 two-lane map (map/twisted_grove.cpp)
 
 }  // namespace em

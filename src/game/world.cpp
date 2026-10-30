@@ -9,15 +9,16 @@
 #include <format>
 
 #include "game/match/layout.hpp"
+#include "game/match/maps.hpp"
 
 namespace em {
 
 std::int32_t isqrt32(std::int64_t v) { return std::int32_t(isqrt(v)); }
 
-World::World(MatchConfig c) : cfg(c), grid(make_default_map()), rng(c.seed ? c.seed : 1) {
+World::World(MatchConfig c) : cfg(c), grid((set_map(c.map), cur_map().make())), rng(c.seed ? c.seed : 1) {  // [U-420] the chosen map
     prepare_match_grid(grid);
     sky = WorldClock::at_ms(cfg.start_ms);
-    next_wave_ms = cfg.first_wave_ms;
+    next_wave_ms = std::min(cfg.first_wave_ms, cur_map().minions.first_ms);  // [U-420] the map's first wave (a test may start earlier)
     setup_match();
     rebuild_collision_maps();
 }
@@ -280,7 +281,7 @@ bool World::has_passive(const Unit& u, PassiveId p) const {
 }
 
 std::pair<std::int32_t, std::int32_t> World::fountain(Team t) const {
-    const auto [cx, cy] = t == Team::FireNation ? kFountainCell : mirror(kFountainCell);
+    const auto [cx, cy] = t == Team::FireNation ? cur_map().fountain : mirror(cur_map().fountain);
     return {cx * kCellUnits + kCellUnits / 2, cy * kCellUnits + kCellUnits / 2};
 }
 
@@ -442,7 +443,7 @@ std::uint32_t World::add_champion(Team team, int champ, int q_pick, int f_pick, 
     int n = 0;
     for (const Unit& o : units) n += o.kind == UnitKind::Champion && o.team == team;
     static constexpr std::uint8_t kLaneOf[] = {1, 0, 2, 2, 0, 1, 0, 2};
-    u.botm.lane = kLaneOf[std::size_t(n) % std::size(kLaneOf)];
+    u.botm.lane = std::uint8_t(kLaneOf[std::size_t(n) % std::size(kLaneOf)] % lane_count());  // [U-420] the map's lanes
     return spawn_unit(std::move(u)).id;
 }
 
@@ -574,8 +575,12 @@ void World::command(std::uint32_t id, const Cmd& c) {
             break;
         case CmdKind::UseItem: use_item(u, c.slot, c.x, c.y); break;
         case CmdKind::Portal: {  // [X-54][U-350] channel 8 s (= recall) at a pole portal → the other one
+            if (cur_map().portal.first < 0) {  // [U-420]
+                refuse(u, "this map has no spirit portals");
+                break;
+            }
             refuse(u, "portal: stand in the beam of light at a pole (glacier corner)");
-            for (const auto& p : {kPortalCell, mirror(kPortalCell)}) {
+            for (const auto& p : {cur_map().portal, mirror(cur_map().portal)}) {
                 if (dist2(u.ux(), u.uy(), p.first * kCellUnits, p.second * kCellUnits) <= 260LL * 260) {
                     u.order = {OrderKind::Portal};
                     u.path.clear();
@@ -584,7 +589,7 @@ void World::command(std::uint32_t id, const Cmd& c) {
                     u.st.add(StatusKind::Channel, u.channel_end_ms, 0, u.id);
                     u.fail_ms = -1;
                     // the far portal shows that someone is coming (everybody sees it)
-                    const auto& far = p == kPortalCell ? mirror(kPortalCell) : kPortalCell;
+                    const auto& far = p == cur_map().portal ? mirror(cur_map().portal) : cur_map().portal;
                     std::erase_if(clouds, [&](const Cloud& c) { return c.kind == CloudKind::Arrival && c.owner == u.id; });
                     clouds.push_back({far.first * kCellUnits, far.second * kCellUnits, 90, u.channel_end_ms, CloudKind::Arrival, u.id});
                 }

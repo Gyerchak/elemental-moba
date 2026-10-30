@@ -5,6 +5,13 @@
 #include <format>
 
 #include "client/app.hpp"
+#include "game/match/maps.hpp"
+#if !defined(_WIN32)
+#include <arpa/inet.h>
+#include <ifaddrs.h>
+#include <net/if.h>
+#include <netinet/in.h>
+#endif
 #include "client/own_emotes.hpp"
 #include "client/locale.hpp"
 
@@ -135,6 +142,30 @@ void App::draw_chat_box(float x, float y, float w, float h, net::Chat channel) {
     }
 }
 
+namespace {
+// [U-422] the address others can use: the one I joined, or — when I host on this PC — my LAN address
+std::string invite_address(const std::string& joined) {
+    if (joined != "127.0.0.1" && joined != "localhost" && joined != "::1" && !joined.empty()) return joined;
+#if !defined(_WIN32)
+    ifaddrs* all = nullptr;
+    std::string best = "127.0.0.1";
+    if (getifaddrs(&all) == 0) {
+        for (ifaddrs* i = all; i; i = i->ifa_next)
+            if (i->ifa_addr && i->ifa_addr->sa_family == AF_INET && !(i->ifa_flags & IFF_LOOPBACK)) {
+                char buf[INET_ADDRSTRLEN] = {};
+                inet_ntop(AF_INET, &reinterpret_cast<sockaddr_in*>(i->ifa_addr)->sin_addr, buf, sizeof buf);
+                best = buf;
+                break;
+            }
+        freeifaddrs(all);
+    }
+    return best;
+#else
+    return joined;
+#endif
+}
+}  // namespace
+
 void App::champ_select() {
     int w = 0, h = 0;
     SDL_GetRenderOutputSize(ren_, &w, &h);
@@ -157,6 +188,10 @@ void App::champ_select() {
         const std::string t = std::format("{} {} s", tr("Pick time left:"), left);
         text(ren_, W / 2 - text_w(t, 2) / 2, 60, t, left <= 10 ? Rgba{255, 110, 90} : Rgba{255, 230, 150}, 2);
     }
+    // [U-422] am I the lobby owner? (the "host" flag of my lobby slot; it can be handed over)
+    bool i_own = false;
+    for (const auto& s : net_.lobby)
+        if (s.id == net_.my_id && s.host) i_own = true;
     // ---- teams (mine left, the other right), bans under them
     auto draw_team = [&](int team, float x) {
         text(ren_, x, 60, team == 0 ? tr("FIRE NATION") : tr("EARTH NATION"), team == 0 ? hex(0xd8402a) : hex(0x4f9a35), 2);
@@ -177,6 +212,9 @@ void App::champ_select() {
             if (s.ready) text(ren_, x + 58, y + 36, tr("ready"), {120, 230, 120});
             if (s.ban >= 0) text(ren_, x + 150, y + 36, std::format("{}: {}", tr("ban"), roster[std::size_t(s.ban)].name), {255, 120, 120});
             if (s.lp >= 0) text(ren_, x + 140, y + 8, fit_text(net::tier_name(s.lp), 108), {230, 200, 120});  // [U-276]
+            if (i_own && s.id != net_.my_id && !s.bot && button(ren_, ui_, x + 186, y + 32, 60, 18, tr("owner")))  // [U-422] hand over
+                net_.send_transfer_owner(s.id);
+            if (net_.queue_mode && !s.plays) text(ren_, x + 186, y + 22, s.queued ? tr("queued") : tr("waiting"), {170, 170, 200});
             y += 58;
         }
     };
@@ -374,6 +412,38 @@ void App::champ_select() {
 
     // ---- ready / start / leave
     const float bx = W - 266;
+    // [U-420][U-422] the map + rules: the owner changes them (a click = the next one); others see them
+    // [U-423] queue mode: each player chooses map + mode for the queue and joins / leaves it
+    {
+        const MapDef& md = cur_map();
+        if (net_.queue_mode) {
+            bool queued = false;
+            for (const auto& s : net_.lobby)
+                if (s.id == net_.my_id) queued = s.queued;
+            if (button(ren_, ui_, bx, H - 278, 250, 26, std::format("{}: {}", tr("Queue map"), maps()[std::size_t(queue_map_)].name), false, !queued))
+                queue_map_ = (queue_map_ + 1) % int(maps().size());
+            if (button(ren_, ui_, bx, H - 248, 250, 26, std::format("{}: {}", tr("Mode"), tr(kRuleSetNames[queue_rules_])), false, !queued))
+                queue_rules_ = (queue_rules_ + 1) % int(RuleSet::Count);
+            int same = 0;
+            for (const auto& s : net_.lobby) same += s.queued && s.q_map == queue_map_ && s.q_rules == queue_rules_;
+            if (button(ren_, ui_, bx, H - 218, 250, 30, queued ? std::format("{} ({} {})", tr("Leave the queue"), same, tr("in it"))
+                                                              : std::format("{} ({} {})", tr("Find a match"), same, tr("waiting")), queued))
+                net_.send_queue(!queued, queue_map_, queue_rules_);
+        } else {
+            if (button(ren_, ui_, bx, H - 248, 250, 26, std::format("{}: {}", tr("Map"), md.name), false, i_own))
+                net_.send_lobby_config((map_index(md.id) + 1) % int(maps().size()), net_.ruleset);
+            if (button(ren_, ui_, bx, H - 218, 250, 26, std::format("{}: {}", tr("Rules"), tr(kRuleSetNames[std::min<int>(net_.ruleset, 2)])), false, i_own))
+                net_.send_lobby_config(map_index(md.id), (net_.ruleset + 1) % int(RuleSet::Count));
+        }
+        text(ren_, bx, H - 300, fit_text(std::string(md.desc), 250), {150, 160, 180});
+        // [U-422] invite: a join link to the clipboard (paste it into Multiplayer → Direct connect)
+        if (button(ren_, ui_, bx, H - 186, 120, 30, tr("Invite"))) {
+            const std::string link = std::format("em-join://{}:{}", invite_address(net_.address), net_.port);
+            SDL_SetClipboardText(link.c_str());
+            status_ = std::format("{} {}", tr("copied:"), link);
+        }
+        if (!status_.empty()) text(ren_, 290, H - 20, fit_text(status_, W - 580), {200, 220, 160});
+    }
     if (button(ren_, ui_, bx, H - 140, 250, 40, ready_ ? tr("Ready!") : tr("Lock in / ready"), ready_, pick_champ_ >= 0)) {
         ready_ = !ready_;
         if (ready_ && pick_champ_ >= 0) {
@@ -385,14 +455,14 @@ void App::champ_select() {
         send_pick();
         set_.save();
     }
-    if ((net_.is_host || net_.practice) &&
+    if ((i_own || net_.practice) && !net_.queue_mode &&
         button(ren_, ui_, bx, H - 94, 250, 40, banning ? tr("End the ban phase") : tr("Start (bots fill empty slots)"))) {
         if (pick_champ_ < 0 && !banning) pick_champ_ = 0, apply_champion_defaults(0);
         send_pick();
         set_.save();
         net_.send_start();
     }
-    if (button(ren_, ui_, bx, H - 48, 250, 36, tr("Leave"))) {
+    if (button(ren_, ui_, bx, H - 48, 250, 36, tr("Leave the lobby"))) {  // [U-422]
         net_.disconnect();
         stop_server();
         go(Screen::Menu);

@@ -1,6 +1,7 @@
 // Structures [X-07][U-144]: spawning + turret targeting.
 #include <algorithm>
 #include "game/match/layout.hpp"
+#include "game/match/maps.hpp"
 #include "game/mobs/rules.hpp"
 #include "game/world.hpp"
 
@@ -38,16 +39,17 @@ void World::spawn_structures() {
     for (int side = 0; side < 2; ++side) {
         const Team t = side == 0 ? Team::FireNation : Team::EarthNation;
         auto P = [&](CellPt c) { return side == 0 ? c : mirror(c); };
-        for (int lane = 0; lane < 3; ++lane) {
-            // Earth's lane L is the mirror of Fire's lane 2−L
-            const LaneStructs& s = kLaneStructs[std::size_t(side == 0 ? lane : 2 - lane)];
+        const int nl = int(cur_map().lane_structs.size());
+        for (int lane = 0; lane < nl; ++lane) {
+            // Earth's lane L is the mirror of Fire's lane (lanes − 1 − L) [U-420]
+            const LaneStructs& s = cur_map().lane_structs[std::size_t(side == 0 ? lane : nl - 1 - lane)];
             spawn_unit(structure(UnitKind::Turret, t, P(s.t1), lane, 1));
             spawn_unit(structure(UnitKind::Turret, t, P(s.t2), lane, 2));
-            spawn_unit(structure(UnitKind::Turret, t, P(s.t3), lane, 3));
+            if (s.t3.first >= 0) spawn_unit(structure(UnitKind::Turret, t, P(s.t3), lane, 3));  // small maps: 2 per lane
             spawn_unit(structure(UnitKind::Inhibitor, t, P(s.inhib), lane, 0));
         }
-        for (CellPt c : kNexusTurrets) spawn_unit(structure(UnitKind::Turret, t, P(c), 1, 4));
-        spawn_unit(structure(UnitKind::Nexus, t, P(kNexusCell), 1, 5));
+        for (CellPt c : cur_map().nexus_turrets) spawn_unit(structure(UnitKind::Turret, t, P(c), std::min(1, nl - 1), 4));
+        spawn_unit(structure(UnitKind::Nexus, t, P(cur_map().nexus), std::min(1, nl - 1), 5));
     }
 }
 

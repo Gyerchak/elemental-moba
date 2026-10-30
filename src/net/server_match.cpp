@@ -2,6 +2,7 @@
 // the client draws everything), terrain diffs, final statistics and the way back to the lobby.
 #include "core/modifiers.hpp"
 #include "net/server.hpp"
+#include "game/match/maps.hpp"
 
 #include <enet/enet.h>
 
@@ -45,6 +46,7 @@ void Server::start_match() {
     mc.start_ms = cfg_.start_ms;
     mc.first_wave_ms = cfg_.first_wave_ms;
     mc.ruleset = cfg_.ruleset;  // [U-416]
+    mc.map = std::uint8_t(cfg_.map);  // [U-420]
     mc.seed = std::uint32_t(std::chrono::steady_clock::now().time_since_epoch().count() | 1);
     world_ = std::make_unique<World>(mc);
     // [U-276] skill-based matchmaking: humans are split into two teams of equal strength (snake draft by MMR)
@@ -65,7 +67,7 @@ void Server::start_match() {
     std::vector<bool> taken(champions().size(), false);  // [U-08] a character only once per game
     for (std::size_t c = 0; c < taken.size(); ++c) taken[c] = champion_banned(int(c));  // [U-181] bans
     for (Player& p : players_) {
-        if (!p.connected) continue;
+        if (!p.connected || !p.slot.plays) continue;  // [U-423] waiting players stay in the lobby
         const int team = std::clamp<int>(p.slot.team, 0, 1);
         int champ = p.slot.champ;
         if (champ < 0 || taken[std::size_t(champ)])
@@ -79,7 +81,7 @@ void Server::start_match() {
                                       p.slot.name, p.slot.loadout);
         ++count[team];
     }
-    const int per_team = std::max({5, count[0], count[1]});
+    const int per_team = std::max({cur_map().team_size, count[0], count[1]});  // [U-420] 5 v 5, 3 v 3 …
     for (int team = 0; team < 2; ++team)
         for (; count[team] < per_team; ++count[team]) {
             int champ = 0;
@@ -97,7 +99,7 @@ void Server::start_match() {
     feed_sent_ = 0;
     over_ms_ = -1;
     for (Player& p : players_)
-        if (p.connected && p.joined) send_match_start(p);
+        if (p.connected && p.joined && p.unit) send_match_start(p);  // [U-423] (waiting players have no unit)
     send_skins();
     if (cfg_.allow_own_emotes) send_own_emotes();  // [U-414] a server option, separate from skins
     send_lobby();
@@ -131,7 +133,7 @@ void Server::send_match_start(Player& p) {
 }
 
 void Server::send_all_cells(Player& p) {  // reconnect / late start: every cell that differs from the start map
-    Grid fresh = make_default_map();
+    Grid fresh = cur_map().make();  // [U-420]
     prepare_match_grid(fresh);
     Writer w;
     w.put(Msg::Cells);
@@ -596,6 +598,7 @@ void Server::finish_match() {
         p.unit = 0;
         p.slot.ready = false;
         p.slot.ban = -1;
+        p.slot.plays = !cfg_.queue_mode;  // [U-423] queue mode: queue again for the next match
         if (!p.connected) p = Player{};
     }
     phase_ = cfg_.bans ? DraftPhase::Banning : DraftPhase::Picking;

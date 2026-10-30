@@ -54,6 +54,9 @@ struct ServerConfig {
     bool allow_custom_champions = true;   // [U-210][U-277] own champions; their files are sent to every player who joins
     bool players_are_bots = false;        // test / autoplay: bots drive the human slots too
     std::uint8_t ruleset = 0;             // [U-416] RuleSet: 0 Elemental, 1 LoL-like, 2 Dota-like
+    int map = 0;                          // [U-420] index in maps(); the lobby owner may change it before the match
+    bool queue_mode = false;              // [U-423] matchmaking: players queue for a map + mode, the server makes random teams
+    int queue_min = 2;                    // [U-423] players in the same queue that start a match (bots fill the teams)
     bool allow_own_emotes = true;         // [U-414] players' own emotes are sent to everyone (separate from skins)
 };
 
@@ -129,7 +132,10 @@ private:
     std::int64_t over_ms_ = -1;  // match time when it ended
     std::int64_t over_ticks_ = 0;
     Ratings ratings_;                       // [U-276]
-    std::int64_t lobby_deadline_ms_ = -1;   // [U-276] steady-clock ms when the pick timer ends (−1 = not running)
+    std::int64_t lobby_deadline_ms_ = -1;
+    int owner_ = -1;                        // [U-422] the lobby owner (player index): map, rule set, start, hand over
+    void pick_owner();                      // after the owner left
+    void try_pop_queue();                   // [U-423]   // [U-276] steady-clock ms when the pick timer ends (−1 = not running)
     void lobby_timer();
     [[nodiscard]] static std::int64_t wall_ms();
 };

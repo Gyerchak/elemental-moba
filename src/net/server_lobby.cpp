@@ -1,11 +1,13 @@
 // [U-10][U-101][U-181][U-182][U-200][U-212][U-213] Lobby side of the server: who joins, picks and bans,
 // chat channels, skins, and the answer to a server-list ping.
+#include <random>
 #include <enet/enet.h>
 
 #include <algorithm>
 #include <format>
 
 #include "net/server.hpp"
+#include "game/match/maps.hpp"
 
 namespace em::net {
 
@@ -22,6 +24,36 @@ void Server::receive(int pid, Reader& r) {
         case Msg::Chat: on_chat(p, r); break;
         case Msg::SkinUpload: on_skin(p, r); break;
         case Msg::EmoteUpload: on_emote(p, r); break;  // [U-414]
+        case Msg::LobbyConfig: {  // [U-422] the owner chooses the map + rule set (before the match; not in queue mode)
+            const std::uint8_t m = r.get<std::uint8_t>(), rs = r.get<std::uint8_t>();
+            if (r.bad() || world_ || cfg_.queue_mode || pid != owner_) break;
+            cfg_.map = std::clamp<int>(m, 0, int(maps().size()) - 1);
+            cfg_.ruleset = std::uint8_t(std::min<int>(rs, 2));
+            set_map(cfg_.map);
+            send_chat(Chat::System, "server", std::format("Map: {} — rules: {}", cur_map().name, kRuleSetNames[cfg_.ruleset]), nullptr, nullptr);
+            send_lobby();
+            break;
+        }
+        case Msg::TransferOwner: {  // [U-422]
+            const std::uint8_t to = r.get<std::uint8_t>();
+            if (r.bad() || pid != owner_ || to >= players_.size()) break;
+            const Player& t = players_[to];
+            if (!t.connected || !t.joined) break;
+            owner_ = to;
+            send_chat(Chat::System, "server", std::format("{} owns the lobby now", t.slot.name), nullptr, nullptr);
+            send_lobby();
+            break;
+        }
+        case Msg::Queue: {  // [U-423] join / leave the queue for a map + mode
+            const std::uint8_t on = r.get<std::uint8_t>(), m = r.get<std::uint8_t>(), rs = r.get<std::uint8_t>();
+            if (r.bad() || !cfg_.queue_mode || world_ || (p.slot.plays && lobby_deadline_ms_ >= 0)) break;
+            p.slot.queued = on != 0;
+            p.slot.q_map = std::uint8_t(std::min<int>(m, int(maps().size()) - 1));
+            p.slot.q_rules = std::uint8_t(std::min<int>(rs, 2));
+            try_pop_queue();
+            send_lobby();
+            break;
+        }
         case Msg::StartMatch:
             // [U-383] only the host starts; a server without a host secret starts when every player in the lobby is ready to
             // pick (at least 2 players, or practice)
@@ -113,6 +145,7 @@ void Server::on_hello(int pid, Reader& r) {
         w.str(cfg_.motd);
         w.put<std::uint8_t>(cfg_.ruleset);                  // [U-416]
         w.put<std::uint8_t>(cfg_.allow_own_emotes ? 1 : 0); // [U-414]
+        w.put<std::uint8_t>(std::uint8_t(cfg_.map));        // [U-420]
         send(to.peer, w, true);
         send_custom_champions(to);  // [U-277] before any lobby state that names champions
     };
@@ -147,6 +180,9 @@ void Server::on_hello(int pid, Reader& r) {
     p.slot.name = name;
     p.slot.platform = platform;
     p.slot.host = cfg_.host_secret != 0 && secret == cfg_.host_secret;
+    // [U-422] owner: the host of a hosted lobby; on a dedicated server the first player (until handed over / left)
+    if (p.slot.host || owner_ < 0 || !players_[std::size_t(owner_)].joined) owner_ = pid;
+    p.slot.plays = !cfg_.queue_mode;  // [U-423] in queue mode nobody plays until their queue pops
     int n[2] = {};
     for (const Player& o : players_)
         if (o.connected && o.joined && &o != &p) ++n[std::clamp<int>(o.slot.team, 0, 1)];
@@ -282,13 +318,57 @@ void Server::on_emote(Player& p, Reader& r) {
     p.emotes[idx] = {std::move(png), std::move(wav)};
 }
 
+// [U-422] the owner left: the first player still in the lobby owns it
+void Server::pick_owner() {
+    owner_ = -1;
+    for (std::size_t i = 0; i < players_.size(); ++i)
+        if (players_[i].connected && players_[i].joined) {
+            owner_ = int(i);
+            send_chat(Chat::System, "server", std::format("{} owns the lobby now", players_[i].slot.name), nullptr, nullptr);
+            return;
+        }
+}
+
+// [U-423] matchmaking: when queue_min players wait in the SAME queue (map + mode), they get that map / mode and random
+// teams, then pick their champions (pick timer); everyone else keeps waiting in the lobby
+void Server::try_pop_queue() {
+    if (!cfg_.queue_mode || world_ || lobby_deadline_ms_ >= 0) return;
+    for (const Player& a : players_) {
+        if (!a.connected || !a.joined || !a.slot.queued) continue;
+        std::vector<Player*> same;
+        for (Player& b : players_)
+            if (b.connected && b.joined && b.slot.queued && b.slot.q_map == a.slot.q_map && b.slot.q_rules == a.slot.q_rules) same.push_back(&b);
+        const int team_cap = 2 * maps()[a.slot.q_map].team_size;
+        if (int(same.size()) < std::min(cfg_.queue_min, team_cap)) continue;
+        if (int(same.size()) > team_cap) same.resize(std::size_t(team_cap));
+        cfg_.map = a.slot.q_map;
+        cfg_.ruleset = a.slot.q_rules;
+        set_map(cfg_.map);
+        std::shuffle(same.begin(), same.end(), std::mt19937{std::random_device{}()});  // random teams
+        for (Player& p : players_) p.slot.plays = false;
+        for (std::size_t i = 0; i < same.size(); ++i) {
+            same[i]->slot.plays = true;
+            same[i]->slot.queued = false;
+            same[i]->slot.team = std::int8_t(i % 2);
+            same[i]->slot.champ = -1;
+        }
+        lobby_deadline_ms_ = wall_ms() + std::int64_t(std::max(cfg_.pick_seconds, 60)) * 1000;
+        send_chat(Chat::System, "server", std::format("Match found: {} — {} ({} players). Pick your champions!", cur_map().name,
+                                                      kRuleSetNames[cfg_.ruleset], same.size()), nullptr, nullptr);
+        return;
+    }
+}
+
 // ---------------------------------------------------------------- lobby state for everyone
 void Server::send_lobby() {
     Writer w;
     w.put(Msg::Lobby);
     std::vector<const LobbySlot*> slots;
-    for (const Player& p : players_)
+    for (std::size_t i = 0; i < players_.size(); ++i) {
+        Player& p = players_[i];
+        p.slot.host = int(i) == owner_;  // [U-422] the owner flag is the "host" flag of the lobby
         if (p.connected && p.joined) slots.push_back(&p.slot);
+    }
     w.put<std::uint8_t>(std::uint8_t(slots.size()));
     for (const LobbySlot* s : slots) {
         w.put(s->id);
@@ -305,11 +385,13 @@ void Server::send_lobby() {
         w.put(s->platform);
         w.put<std::uint8_t>(s->has_skin);
         w.put<std::int32_t>(s->lp);
+        w.put<std::uint8_t>(s->queued), w.put(s->q_map), w.put(s->q_rules), w.put<std::uint8_t>(s->plays);  // [U-423]
     }
     w.put<std::uint8_t>(in_match.load());
     w.put(phase_);
     w.put<std::uint8_t>(cfg_.bans);
     w.put<std::uint16_t>(std::uint16_t(lobby_deadline_ms_ < 0 ? 0 : std::max<std::int64_t>(1, (lobby_deadline_ms_ - wall_ms()) / 1000)));  // [U-276]
+    w.put<std::uint8_t>(std::uint8_t(cfg_.map)), w.put(cfg_.ruleset), w.put<std::uint8_t>(cfg_.queue_mode);  // [U-420][U-422][U-423]
     broadcast(w, true);
 }
 

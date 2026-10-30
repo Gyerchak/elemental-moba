@@ -81,6 +81,12 @@ inline constexpr std::array kMonsters = {
     MonsterDef{.name = "Dark Spirit", .body = &kSlimBody, .aggressive = true, .spirit = true, .hp = 160'000, .attack = 5'500,
                .defence = 2'000, .elemental_defence = 4'000, .move_speed = 33'000, .attack_speed = 70, .attack_range = 300,
                .range = Range::Ranged, .model_size = 1'000, .sight = 750, .gold = 90, .xp = 180, .patience = 900, .respawn_ms = 180'000},
+    // [U-421] the epic monster of Twisted Grove (centre pit): team gold + the Wisdom buff for the killer
+    MonsterDef{.name = "Canyon Crawler Queen", .body = &kBeastBody, .boss = true, .aggressive = false, .hp = 800'000, .attack = 11'000,
+               .defence = 6'000, .elemental_defence = 6'000, .move_speed = 30'000, .attack_speed = 60, .attack_range = 120,
+               .model_size = 7'000, .sight = 800, .gold = 200, .xp = 500, .patience = 700, .give_up_ms = 3'000, .reset_heal_pct = 8,
+               .respawn_ms = 360'000, .first_spawn_ms = 360'000, .hp_growth_pct = 15, .attack_growth_pct = 10, .buff = JungleBuff::Wisdom,
+               .buff_ms = 120'000, .team_reward = TeamReward::DragonGold, .team_value = 300},
     // [U-364] epic monsters (Claude ideas): a stacking team buff and a gold one
     MonsterDef{.name = "Lion Turtle", .body = &kBeastBody, .boss = true, .hp = 900'000, .attack = 10'000, .defence = 7'000,
                .elemental_defence = 7'000, .move_speed = 20'000, .attack_speed = 45, .attack_range = 120, .model_size = 9'000,

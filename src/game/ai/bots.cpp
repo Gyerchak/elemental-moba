@@ -4,6 +4,7 @@
 
 #include "game/match/layout.hpp"
 #include "game/world.hpp"
+#include "game/match/maps.hpp"
 
 namespace em {
 

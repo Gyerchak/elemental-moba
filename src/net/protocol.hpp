@@ -28,6 +28,9 @@ enum class Msg : std::uint8_t {
     Ban,           // [U-181] ban one champion in the ban phase
     SkinUpload,    // [U-200] my skin image for this match (Minecraft-like)
     EmoteUpload,   // [U-414] one of my own emotes (picture + optional sound), separate from skins
+    LobbyConfig,   // [U-422] the owner sets the map + rule set (u8 map, u8 ruleset)
+    TransferOwner, // [U-422] the owner hands the lobby to another player (u8 slot id)
+    Queue,         // [U-423] queue mode: u8 on, u8 map, u8 ruleset
     // server → client
     Welcome = 64, Reject, Lobby, MatchStart, Cells, Snapshot, Feed, GameOver, ChatLine, Notice,
     StatusReply,   // [U-212]
@@ -143,6 +146,9 @@ struct LobbySlot {
     std::uint8_t platform = 0; // [U-213]
     bool has_skin = false;     // [U-200]
     std::int32_t lp = -1;      // [U-276] ranking LP (−1 = not rated: bot / guest / unranked server)
+    bool queued = false;       // [U-423] queue mode: in the queue for q_map / q_rules …
+    std::uint8_t q_map = 0, q_rules = 0;
+    bool plays = true;         // … and taking part in the match being prepared (false = waiting in the lobby)
 };
 
 // [U-179] one row of the post-game statistics
@@ -222,7 +228,7 @@ struct NetUnit {
     std::uint8_t cc_kind, emote;         // strongest crowd control now [U-193] (255 = none); emote [U-246]
     std::uint16_t cc_left_cs;            // … time left in 1/100 s
 };
-inline constexpr const char* kMobNames[] = {"", "Spirit Wolf", "Wandering Spirit", "Cursed Spirit", "Angry Beast", "Bandit", "Face Stealer", "Bandit Archer", "Platypus Bear", "Knowledge Seeker", "Lion Turtle", "Sun Dragons", "Dark Spirit"};
+inline constexpr const char* kMobNames[] = {"", "Spirit Wolf", "Wandering Spirit", "Cursed Spirit", "Angry Beast", "Bandit", "Face Stealer", "Bandit Archer", "Platypus Bear", "Knowledge Seeker", "Lion Turtle", "Sun Dragons", "Dark Spirit", "Canyon Crawler Queen"};
 
 struct NetFx {
     std::uint32_t id, seed;

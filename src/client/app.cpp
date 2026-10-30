@@ -99,7 +99,9 @@ void App::connect_local(std::uint16_t port) {
     go(Screen::ChampSelect);
 }
 
-void App::connect_to(const std::string& address) {
+void App::connect_to(const std::string& address_in) {
+    // [U-422] an invite link "em-join://host:port" works like a plain address
+    const std::string address = address_in.starts_with("em-join://") ? address_in.substr(10) : address_in;
     const auto c = address.rfind(':');
     const std::string host = c == std::string::npos ? address : address.substr(0, c);
     const int port = c == std::string::npos ? net::kDefaultPort : std::atoi(address.c_str() + c + 1);

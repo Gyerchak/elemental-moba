@@ -11,6 +11,7 @@
 #include "client/game_view.hpp"
 #include "client/locale.hpp"
 #include "game/match/layout.hpp"
+#include "game/match/maps.hpp"
 
 namespace em {
 
@@ -194,7 +195,8 @@ void GameView::draw_wall_damage(NetClient& net) {
 // ---------------------------------------------------------------- clouds: steam, smoke, sand, snow [U-241]
 void GameView::draw_clouds(NetClient& net) {
     // [U-350] the spirit portals: a column of soft light at both poles, always (like the spirit portals in Korra)
-    for (const auto& p : {kPortalCell, mirror(kPortalCell)}) {
+    for (const auto& p : {cur_map().portal, mirror(cur_map().portal)}) {
+        if (cur_map().portal.first < 0) break;  // [U-420] a map without portals
         const float wx = float(p.first * kCellUnits), wy = float(p.second * kCellUnits);
         const float sx = view_.sx(wx), gy = view_.sy(wy), top = view_.sy_h(wy, 900);
         const float shimmer = 0.5f + 0.5f * float(std::sin(double(local_tick_) * 0.02));
@@ -852,7 +854,7 @@ void GameView::draw_world(NetClient& net, double now_s) {
     };
     draw_layer(map_tex_, float(kGroundPx));
     {  // [U-149] shop territory at my fountain
-        const auto [fx_, fy_] = net.my_team == 0 ? kFountainCell : mirror(kFountainCell);
+        const auto [fx_, fy_] = net.my_team == 0 ? cur_map().fountain : mirror(cur_map().fountain);
         const float wxs = float(fx_ * kCellUnits + 16), wys = float(fy_ * kCellUnits + 16);
         ground_fill(r_, view_, wxs, wys, float(kShopRange), {255, 215, 90, 28}, 96);
         ground_ring(r_, view_, wxs, wys, float(kShopRange), {255, 215, 90, 170}, 96);
