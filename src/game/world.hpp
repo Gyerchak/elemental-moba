@@ -573,7 +573,8 @@ public:
     // [X-94] collision helpers
     std::vector<std::uint8_t> struct_block;  // cells under alive structures (never bendable) [X-95]
     std::vector<std::uint8_t> clearance;     // cells to the nearest blocker (Chebyshev, max 7) for A*
-    std::vector<Circle> rock_bodies_;        // [U-386] stone skills (boulders) this tick: they block like walls (kCollWall)
+    std::vector<Circle> rock_bodies_;
+    std::vector<Effect> fx_pending_;         // [U-383] effects made while the effect loop runs (added after it)        // [U-386] stone skills (boulders) this tick: they block like walls (kCollWall)
     bool clearance_dirty = true;
     void rebuild_collision_maps();
     [[nodiscard]] int body_violations(const Unit& u, std::int32_t x_sub, std::int32_t y_sub) const;

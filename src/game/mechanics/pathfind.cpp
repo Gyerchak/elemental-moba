@@ -38,6 +38,7 @@ int octile(int x0, int y0, int x1, int y1) {
 
 // [U-394] does a circle of radius r (units) centred at px / py touch any blocked cell (clearance 0)?
 bool circle_clear(const std::uint8_t* clr, int px, int py, int r) {
+    if (px - r < 0 || py - r < 0) return false;  // [U-383] off the map edge
     for (int y = (py - r) / kCellUnits; y <= (py + r) / kCellUnits; ++y)
         for (int x = (px - r) / kCellUnits; x <= (px + r) / kCellUnits; ++x) {
             if (!Grid::in_bounds(x, y)) return false;

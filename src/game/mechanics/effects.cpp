@@ -33,7 +33,8 @@ void World::effect_hits(Effect& e) {
             e.team = o.team;
             e.owner = o.id;
             e.src = o.stats;
-            const Dir d = dir_of(std::int64_t(o.redirect_x) - e.ux(), std::int64_t(o.redirect_y) - e.uy());
+            Dir d = dir_of(std::int64_t(o.redirect_x) - e.ux(), std::int64_t(o.redirect_y) - e.uy());
+            if (d.x == 0 && d.y == 0) d = e.dir;  // [U-383] cursor right on the bolt: keep flying
             const std::int32_t sp = std::int32_t(isqrt(std::int64_t(e.vx) * e.vx + std::int64_t(e.vy) * e.vy));
             e.dir = d;
             e.vx = d.x * sp / kOne;
@@ -151,7 +152,7 @@ void World::step_effects() {
                 glow.radius = 1;
                 glow.light = e.light;
                 glow.end_ms = now_ms + 600;
-                fx.push_back(glow);
+                fx_pending_.push_back(glow);  // [U-383] added after the loop (pushing into fx here moved `e`)
             }
             continue;
         }

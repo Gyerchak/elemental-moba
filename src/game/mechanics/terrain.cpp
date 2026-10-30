@@ -101,9 +101,13 @@ void World::raise_segment(std::int32_t x, std::int32_t y, Dir along, Wall kind, 
     const int half_t = std::max(8, ws.thick / 2);
     for (std::int32_t s = -kWallSegLen / 2; s <= kWallSegLen / 2; s += 8)
         for (std::int32_t t = -half_t; t <= half_t; t += 8) {
-            const int cx = (x + rot_x(along, s, 0) + side.x * t / kOne) / kCellUnits;
-            const int cy = (y + rot_y(along, s, 0) + side.y * t / kOne) / kCellUnits;
+            const std::int32_t ux = x + rot_x(along, s, 0) + side.x * t / kOne, uy = y + rot_y(along, s, 0) + side.y * t / kOne;
+            if (ux < 0 || uy < 0) continue;  // [U-383]
+            const int cx = ux / kCellUnits, cy = uy / kCellUnits;
             if (!Grid::in_bounds(cx, cy) || protected_cell(cx, cy)) continue;
+            // [U-383] a cell some other timer owns (a burned tree regrowing, frozen water…) is skipped: its timer would
+            // decide when the wall falls
+            if (std::ranges::any_of(cell_timers, [&](const CellTimer& tm) { return tm.x == cx && tm.y == cy; })) continue;
             const std::uint32_t key = std::uint32_t(cy) * kGridSize + std::uint32_t(cx);
             if (std::ranges::find(cells, key) != cells.end()) continue;
             const Cell c = grid.at(cx, cy);
@@ -307,7 +311,7 @@ void World::scorch(const Effect& e) {
             g.x = e.x + e.dir.x * (e.length * 2 / 3) / kOne * kSub;
             g.y = e.y + e.dir.y * (e.length * 2 / 3) / kOne * kSub;
         }
-        fx.push_back(g);  // spawned after this tick's loop (vector may grow: callers must not hold references)
+        fx_pending_.push_back(g);  // [U-383] spawned after this tick's effect loop (never moves effects that are in use)
         fx.back().id = next_id++;
         fx.back().born_ms = now_ms;
     }
@@ -386,6 +390,7 @@ void World::add_wall_cell(int cx, int cy, Wall kind) {
 
 // [U-359] one cell of rock where a thrown rock landed (only on free, walkable ground); a magma rock glows a moment
 void World::drop_rock(std::int32_t x, std::int32_t y, bool magma) {
+    if (x < 0 || y < 0) return;  // [U-383] (−31 / 32 would be cell 0)
     const int cx = x / kCellUnits, cy = y / kCellUnits;
     if (!Grid::in_bounds(cx, cy) || protected_cell(cx, cy)) return;
     Cell c = grid.at(cx, cy);
@@ -459,9 +464,10 @@ void World::damage_wall(int cx, int cy, std::int32_t amount, Dir from) {
         set_cell(cx, cy, r);
         cell_public_ = false;
     }
-    for (CellTimer& t : cell_timers)  // falls now: the timer restores the original cell next tick (public)
-        if (t.x == cx && t.y == cy) t.at_ms = now_ms;
-    walls.erase(it);
+    if (!natural)  // a bent wall falls now: its timer restores the original cell next tick (public)
+        for (CellTimer& t : cell_timers)
+            if (t.x == cx && t.y == cy) t.at_ms = now_ms;
+    walls.erase(key);  // (by key: set_cell above may have erased the entry already — `it` would dangle)
     // [U-341] broken by a hit: the pieces fly the way the hit went
     wall_breaks.push_back({std::int16_t(cx), std::int16_t(cy), std::int16_t(std::int64_t(from.x) * 1000 / kOne),
                            std::int16_t(std::int64_t(from.y) * 1000 / kOne), std::uint8_t(c.wall()), now_ms});

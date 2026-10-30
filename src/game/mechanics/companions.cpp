@@ -38,6 +38,10 @@ void World::step_companions() {
                 u->path.clear();
                 u->casting = false;
                 u->channel_end_ms = 0;
+                u->windup_end_ms = 0;
+                u->st.remove(StatusKind::Channel);
+                for (Effect& f : fx)  // [U-383] a dash in progress ends: the companion carries now
+                    if (f.owner == u->id && f.def && f.def->kind == SkillKind::Dash) f.dead = true;
             } else {  // home
                 u->riding = false;
                 u->x = tx * kSub, u->y = ty * kSub;

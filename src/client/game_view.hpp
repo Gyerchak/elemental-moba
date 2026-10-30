@@ -44,7 +44,11 @@ private:
     void rebuild_textures(NetClient& net, std::int64_t now_ms, bool force);
     // world_draw.cpp
     void draw_world(NetClient& net, double now_s);
-    void draw_terrain_models(NetClient& net);
+    void terrain_begin();                               // [U-389]
+    void terrain_until(NetClient& net, float screen_y);
+    void draw_terrain_row(NetClient& net, int y);
+    bool terr_on_ = false;
+    int terr_x0_ = 0, terr_x1_ = 0, terr_y0_ = 0, terr_y1_ = 0, terr_k_ = 0;
     void draw_clouds(NetClient& net);
     void draw_wall_damage(NetClient& net);  // [U-288]
     void draw_ghosts(NetClient& net);
@@ -150,7 +154,8 @@ private:
     bool ping_wheel_ = false, swallow_click_ = false;  // [U-246]
     float ping_x_ = 0, ping_y_ = 0;
     std::vector<std::pair<std::uint32_t, std::int64_t>> pings_seen_;
-    std::unordered_map<std::uint32_t, std::uint16_t> cc_max_;      // longest CC time seen per unit [U-193]
+    std::unordered_map<std::uint32_t, std::uint16_t> cc_max_;
+    std::unordered_map<std::uint32_t, std::pair<std::uint8_t, std::uint16_t>> cc_last_;  // [U-389] the CC kind / time seen last frame
     std::unordered_map<std::uint32_t, bool> fx_seen_, alive_seen_; // for sounds [U-201]
     // [U-258] model sprites: animation state per unit (walking = its walk phase changed lately; attack = it just hit)
     Sprites sprites_;
@@ -162,7 +167,10 @@ private:
     std::unordered_map<std::uint32_t, AnimMem> anim_mem_;
     std::unordered_map<std::uint32_t, double> fx_born_;
     int sent_companion_ = -1;  // [U-407]
+    std::vector<net::NetFx> fx_draw_;                 // [U-389] this frame's effects at their delayed positions
+    std::vector<net::NetCompanion> comp_draw_;
     std::unordered_map<std::uint32_t, float> companion_last_x_, companion_last_y_;  // facing of the companion models
+    std::unordered_map<std::uint32_t, int> companion_dir_;
     // [U-402] mouse control while a cast key is held
     int drawing_slot_ = -1;                       // a wall being drawn (control 2)
     std::vector<std::pair<float, float>> draw_path_;

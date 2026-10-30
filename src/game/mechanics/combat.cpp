@@ -462,7 +462,7 @@ void World::on_kill(Unit* killer, Unit& dead) {
     dead.casting = false;
     // credit goes to the champion owning the killer (minion/turret kills give no gold)
     Unit* k = killer;
-    const Team kt = k ? k->team : (dead.team == Team::FireNation ? Team::EarthNation : Team::FireNation);
+    Team kt = k ? k->team : (dead.team == Team::FireNation ? Team::EarthNation : dead.team == Team::EarthNation ? Team::FireNation : Team::Neutral);
     auto champs_near = [&](Team t, std::int32_t x, std::int32_t y, std::int64_t r) {
         std::vector<Unit*> out;
         for (Unit& o : units)
@@ -479,6 +479,8 @@ void World::on_kill(Unit* killer, Unit& dead) {
                     if (id && now_ms - ms <= 10'000 && ms > best)
                         if (Unit* c = find(id); c && c->kind == UnitKind::Champion && c->team != dead.team) best = ms, k = c;
             }
+            if (k && k->team != Team::Neutral) kt = k->team;  // [U-383] the credited champion's team (also after a monster finished it)
+            if (kt == Team::Neutral) kt = dead.team == Team::FireNation ? Team::EarthNation : Team::FireNation;
             ++dead.deaths;
             dead.respawn_ms = now_ms + std::min<std::int64_t>(60'000, 8'000 + 2'000LL * dead.level);
             if (kt != Team::Neutral) ++team_kills[std::size_t(kt)];
@@ -598,12 +600,13 @@ void World::on_kill(Unit* killer, Unit& dead) {
                 kc->jbuff = std::uint8_t(md->buff);
                 kc->jbuff_until = now_ms + md->buff_ms;
             }
+            if (!kc && near.empty()) kt = Team::Neutral;  // [U-383] nobody killed it (e.g. a minion): no team reward
             if (md && kt != Team::Neutral && md->team_reward == TeamReward::LionTurtleStack) {  // [U-364] permanent team stack
                 ++lion_stacks[std::size_t(kt) & 1];
                 add_feed(std::format("The Lion Turtle blesses the {} (stack {})", kt == Team::FireNation ? "Fire Nation" : "Earth Nation",
                                      lion_stacks[std::size_t(kt) & 1]));
             }
-            if (md && md->team_reward == TeamReward::DragonGold)  // [U-364] gold for the whole team
+            if (md && kt != Team::Neutral && md->team_reward == TeamReward::DragonGold)  // [U-364] gold for the whole team
                 for (Unit& c : units)
                     if (c.kind == UnitKind::Champion && c.team == kt) reward(c, dead, md->team_value + md->gold_growth * (dead.deaths - 1), 0);
             if (boss && !near.empty() && md && md->team_reward == TeamReward::FaceSteal) {  // [X-55] the Face Stealer steals a skill of a random killer for 2 min

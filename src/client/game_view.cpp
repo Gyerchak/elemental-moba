@@ -145,6 +145,10 @@ void GameView::reset() {
     sky_banners_.clear();
     anim_mem_.clear();
     sent_companion_ = -1;
+    // [U-389] nothing of the last match may leak into the next one
+    companion_last_x_.clear(), companion_last_y_.clear(), companion_dir_.clear();
+    cc_max_.clear(), cc_last_.clear(), fx_born_.clear(), pings_seen_.clear();
+    drawing_slot_ = -1, draw_path_.clear(), src_x_ = src_y_ = -1;
     show_recap_ = show_events_ = false;
 }
 
@@ -626,7 +630,7 @@ void GameView::frame(NetClient& net, double now_s, Ui& ui) {
     // A late packet then never shows as a freeze-and-jump (the old way blended only the last two and waited).
     draw_.clear();
     my_team_ = net.my_team;
-    const double render_t = now_s - 0.05;
+    const double render_t = now_s - 0.1;  // [U-389] 2 snapshot intervals: one late packet never freezes the picture
     const NetClient::PosFrame* fa = nullptr;
     const NetClient::PosFrame* fb = nullptr;
     for (std::size_t i = 0; i + 1 < net.pos_hist.size(); ++i)
@@ -646,6 +650,23 @@ void GameView::frame(NetClient& net, double now_s, Ui& ui) {
             }
         }
         draw_.push_back({u, x, y});
+    }
+    // [U-389] effects + companions on the same delayed timeline as the units (they ran ahead of their casters)
+    auto lerp_map = [&](const auto& ma, const auto& mb, std::uint32_t id, std::int32_t& x, std::int32_t& y) {
+        const auto ia = ma.find(id), ib = mb.find(id);
+        if (ib == mb.end()) return;
+        if (ia == ma.end()) {
+            x = ib->second.first, y = ib->second.second;
+            return;
+        }
+        x = ia->second.first + std::int32_t(float(ib->second.first - ia->second.first) * alpha);
+        y = ia->second.second + std::int32_t(float(ib->second.second - ia->second.second) * alpha);
+    };
+    fx_draw_ = cur.fx;
+    comp_draw_ = cur.companions;
+    if (fa && fb) {
+        for (auto& f : fx_draw_) lerp_map(fa->fx, fb->fx, f.id, f.x, f.y);
+        for (auto& c : comp_draw_) lerp_map(fa->comp, fb->comp, c.owner, c.x, c.y);
     }
     if (!auto_sent_) {  // [U-158] my autoattack setting → server, once per match
         net.send_cmd({.kind = CmdKind::SetAutoAttack, .slot = std::uint8_t(set_.auto_attack)});

@@ -34,9 +34,12 @@ void Ratings::save() const {
     if (path_.empty()) return;
     std::error_code ec;
     std::filesystem::create_directories(std::filesystem::path(path_).parent_path(), ec);
-    std::ofstream out(path_);
-    out << "# [U-276] name|mmr|lp|wins|losses|secret\n";
-    for (const auto& [n, r] : r_) out << n << '|' << r.mmr << '|' << r.lp << '|' << r.wins << '|' << r.losses << '|' << r.secret << '\n';
+    {
+        std::ofstream out(path_ + ".tmp");  // [U-383] temp file + rename: a crash never loses the ranking
+        out << "# [U-276] name|mmr|lp|wins|losses|secret\n";
+        for (const auto& [n, r] : r_) out << n << '|' << r.mmr << '|' << r.lp << '|' << r.wins << '|' << r.losses << '|' << r.secret << '\n';
+    }
+    std::filesystem::rename(path_ + ".tmp", path_, ec);
 }
 
 Rating* Ratings::get(const std::string& name, std::uint64_t secret) {

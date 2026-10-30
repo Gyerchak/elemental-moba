@@ -22,7 +22,9 @@ void Server::receive(int pid, Reader& r) {
         case Msg::Chat: on_chat(p, r); break;
         case Msg::SkinUpload: on_skin(p, r); break;
         case Msg::StartMatch:
-            if (world_ || !(p.slot.host || cfg_.host_secret == 0)) break;
+            // [U-383] only the host starts; a server without a host secret starts when every player in the lobby is ready to
+            // pick (at least 2 players, or practice)
+            if (world_ || !(p.slot.host || (cfg_.host_secret == 0 && (cfg_.practice || players >= 2)))) break;
             if (phase_ == DraftPhase::Banning) {  // [U-181] bans done → picks
                 phase_ = DraftPhase::Picking;
                 send_chat(Chat::System, "server", "Ban phase over — pick your champions", nullptr, nullptr);
@@ -73,9 +75,14 @@ void Server::on_status_query(Player& p) {
 // ---------------------------------------------------------------- joining
 void Server::on_hello(int pid, Reader& r) {
     Player& p = players_[std::size_t(pid)];
+    if (p.joined) return;  // [U-383] a second Hello never joins twice
     const std::uint16_t proto = r.get<std::uint16_t>();
     const std::string version = r.str();
     std::string name = r.str().substr(0, 24);
+    // [U-383] nicknames: no control characters or the separators of the ranking file / settings; no cut UTF-8 sequence
+    std::erase_if(name, [](char c) { return static_cast<unsigned char>(c) < 32 || c == '|' || c == '=' || c == '#'; });
+    while (!name.empty() && (static_cast<unsigned char>(name.back()) & 0xC0) == 0x80) name.pop_back();
+    if (!name.empty() && static_cast<unsigned char>(name.back()) >= 0xC0) name.pop_back();
     const std::uint64_t secret = r.get<std::uint64_t>();
     const std::uint8_t platform = r.get<std::uint8_t>();
     const bool allow_skins = r.get<std::uint8_t>() != 0;
@@ -110,7 +117,7 @@ void Server::on_hello(int pid, Reader& r) {
     if (world_) {
         for (int i = 0; i < kMaxPlayers; ++i) {
             Player& old = players_[std::size_t(i)];
-            if (i != pid && !old.connected && old.unit && old.slot.name == name) {
+            if (i != pid && !old.connected && old.unit && old.slot.name == name && old.secret == secret) {  // [U-383] the same player only
                 old.peer = p.peer;
                 old.connected = true;
                 old.joined = true;
@@ -240,7 +247,12 @@ void Server::on_skin(Player& p, Reader& r) {
     if (r.bad() || n < 2 || n > kMaxSkin) return;
     std::vector<std::uint8_t> bytes(n);
     for (auto& b : bytes) b = r.get<std::uint8_t>();
-    if (r.bad() || bytes[0] != 'B' || bytes[1] != 'M') return;  // BMP only for now
+    if (r.bad() || bytes[0] != 'B' || bytes[1] != 'M' || n < 54) return;  // BMP only for now
+    {  // [U-383] a small picture only: width / height ≤ 512, no compression tricks (a 500-byte "30 000 × 30 000" bomb)
+        auto i32 = [&](std::size_t o) { return std::int32_t(bytes[o] | bytes[o + 1] << 8 | bytes[o + 2] << 16 | std::uint32_t(bytes[o + 3]) << 24); };
+        const std::int32_t w = i32(18), h = i32(22), comp = i32(30);
+        if (w <= 0 || w > 512 || h == 0 || h > 512 || h < -512 || (comp != 0 && comp != 3)) return;
+    }
     p.skin = std::move(bytes);
     p.slot.has_skin = true;
     send_lobby();

@@ -137,7 +137,15 @@ void World::step_minion(Unit& u) {
     follow_path(u);
 
     // 3. [U-12][U-13] blocked by bending: earth minions clear the way at 1.5 s, fire minions blow it up at 2.5 s
-    if (u.stuck_ms > 0) u.blocked_ms += 1'000 / cfg.tick_hz;
+    // [U-383] only a WALL ahead counts (with unit collision a minion often waits behind other units)
+    const bool wall_ahead = [&] {
+        for (int d = 1; d <= 2; ++d) {
+            const int ax = (u.ux() + u.face.x * d * kCellUnits / kOne) / kCellUnits, ay = (u.uy() + u.face.y * d * kCellUnits / kOne) / kCellUnits;
+            if (Grid::in_bounds(ax, ay) && (grid.at(ax, ay).wall() != Wall::None || grid.at(ax, ay).has_temp_elevation())) return true;
+        }
+        return false;
+    }();
+    if (u.stuck_ms > 0 && wall_ahead) u.blocked_ms += 1'000 / cfg.tick_hz;
     else u.blocked_ms = std::max<std::int64_t>(0, u.blocked_ms - 1'000 / cfg.tick_hz);
     if (u.blocked_ms >= (fire ? 2'500 : 1'500)) {
         u.blocked_ms = 0;

@@ -70,11 +70,14 @@ static_assert(roster_ok());
 
 }  // namespace
 
-// The roster in use: the built-in champions, then own champions [U-210]. Reserved so pointers stay valid.
+// The roster in use: the built-in champions, then own champions [U-210]. Reserved so pointers stay valid:
+// it NEVER grows past kMaxChampions (the network sends champion numbers as int8 → 127 at most).
+inline constexpr std::size_t kMaxChampions = 127;
+static_assert(std::size(kRoster) < kMaxChampions);
 std::vector<ChampionDef>& roster_vec() {
     static std::vector<ChampionDef> v = [] {
         std::vector<ChampionDef> r;
-        r.reserve(64);
+        r.reserve(kMaxChampions);
         r.assign(kRoster.begin(), kRoster.end());
         return r;
     }();
@@ -86,7 +89,7 @@ int builtin_champion_count() { return int(kRoster.size()); }
 void reset_custom_champions() { roster_vec().resize(kRoster.size()); }  // [U-277] (pointers to built-ins stay valid)
 int register_champion(const ChampionDef& c) {
     auto& v = roster_vec();
-    if (v.size() >= 64) return -1;
+    if (v.size() >= kMaxChampions) return -1;  // [U-415] was 64 — with 71 built-ins no own champion could register
     Kit kit{to_ability(c.p, Slot::P), to_ability(c.w, Slot::W), to_ability(c.e, Slot::E), to_ability(c.r, Slot::R), to_ability(c.t, Slot::T),
             to_ability(c.y, Slot::Y)};
     if (!kit_ok(kit, c.mage)) return -1;

@@ -80,6 +80,10 @@ void NetClient::disconnect() {
     inbox_.clear();
     outbox_.clear();
     state = State::Idle;
+    if (custom_from_server >= 0) {  // [U-415] the server's own champions are dropped; the app loads mine again
+        custom_from_server = -1;
+        reload_own_champions = true;
+    }
 }
 
 // The network thread: sends what the game queued, services enet with a 1 ms wait, hands packets over.
@@ -225,6 +229,7 @@ void NetClient::handle(const std::uint8_t* data, std::size_t n, double now_s) {
                 s.name = r.str();
                 s.team = r.get<std::int8_t>();
                 s.champ = r.get<std::int8_t>();
+                if (s.champ >= int(champions().size())) s.champ = -1;  // [U-383]
                 s.q = r.get<std::int8_t>();
                 s.f = r.get<std::int8_t>();
                 s.g = r.get<std::int8_t>();
@@ -262,6 +267,7 @@ void NetClient::handle(const std::uint8_t* data, std::size_t n, double now_s) {
                 e.id = r.get<std::uint32_t>();
                 e.team = r.get<std::uint8_t>();
                 e.champ = r.get<std::int8_t>();
+                if (e.champ >= int(champions().size())) e.champ = 0;  // [U-383] a server can't make me index past the roster
                 e.q = r.get<std::int8_t>();
                 e.f = r.get<std::int8_t>();
                 e.g = r.get<std::int8_t>();
@@ -299,7 +305,12 @@ void NetClient::handle(const std::uint8_t* data, std::size_t n, double now_s) {
             s.kills[0] = r.get<std::int32_t>();
             s.kills[1] = r.get<std::int32_t>();
             s.units.resize(r.get<std::uint16_t>());
-            for (auto& u : s.units) u = r.get<NetUnit>();
+            for (auto& u : s.units) {
+                u = r.get<NetUnit>();
+                // [U-383] never trust indices from the server: champion / body / monster name in range
+                if (u.champ >= int(champions().size())) u.champ = -1;
+                if (u.name_id >= std::size(net::kMobNames)) u.name_id = 0;
+            }
             s.fx.resize(r.get<std::uint16_t>());
             for (auto& f : s.fx) f = r.get<NetFx>();
             if (const std::uint16_t nl = r.get<std::uint16_t>(); nl == 0xffff) {  // [U-280] lights unchanged: keep the last ones
@@ -340,6 +351,7 @@ void NetClient::handle(const std::uint8_t* data, std::size_t n, double now_s) {
             s.camps.resize(r.get<std::uint8_t>());  // [U-365]
             for (auto& c : s.camps) c = r.get<NetCamp>();
             s.me = r.get<NetMe>();
+            s.me.nstatus = std::min<std::uint8_t>(s.me.nstatus, std::uint8_t(std::size(s.me.status)));  // [U-383]
             const std::uint16_t nr = r.get<std::uint16_t>();
             for (int i = 0; i < nr && !r.bad(); ++i) rewards.push_back({r.get<NetReward>(), now_s});
             if (r.bad()) return;
@@ -349,8 +361,10 @@ void NetClient::handle(const std::uint8_t* data, std::size_t n, double now_s) {
             {  // [U-338] position history for the delayed interpolation
                 PosFrame f{now_s, {}};
                 for (const auto& u : cur.units) f.pos[u.id] = {u.x, u.y};
+                for (const auto& e : cur.fx) f.fx[e.id] = {e.x, e.y};               // [U-389] effects and companions
+                for (const auto& c : cur.companions) f.comp[c.owner] = {c.x, c.y};  // ride the same delayed timeline
                 pos_hist.push_back(std::move(f));
-                while (pos_hist.size() > 6) pos_hist.pop_front();
+                while (pos_hist.size() > 8) pos_hist.pop_front();
             }
             have_snapshot = true;
             break;
@@ -398,8 +412,9 @@ void NetClient::handle(const std::uint8_t* data, std::size_t n, double now_s) {
             for (std::size_t i = 0; same && i < defs.size(); ++i) same = champions()[std::size_t(builtin_champion_count()) + i].name == defs[i].name;
             if (same) break;  // already the same list (e.g. I am the host)
             std::error_code ec;
-            std::filesystem::create_directories("custom_champions", ec);
-            for (auto& [f, text] : files) std::ofstream(std::filesystem::path("custom_champions") / f, std::ios::binary) << text;
+            // the server's files go into their own folder: they never overwrite my own champions (same file name) [U-415]
+            std::filesystem::create_directories("custom_champions/_server", ec);
+            for (auto& [f, text] : files) std::ofstream(std::filesystem::path("custom_champions/_server") / f, std::ios::binary) << text;
             reset_custom_champions();
             for (const ChampionDef& d : defs) register_champion(d);
             custom_from_server = int(defs.size());

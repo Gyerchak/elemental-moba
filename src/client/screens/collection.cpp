@@ -180,7 +180,8 @@ void App::custom_champions() {
     float y = 80;
     // [U-353] the files are read once a second (not every frame); a change applies AT ONCE (no restart)
     if (now_s_ - custom_scan_t_ > 1.0) custom_scan_ = scan_custom_champions(), custom_scan_t_ = now_s_;
-    const bool can_change = !server_;  // never while a server of this game runs (it shares the roster)
+    // never while a server of this game runs (it shares the roster) or while I am connected to one (champion numbers)
+    const bool can_change = !server_ && net_.state == NetClient::State::Idle;
     for (const CustomChampionFile& f : custom_scan_) {
         const bool on = std::ranges::find(set_.custom_champions, f.file) != set_.custom_champions.end();
         if (button(ren_, ui_, 20, y, 300, 26, std::format("{}  {}", f.ok ? "" : "[!]", f.file), on, f.ok && can_change)) {

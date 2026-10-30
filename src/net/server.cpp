@@ -34,6 +34,7 @@ void Server::load_custom_champions() {
         files.push_back({e.path().filename().string(), std::string((std::istreambuf_iterator<char>(in)), {})});
     }
     std::ranges::sort(files);
+    std::erase_if(files, [](const auto& f) { return f.second.size() > 4'000; });  // [U-383] a cut file would differ on clients
     auto name_of = [](const std::string& text) {
         ChampionDef d;
         return parse_champion_text(text, d).empty() ? std::string(d.name) : std::string();
@@ -104,8 +105,10 @@ void Server::lobby_timer() {
 void Server::send_custom_champions(Player& p) {
     Writer w;
     w.put(Msg::CustomChampions);
-    w.put<std::uint8_t>(std::uint8_t(std::min<std::size_t>(custom_files_.size(), 50)));
-    for (std::size_t i = 0; i < custom_files_.size() && i < 50; ++i) {
+    // the same cap as the roster (127 champions in total) → server and clients number the champions the same way
+    const std::size_t cap = std::size_t(std::max(0, 127 - builtin_champion_count()));
+    w.put<std::uint8_t>(std::uint8_t(std::min(custom_files_.size(), cap)));
+    for (std::size_t i = 0; i < custom_files_.size() && i < cap; ++i) {
         w.str(custom_files_[i].first);
         w.str(custom_files_[i].second);
     }

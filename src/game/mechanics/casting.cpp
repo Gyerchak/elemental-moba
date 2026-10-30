@@ -215,7 +215,7 @@ void World::cast_skill(Unit& u, Slot slot, std::int32_t tx, std::int32_t ty, std
                         const std::int64_t mx = o.stats.health.total(), cur = std::max(0, o.hp);
                         const std::int32_t heal_here = amount + std::int32_t((cur * d.pct_current_hp + mx * d.pct_max_hp +
                                                                               (mx - cur) * d.pct_missing_hp) / 10'000);
-                        u.stat_healing += std::min(heal_here, o.stats.health.total() - o.hp) / 100;
+                        u.stat_healing += std::max(0, std::min(heal_here, o.stats.health.total() - o.hp)) / 100;
                         heal(o, heal_here);
                     }
             }
@@ -390,6 +390,7 @@ void World::cast_skill(Unit& u, Slot slot, std::int32_t tx, std::int32_t ty, std
             for (Effect& f : fx)
                 if (f.id == a.boulder && !f.dead) rock = &f;
             if (!rock || d.casts <= 1) {  // [U-406] a one-cast lift only raises (others push it)
+                if (rock) rock->dead = true;  // [U-383] one lifted stone per caster and skill (no stacking)
                 if (d.lift_beside) {
                     px = u.ux() + std::int32_t(std::int64_t(dir.x) * (body_reach(*u.body, size_pct(u)) + r.width / 2 + 8) / kOne);
                     py = u.uy() + std::int32_t(std::int64_t(dir.y) * (body_reach(*u.body, size_pct(u)) + r.width / 2 + 8) / kOne);
@@ -404,13 +405,18 @@ void World::cast_skill(Unit& u, Slot slot, std::int32_t tx, std::int32_t ty, std
                 earth_events.push_back({px / kCellUnits, py / kCellUnits});
                 earth_event_team.push_back(u.team);
             } else {
+                const Effect rest = *rock;  // (copy: spawn_fx below may move the vector)
                 const Dir pd = dir_of(std::int64_t(tx) - rock->ux(), std::int64_t(ty) - rock->uy());
                 rock->dir = pd;
                 rock->vx = pd.x * speed_sub / kOne;
                 rock->vy = pd.y * speed_sub / kOne;
                 rock->end_ms = now_ms + 5'000;
-                a.boulder = 0;
-                a.mc = {};
+                if (d.casts > 2 && a.mc.casts_used > 0 && a.mc.casts_used < d.casts) {
+                    a.boulder = spawn_fx(rest).id;  // [U-383] more shots left: the next stone is ready where this one was
+                } else {
+                    a.boulder = 0;
+                    a.mc = {};
+                }
             }
             break;
         }

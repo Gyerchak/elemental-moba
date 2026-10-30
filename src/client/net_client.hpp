@@ -121,6 +121,7 @@ public:
     struct PosFrame {
         double arrived = 0;
         std::unordered_map<std::uint32_t, std::pair<std::int32_t, std::int32_t>> pos;
+        std::unordered_map<std::uint32_t, std::pair<std::int32_t, std::int32_t>> fx, comp;  // [U-389] effects, companions
     };
     std::deque<PosFrame> pos_hist;
     bool have_snapshot = false;
@@ -139,6 +140,7 @@ public:
     std::vector<WallAnim> wall_anims;
     std::int64_t last_break_ms = -1;
     DeathRecapView recap;                    // [U-262] the last death
+    bool reload_own_champions = false;      // [U-415] set on disconnect after a server sent its own champions
     int custom_from_server = -1;             // [U-277] own champions taken from the server (−1 = none sent)
     bool back_in_lobby = false;              // server returned to the lobby after the match
     std::string notice;           // last "why nothing happened" from the server

@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <filesystem>
 #include <fstream>
 #include <sstream>
 
@@ -208,7 +209,15 @@ bool Settings::load(const std::string& path) {
 }
 
 void Settings::save(const std::string& path) const {
-    std::ofstream out(path);
+    // [U-383] written to a temporary file, then renamed: a crash while saving never leaves a half file
+    struct Commit {
+        std::string path;
+        ~Commit() {
+            std::error_code ec;
+            std::filesystem::rename(path + ".tmp", path, ec);
+        }
+    } commit{path};
+    std::ofstream out(path + ".tmp");
     if (!out) return;
     out << "# elemental-moba settings (key=value). Delete this file to get the defaults back.\n";
     out << "settings_version=4\n# ---- player\nname=" << name << '\n';

@@ -2,6 +2,7 @@
 //   map → shop territory → terrain models → clouds → skills → falcon ghosts → units (+ animation cues, bars,
 //   modifiers, CC timers, emotes) → paths → pings → sense waves → damage numbers → fog / night → falcons.
 #include <algorithm>
+#include <functional>
 #include <cmath>
 #include <format>
 
@@ -47,22 +48,42 @@ void outlined(SDL_Renderer* r, float x, float y, std::string_view s, Rgba c, flo
 }  // namespace
 
 // ---------------------------------------------------------------- trees, bushes, walls as simple models [U-202]
-void GameView::draw_terrain_models(NetClient& net) {
-    const SpriteSheet* tree = view_.hz > 0 ? sprites_.get("tree") : nullptr;  // [U-258]
-    const SpriteSheet* bush = view_.hz > 0 ? sprites_.get("bush") : nullptr;
-    if (view_.hz <= 0 || !set_.tree_models || view_.zoom < 0.3f) return;
-    const int x0 = std::clamp(int(std::min(view_.wx(0), view_.wx(view_.sw)) / kCellUnits) - 2, 0, kGridSize - 1);
-    const int x1 = std::clamp(int(std::max(view_.wx(0), view_.wx(view_.sw)) / kCellUnits) + 2, 0, kGridSize - 1);
-    const int y0 = std::clamp(int(std::min(view_.wy(0), view_.wy(view_.sh)) / kCellUnits) - 4, 0, kGridSize - 1);
-    const int y1 = std::clamp(int(std::max(view_.wy(0), view_.wy(view_.sh)) / kCellUnits) + 2, 0, kGridSize - 1);
+// [U-389] terrain models (trees, bushes, rocks, walls) are drawn ROW BY ROW interleaved with the units (see
+// draw_units): a unit standing behind a tree / wall is now hidden by it, one in front covers it. Rows reach further
+// on the side where tall models stand below the screen edge (their tops still show) → no pop-in.
+void GameView::terrain_begin() {
+    terr_on_ = view_.hz > 0 && set_.tree_models && view_.zoom >= 0.2f;
+    if (!terr_on_) return;
+    const int up = int(std::ceil(300.f * view_.hz / std::max(0.1f, view_.gy) / kCellUnits)) + 1;  // tall models
+    const int lo_y = int(std::min(view_.wy(0), view_.wy(view_.sh)) / kCellUnits), hi_y = int(std::max(view_.wy(0), view_.wy(view_.sh)) / kCellUnits);
+    terr_x0_ = std::clamp(int(std::min(view_.wx(0), view_.wx(view_.sw)) / kCellUnits) - 3, 0, kGridSize - 1);
+    terr_x1_ = std::clamp(int(std::max(view_.wx(0), view_.wx(view_.sw)) / kCellUnits) + 3, 0, kGridSize - 1);
+    // the screen bottom is high world y (normal) or low world y (flipped): give that side the big margin
+    terr_y0_ = std::clamp(lo_y - (view_.flip ? up : 2), 0, kGridSize - 1);
+    terr_y1_ = std::clamp(hi_y + (view_.flip ? 2 : up), 0, kGridSize - 1);
+    terr_k_ = 0;
+}
+
+void GameView::terrain_until(NetClient& net, float screen_y) {
+    if (!terr_on_) return;
+    for (; terr_k_ <= terr_y1_ - terr_y0_; ++terr_k_) {
+        const int y = view_.flip ? terr_y1_ - terr_k_ : terr_y0_ + terr_k_;  // back to front on screen
+        if (view_.sy(float(y * kCellUnits + 16)) > screen_y) return;
+        draw_terrain_row(net, y);
+    }
+}
+
+void GameView::draw_terrain_row(NetClient& net, int y) {
+    const SpriteSheet* tree = sprites_.get("tree");  // [U-258]
+    const SpriteSheet* bush = sprites_.get("bush");
     const float z = view_.zoom;
-    for (int k = 0; k <= y1 - y0; ++k) {
-        const int y = view_.flip ? y1 - k : y0 + k;  // back to front on screen
+    const int x0 = terr_x0_, x1 = terr_x1_;
+    const bool trees = z >= 0.3f;  // far out: only the rocks / walls (no sudden switch for everything) [U-389]
         for (int x = x0; x <= x1; ++x) {
             const Cell c = net.seen.at(x, y);
             const float wx = float(x * kCellUnits + 16), wy = float(y * kCellUnits + 16);
             const float sx = view_.sx(wx), gy = view_.sy(wy);
-            if (c.tree() == Tree::Alive && ((x * 7 + y * 13) % 3 == 0)) {  // a tree on every 3rd tree cell
+            if (trees && c.tree() == Tree::Alive && ((x * 7 + y * 13) % 3 == 0)) {  // a tree on every 3rd tree cell
                 if (tree) {  // [U-258] Blender model; size varies a little per cell
                     const float sz = 0.5f + float((x * 31 + y * 17) % 5) * 0.04f;
                     Sprites::draw(r_, *tree, "idle", 0, 0, sx, gy, z * sz, mixc({255, 255, 255, 255}, {200, 230, 190, 255}, (x * 13 + y) % 40));
@@ -71,7 +92,7 @@ void GameView::draw_terrain_models(NetClient& net) {
                     fill_circle(r_, sx, view_.sy_h(wy, 75), 34 * z, {32, 88, 38, 255}, 14);
                     fill_circle(r_, sx - 6 * z, view_.sy_h(wy, 85), 20 * z, {44, 110, 48, 255}, 12);
                 }
-            } else if (c.bush() == Bush::Alive && ((x + y) % 2 == 0)) {
+            } else if (trees && c.bush() == Bush::Alive && ((x + y) % 2 == 0)) {
                 if (bush) Sprites::draw(r_, *bush, "idle", 0, 0, sx, gy, z * 0.7f);
                 else fill_ellipse(r_, sx, view_.sy_h(wy, 10), 18 * z, 12 * z, {54, 128, 44, 230}, 12);
             } else if (c.walk() == Walk::Blocked && c.surface() == Surface::Stone && c.wall() == Wall::None) {
@@ -94,7 +115,6 @@ void GameView::draw_terrain_models(NetClient& net) {
                 line(r_, sx - 10 * z, top + 4 * z, sx - 10 * z, gy - 4 * z, {225, 230, 240, 200});
             }
         }
-    }
 }
 
 // ---------------------------------------------------------------- [U-290] fog fade
@@ -296,8 +316,10 @@ void GameView::draw_units(NetClient& net, double now_s) {
             AnimMem& am = anim_mem_[h.h.src];
             am.attacked = std::max(am.attacked, h.born);
         }
+    std::vector<std::function<void()>> deferred;  // [U-389]
     for (const DrawUnit* dp : order) {
         const DrawUnit& du = *dp;
+        terrain_until(net, view_.sy(du.y));  // [U-389] every terrain row behind this unit first
         const auto& u = du.u;
         const UnitKind kind = UnitKind(u.kind);
         // [U-258] animation memory for the model sprite (before the "dead" check: the death animation plays 2 s)
@@ -494,6 +516,7 @@ void GameView::draw_units(NetClient& net, double now_s) {
             text(r_, view_.sx(du.x) + 12, view_.sy(du.y) - 4, anim_name(anim), {200, 255, 200, 160});  // dev: the slot name
         }
         if (!u.alive) continue;
+        deferred.push_back([=, this, &net] {  // [U-389] bars / names / CC timers after ALL sprites and terrain rows
         // ---- bars [U-155][U-166]
         const bool is_struct = u.kind >= std::uint8_t(UnitKind::Turret) && u.kind <= std::uint8_t(UnitKind::Nexus);
         const float bw = kind == UnitKind::Champion ? 96 : is_struct ? 110 : kind == UnitKind::Boss ? 120 : 40;
@@ -506,7 +529,7 @@ void GameView::draw_units(NetClient& net, double now_s) {
         draw_health_bar(bx, by, bw, bh, u.hp / 100, u.hp_max / 100, u.shield, u.shield_sub, hc, kind == UnitKind::Champion || is_struct || kind == UnitKind::Boss);
         if (kind == UnitKind::Boss || (kind == UnitKind::Monster && u.size_pct > 100)) {  // [U-364] big / epic monsters: the exact HP
             const std::string hs = std::format("{} / {}", u.hp / 100, u.hp_max / 100);
-            text(r_, bx + (bw - text_w(hs, 0.8f)) / 2, by - 12, hs, {255, 255, 255}, 0.8f);
+            text(r_, bx + (bw - text_w(hs, 0.7f)) / 2, by + std::max(0.f, (bh - 7) / 2), hs, {255, 255, 255}, 0.7f);  // inside the bar [U-389]
         }
         float below = by + bh + 2;
         if (kind == UnitKind::Champion && u.res_max > 0 && u.champ >= 0) {  // resource bar for every champion
@@ -546,6 +569,9 @@ void GameView::draw_units(NetClient& net, double now_s) {
         // [U-193] crowd-control timer above the bar, like LoL
         if (set_.cc_timers && u.cc_kind != 255 && u.cc_left_cs > 0) {
             auto& mx = cc_max_[u.id];
+            auto& last = cc_last_[u.id];  // [U-389] a new CC (other kind / more time) restarts the bar
+            if (u.cc_kind != last.first || u.cc_left_cs > last.second) mx = u.cc_left_cs;
+            last = {u.cc_kind, u.cc_left_cs};
             mx = std::max(mx, u.cc_left_cs);
             const float f = float(u.cc_left_cs) / float(std::max<std::uint16_t>(1, mx));
             fill_rect(r_, bx, by - 9, bw, 5, {0, 0, 0, 220});
@@ -557,7 +583,10 @@ void GameView::draw_units(NetClient& net, double now_s) {
             const auto it = net.roster.find(u.id);
             if (set_.show_names && it != net.roster.end()) text(r_, bx, by - 22, std::format("{} {}", u.level, it->second.name), {240, 240, 240});
         }
+        });
     }
+    terrain_until(net, 1e9f);  // the rows in front of every unit
+    for (auto& f : deferred) f();
 }
 
 // ---------------------------------------------------------------- paths of me + my allies [U-203]
@@ -585,7 +614,7 @@ void GameView::draw_paths(NetClient& net) {
 // stands on its back while it carries them home
 void GameView::draw_companions(NetClient& net, double now_s) {
     const float z = view_.zoom;
-    for (const auto& c : net.cur.companions) {
+    for (const auto& c : comp_draw_) {
         const float wx = float(c.x), wy = float(c.y);
         const float sx = view_.sx(wx), gy = view_.sy(wy);
         if (sx < -200 || gy < -200 || sx > view_.sw + 200 || gy > view_.sh + 200) continue;
@@ -598,9 +627,14 @@ void GameView::draw_companions(NetClient& net, double now_s) {
         static const char* kModel[] = {"companion_sky_bison", "companion_polar_bear_dog", "companion_monkey_cat", "companion_shirshu",
                                        "companion_badgermole", "companion_dragon"};
         if (const SpriteSheet* sh = view_.hz > 0 ? sprites_.get(kModel[std::size_t(k)]) : nullptr) {
-            Sprites::draw(r_, *sh, "walk", now_s, sprite_dir(float(c.x) - companion_last_x_[c.owner], float(c.y) - companion_last_y_[c.owner], view_.flip), sx,
-                          view_.sy_h(wy, h), z, {255, 255, 255, 255}, false);
-            companion_last_x_[c.owner] = float(c.x), companion_last_y_[c.owner] = float(c.y);
+            // [U-389] the facing changes only when it really moved (it stood still = keep the last direction)
+            auto [lx, fresh] = companion_last_x_.try_emplace(c.owner, float(c.x));
+            auto [ly, fresh2] = companion_last_y_.try_emplace(c.owner, float(c.y));
+            const float ddx = float(c.x) - lx->second, ddy = float(c.y) - ly->second;
+            int& dir = companion_dir_[c.owner];
+            if (ddx * ddx + ddy * ddy > 0.25f) dir = sprite_dir(ddx, ddy, view_.flip), lx->second = float(c.x), ly->second = float(c.y);
+            Sprites::draw(r_, *sh, c.carrying || ddx * ddx + ddy * ddy > 0.25f ? "walk" : "idle", now_s, dir, sx, view_.sy_h(wy, h), z,
+                          {255, 255, 255, 255}, false);
             continue;
         }
         switch (k) {
@@ -781,11 +815,11 @@ void GameView::draw_world(NetClient& net, double now_s) {
     for (const DrawUnit& du : draw_)  // enemy turret ranges, for my safety
         if (du.u.alive && du.u.kind == std::uint8_t(UnitKind::Turret) && du.u.team != net.my_team)
             ground_ring(r_, view_, du.x, du.y, 680 + 75, {255, 80, 60, 70}, 64);
-    draw_terrain_models(net);
+    terrain_begin();  // [U-389] the terrain rows are drawn between the units (draw_units)
     draw_wall_damage(net);  // [U-288]
     draw_clouds(net);
     // skills [U-131]: fluid body + exact edge
-    for (const auto& f : cur.fx) {
+    for (const auto& f : fx_draw_) {
         const Shape s = fx_shape(FxKind(f.kind), f.x, f.y, f.radius, f.width, f.length, {f.dx, f.dy}, Flow(f.flow), f.seed, local_tick_);
         const SubElement sub = SubElement(f.sub);
         Rgba col = hex(element_colour(base_element(sub)));

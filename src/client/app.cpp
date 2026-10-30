@@ -19,8 +19,8 @@ App::App(AppOptions o) : opt_(std::move(o)) {
     set_.load();  // settings.cfg next to where the game starts [U-99]
     if (!opt_.name.empty()) set_.name = opt_.name;
     loc::load(set_.language);  // [U-239]
-    load_custom_champions(set_.custom_champions);  // [U-210] before any match
     if (!apply_version(set_.version).empty()) set_.version = kOfficialVersion;  // [U-95] own version (bad file → official)
+    load_custom_champions(set_.custom_champions);  // [U-210] before any match — AFTER the version (they copy its numbers)
     // [U-214] Vulkan renderer first; anything else only if this machine has no Vulkan
     const SDL_WindowFlags base = SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY;
     win_ = SDL_CreateWindow("elemental-moba", opt_.width, opt_.height, base | SDL_WINDOW_VULKAN);
@@ -212,6 +212,11 @@ int App::run() {
 }
 
 void App::frame(double now_s) {
+    if (net_.reload_own_champions) {  // [U-415] back from a server that brought its own champions: mine again
+        net_.reload_own_champions = false;
+        reset_custom_champions();
+        load_custom_champions(set_.custom_champions);
+    }
     int w = 0, h = 0;
     SDL_GetRenderOutputSize(ren_, &w, &h);
     if (screen_ != Screen::Game) {

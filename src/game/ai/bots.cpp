@@ -181,7 +181,8 @@ void World::step_bot(Unit& u) {
                     u.botm.next_path_ms = now_ms + 800;
                     send({.kind = CmdKind::Move, .x = fx_, .y = fy_});
                 }
-            } else if (u.order.kind != OrderKind::Recall) {
+            } else if (u.order.kind != OrderKind::Recall &&
+                       std::ranges::none_of(companions, [&](const Companion& c) { return c.owner == u.id; })) {  // [U-383]
                 send({.kind = CmdKind::Recall});
             }
             return;

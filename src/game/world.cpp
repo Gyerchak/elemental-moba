@@ -518,6 +518,7 @@ void World::command(std::uint32_t id, const Cmd& c) {
             const Slot s = Slot(std::min<int>(c.slot, int(Slot::Count) - 1));
             std::string why;
             if (!can_cast_now(u, s, &why, c.sx, c.sy)) {
+                u.draw_pts.clear();  // [U-383] a refused drawn wall never comes back with the next cast
                 const SkillDef* d0 = u.skill[std::size_t(s)];
                 refuse(u, std::format("{}: {}", d0 ? std::string(d0->name) : std::string("skill"), why));
                 break;
@@ -667,6 +668,8 @@ void World::step() {
         if (e.dead && e.light > 0 && e.def && e.def->light_ms > 0 && e.kind != FxKind::Lantern)
             glows.push_back({{e.ux(), e.uy(), e.light, 80}, now_ms + e.def->light_ms});
     std::erase_if(fx, [](const Effect& e) { return e.dead; });
+    for (const Effect& p : fx_pending_) spawn_fx(p);  // [U-383] with real ids / seeds
+    fx_pending_.clear();
     const std::size_t before = units.size();
     std::erase_if(units, [&](const Unit& u) {
         return !u.alive && (u.kind == UnitKind::Minion) && now_ms > u.respawn_ms;
