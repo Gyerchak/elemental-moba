@@ -8,353 +8,63 @@ namespace em::data {
 
 // Ashen Duelist - fire fighter. A blade-dancer who dashes in, carves cones and leaves burning ground.
 // Plays: dash in, kick, back out; the sweet spot of the slash rewards close range.
-inline constexpr ChampionDef kAshenDuelist{.name = "Ashen Duelist", .element = Element::Fire, .sub = S::Fire,
- .range = Range::Melee, .resource = ResourceKind::Rage, .ep_lvl = 200, .hp = 58'000, .hp_lvl = 9'800, .attack = 6'200,
- .attack_lvl = 360, .as = 68, .ms = 34'500, .attack_range = 45, .res_max = 10'000, .res_regen = 800,
- .w = {.name = "Cinder Lunge", .kind = K::Dash, .sub = S::Fire, .dmg = 45, .dmg_rank = 25, .ep = 30, .ad = 30, .range = 420,
-       .width = 100, .speed = 1'500, .cast_ms = 0, .cd_ms = 9'000, .cd_rank = -500, .cost = 25,
-       .desc = "Dash through enemies; leaves a trail of embers", .burns_ground = 1},
- .e = {.name = "Scorching Arc", .kind = K::Cone, .sub = S::Fire, .dmg = 65, .dmg_rank = 35, .ep = 40, .ad = 40, .range = 320,
-       .width = 260, .cast_ms = 200, .cd_ms = 6'000, .cost = 25, .cc = C::Burn, .cc_ms = 1'500, .cc_val = 900,
-       .desc = "Close slash; the tip hits +35 % and burns", .melee = true, .sweet_pct = 35},
- .r = {.name = "Smoulder Guard", .kind = K::Shield, .sub = S::Fire, .dmg = 80, .dmg_rank = 40, .ep = 30, .cast_ms = 0,
-       .cd_ms = 16'000, .cost = 30, .dur_ms = 3'000, .desc = "A shield of hot ash"},
- .t = {.name = "Flare Kick", .kind = K::Cone, .sub = S::Fire, .dmg = 50, .dmg_rank = 25, .ep = 30, .range = 260, .width = 180,
-       .cast_ms = 120, .cd_ms = 10'000, .cost = 20, .knock = 220, .desc = "Kick that throws enemies back", .melee = true},
- .y = {.name = "Pyre Rush", .kind = K::Dash, .sub = S::Fire, .dmg = 170, .dmg_rank = 85, .ep = 60, .ad = 60, .range = 700,
-       .width = 140, .speed = 1'900, .cast_ms = 0, .cd_ms = 85'000, .cd_rank = -8'000, .cost = 60, .cc = C::Burn,
-       .cc_ms = 3'000, .cc_val = 1'600, .desc = "Long blazing charge; everything hit burns", .burns_ground = 1, .ultimate = true},
- .p = {.name = "Inner Flame", .kind = K::Passive, .passive = PassiveId::InnerFlame, .desc = "Skill hits burn for 2 s"},
- .colour = 0xd8481c, .role = Role::Fighter,
- .autos = {.shape = AutoShape::Splash, .splash_radius = 90, .splash_pct = 40},
- .q_pool = {"Fire Whip", "Fire Bolt", "Spark Volley"}};
+inline constexpr ChampionDef kAshenDuelist{.name = "Ashen Duelist", .element = Element::Fire, .sub = S::Fire, .range = Range::Melee, .resource = ResourceKind::Rage, .ep_lvl = 200, .hp = 58'000, .hp_lvl = 9'800, .attack = 6'200, .attack_lvl = 360, .as = 68, .ms = 34'500, .attack_range = 45, .res_max = 10'000, .res_regen = 800, .w = {.name = "Cinder Lunge", .kind = K::Dash, .sub = S::Fire, .dmg = 45, .dmg_rank = 25, .ep = 30, .ad = 30, .range = 420, .width = 100, .speed = 1'500, .cast_ms = 0, .cd_ms = 9'000, .cd_rank = -500, .cost = 25, .desc = "Dash through enemies; leaves a trail of embers", .burns_ground = 1}, .e = {.name = "Scorching Arc", .kind = K::Cone, .sub = S::Fire, .dmg = 65, .dmg_rank = 35, .ep = 40, .ad = 40, .range = 320, .width = 260, .cast_ms = 200, .cd_ms = 6'000, .cost = 25, .cc = C::Burn, .cc_ms = 1'500, .cc_val = 900, .desc = "Close slash; the tip hits +35 % and burns", .melee = true, .sweet_pct = 35}, .r = {.name = "Smoulder Guard", .kind = K::Shield, .sub = S::Fire, .dmg = 80, .dmg_rank = 40, .ep = 30, .cast_ms = 0, .cd_ms = 16'000, .cost = 30, .dur_ms = 3'000, .desc = "A shield of hot ash"}, .t = {.name = "Flare Kick", .kind = K::Cone, .sub = S::Fire, .dmg = 50, .dmg_rank = 25, .ep = 30, .range = 260, .width = 180, .cast_ms = 120, .cd_ms = 10'000, .cost = 20, .knock = 220, .desc = "Kick that throws enemies back", .melee = true}, .y = {.name = "Pyre Rush", .kind = K::Dash, .sub = S::Fire, .dmg = 170, .dmg_rank = 85, .ep = 60, .ad = 60, .range = 700, .width = 140, .speed = 1'900, .cast_ms = 0, .cd_ms = 85'000, .cd_rank = -8'000, .cost = 60, .cc = C::Burn, .cc_ms = 3'000, .cc_val = 1'600, .desc = "Long blazing charge; everything hit burns", .burns_ground = 1, .ultimate = true}, .p = {.name = "Inner Flame", .kind = K::Passive, .passive = PassiveId::InnerFlame, .desc = "Skill hits burn for 2 s"}, .colour = 0xd8481c, .role = Role::Fighter, .autos = {.shape = AutoShape::Splash, .splash_radius = 90, .splash_pct = 40}, .q_pool = {"Fire Whip", "Fire Bolt", "Spark Volley"}};
 
 // Voltaic Seer - lightning mage. A patient storm-caller who bends incoming lightning back at attackers.
 // Plays: long-range pierce, redirect window as protection, a storm field to zone.
-inline constexpr ChampionDef kVoltaicSeer{.name = "Voltaic Seer", .element = Element::Fire, .sub = S::Lightning,
- .range = Range::Ranged, .resource = ResourceKind::Fuel, .ep_lvl = 320, .hp = 50'000, .hp_lvl = 8'500, .attack = 4'800,
- .def = 2'800, .edef = 3'200, .attack_range = 560, .res_max = 11'000, .res_regen = 600,
- .w = {.name = "Return Current", .kind = K::Redirect, .sub = S::Lightning, .cast_ms = 0, .cd_ms = 14'000, .dur_ms = 800,
-       .desc = "0.8 s window: lightning that hits you flies on to your cursor", .turns_caster = false},
- .e = {.name = "Skyfork", .kind = K::Bolt, .sub = S::Lightning, .dmg = 95, .dmg_rank = 45, .ep = 70, .range = 1'400,
-       .width = 60, .speed = 3'200, .cast_ms = 450, .cd_ms = 9'000, .cost = 35, .pierce = true,
-       .desc = "Long piercing lightning; the last 20 % of its flight hits +25 %", .sweet_pct = 25},
- .r = {.name = "Charged Air", .kind = K::Field, .sub = S::Lightning, .dmg = 14, .dmg_rank = 7, .ep = 9, .range = 850,
-       .radius = 230, .cast_ms = 300, .cd_ms = 13'000, .cost = 30, .dur_ms = 3'000, .cc = C::Slow, .cc_ms = 700,
-       .cc_val = 40, .desc = "A humming field that slows and shocks"},
- .t = {.name = "Thunderclap", .kind = K::Burst, .sub = S::Lightning, .dmg = 90, .dmg_rank = 45, .ep = 60, .range = 900,
-       .radius = 150, .cast_ms = 300, .cd_ms = 11'000, .cost = 35, .delay_ms = 600, .cc = C::Stun, .cc_ms = 700,
-       .desc = "Strike from above after 0.6 s; the centre hits +30 %", .sweet_pct = 30},
- .y = {.name = "Tempest Verdict", .kind = K::Field, .sub = S::Lightning, .dmg = 70, .dmg_rank = 35, .ep = 40, .range = 1'300,
-       .radius = 450, .cast_ms = 600, .cd_ms = 105'000, .cd_rank = -10'000, .cost = 60, .dur_ms = 4'500, .tick_ms = 450,
-       .cc = C::Slow, .cc_ms = 600, .cc_val = 25, .desc = "A huge thunderstorm that strikes over and over",
-       .through_walls = true, .ultimate = true},
- .p = {.name = "Static", .kind = K::Passive, .passive = PassiveId::Static, .desc = "Autoattacks chain on water"},
- .colour = 0xf4e060, .role = Role::Mage,
- .q_pool = {"Lightning Bolt", "Spark Volley", "Fire Bolt"}};
+inline constexpr ChampionDef kVoltaicSeer{.name = "Voltaic Seer", .element = Element::Fire, .sub = S::Lightning, .range = Range::Ranged, .resource = ResourceKind::Fuel, .ep_lvl = 320, .hp = 50'000, .hp_lvl = 8'500, .attack = 4'800, .def = 2'800, .edef = 3'200, .attack_range = 560, .res_max = 11'000, .res_regen = 600, .w = {.name = "Return Current", .kind = K::Redirect, .sub = S::Lightning, .cast_ms = 0, .cd_ms = 14'000, .dur_ms = 800, .desc = "0.8 s window: lightning that hits you flies on to your cursor", .turns_caster = false}, .e = {.name = "Skyfork", .kind = K::Bolt, .sub = S::Lightning, .dmg = 95, .dmg_rank = 45, .ep = 70, .range = 1'400, .width = 60, .speed = 3'200, .cast_ms = 450, .cd_ms = 9'000, .cost = 35, .pierce = true, .desc = "Long piercing lightning; the last 20 % of its flight hits +25 %", .sweet_pct = 25}, .r = {.name = "Charged Air", .kind = K::Field, .sub = S::Lightning, .dmg = 14, .dmg_rank = 7, .ep = 9, .range = 850, .radius = 230, .cast_ms = 300, .cd_ms = 13'000, .cost = 30, .dur_ms = 3'000, .cc = C::Slow, .cc_ms = 700, .cc_val = 40, .desc = "A humming field that slows and shocks"}, .t = {.name = "Thunderclap", .kind = K::Burst, .sub = S::Lightning, .dmg = 90, .dmg_rank = 45, .ep = 60, .range = 900, .radius = 150, .cast_ms = 300, .cd_ms = 11'000, .cost = 35, .delay_ms = 600, .cc = C::Stun, .cc_ms = 700, .desc = "Strike from above after 0.6 s; the centre hits +30 %", .sweet_pct = 30}, .y = {.name = "Tempest Verdict", .kind = K::Field, .sub = S::Lightning, .dmg = 70, .dmg_rank = 35, .ep = 40, .range = 1'300, .radius = 450, .cast_ms = 600, .cd_ms = 105'000, .cd_rank = -10'000, .cost = 60, .dur_ms = 4'500, .tick_ms = 450, .cc = C::Slow, .cc_ms = 600, .cc_val = 25, .desc = "A huge thunderstorm that strikes over and over", .through_walls = true, .ultimate = true}, .p = {.name = "Static", .kind = K::Passive, .passive = PassiveId::Static, .desc = "Autoattacks chain on water"}, .colour = 0xf4e060, .role = Role::Mage, .q_pool = {"Lightning Bolt", "Spark Volley", "Fire Bolt"}};
 
 // Thunder Warden - lightning tank. A heavy stormguard whose attacks leap from foe to foe.
 // Plays: chain-lightning autos, roots and knocks to hold a line, drawn to metal and storms.
-inline constexpr ChampionDef kThunderWarden{.name = "Thunder Warden", .element = Element::Fire, .sub = S::Lightning,
- .body = &kBroadBody, .range = Range::Melee, .resource = ResourceKind::Rage, .ep_lvl = 150, .hp = 64'000, .hp_lvl = 10'800,
- .attack = 5'600, .attack_lvl = 320, .def = 3'600, .edef = 3'400, .as = 60, .ms = 33'000, .attack_range = 55,
- .res_max = 10'000, .res_regen = 700,
- .w = {.name = "Stormhide", .kind = K::Shield, .sub = S::Lightning, .dmg = 110, .dmg_rank = 55, .ep = 40, .cast_ms = 0,
-       .cd_ms = 17'000, .cost = 30, .dur_ms = 4'000, .size_bonus = 800, .desc = "Crackling shield; makes you a bit bigger"},
- .e = {.name = "Arc Hammer", .kind = K::Burst, .sub = S::Lightning, .dmg = 70, .dmg_rank = 35, .ep = 45, .ad = 30, .range = 450,
-       .radius = 170, .cast_ms = 350, .cd_ms = 10'000, .cost = 30, .delay_ms = 400, .cc = C::Airborne, .cc_ms = 600,
-       .desc = "Slam the ground; lightning throws enemies up", .ground = true},
- .r = {.name = "Gale Pull", .kind = K::Wave, .sub = S::Lightning, .dmg = 45, .dmg_rank = 25, .ep = 30, .range = 650, .width = 200,
-       .speed = 1'200, .cast_ms = 300, .cd_ms = 12'000, .cost = 30, .cc = C::Slow, .cc_ms = 1'200, .cc_val = 30, .knock = 120,
-       .pierce = true, .desc = "Shock wave that pushes and slows"},
- .t = {.name = "Ground Wire", .kind = K::Field, .sub = S::Lightning, .dmg = 18, .dmg_rank = 9, .ep = 10, .range = 500,
-       .radius = 200, .cast_ms = 250, .cd_ms = 14'000, .cost = 30, .dur_ms = 3'000, .cc = C::Root, .cc_ms = 400,
-       .desc = "Live wire on the ground: briefly roots those inside"},
- .y = {.name = "Thunderfall", .kind = K::Burst, .sub = S::Lightning, .dmg = 230, .dmg_rank = 115, .ep = 80, .range = 800,
-       .radius = 340, .cast_ms = 500, .cd_ms = 95'000, .cd_rank = -9'000, .cost = 60, .delay_ms = 900, .cc = C::Stun, .cc_ms = 1'100,
-       .desc = "Giant strike after 0.9 s; stuns", .sweet_pct = 20, .ultimate = true},
- .p = {.name = "Static", .kind = K::Passive, .passive = PassiveId::Static, .desc = "Autoattacks chain on water"},
- .colour = 0xc8c040, .role = Role::Tank,
- .autos = {.shape = AutoShape::Chain, .chain_count = 2, .chain_range = 350, .chain_pct = 55},
- .q_pool = {"Lightning Bolt", "Fire Whip", "Spark Volley"}};
+inline constexpr ChampionDef kThunderWarden{.name = "Thunder Warden", .element = Element::Fire, .sub = S::Lightning, .body = &kBroadBody, .range = Range::Melee, .resource = ResourceKind::Rage, .ep_lvl = 150, .hp = 64'000, .hp_lvl = 10'800, .attack = 5'600, .attack_lvl = 320, .def = 3'600, .edef = 3'400, .as = 60, .ms = 33'000, .attack_range = 55, .res_max = 10'000, .res_regen = 700, .w = {.name = "Stormhide", .kind = K::Shield, .sub = S::Lightning, .dmg = 110, .dmg_rank = 55, .ep = 40, .cast_ms = 0, .cd_ms = 17'000, .cost = 30, .dur_ms = 4'000, .size_bonus = 800, .desc = "Crackling shield; makes you a bit bigger"}, .e = {.name = "Arc Hammer", .kind = K::Burst, .sub = S::Lightning, .dmg = 70, .dmg_rank = 35, .ep = 45, .ad = 30, .range = 450, .radius = 170, .cast_ms = 350, .cd_ms = 10'000, .cost = 30, .delay_ms = 400, .cc = C::Airborne, .cc_ms = 600, .desc = "Slam the ground; lightning throws enemies up", .ground = true}, .r = {.name = "Gale Pull", .kind = K::Wave, .sub = S::Lightning, .dmg = 45, .dmg_rank = 25, .ep = 30, .range = 650, .width = 200, .speed = 1'200, .cast_ms = 300, .cd_ms = 12'000, .cost = 30, .cc = C::Slow, .cc_ms = 1'200, .cc_val = 30, .knock = 120, .pierce = true, .desc = "Shock wave that pushes and slows"}, .t = {.name = "Ground Wire", .kind = K::Field, .sub = S::Lightning, .dmg = 18, .dmg_rank = 9, .ep = 10, .range = 500, .radius = 200, .cast_ms = 250, .cd_ms = 14'000, .cost = 30, .dur_ms = 3'000, .cc = C::Root, .cc_ms = 400, .desc = "Live wire on the ground: briefly roots those inside"}, .y = {.name = "Thunderfall", .kind = K::Burst, .sub = S::Lightning, .dmg = 230, .dmg_rank = 115, .ep = 80, .range = 800, .radius = 340, .cast_ms = 500, .cd_ms = 95'000, .cd_rank = -9'000, .cost = 60, .delay_ms = 900, .cc = C::Stun, .cc_ms = 1'100, .desc = "Giant strike after 0.9 s; stuns", .sweet_pct = 20, .ultimate = true}, .p = {.name = "Static", .kind = K::Passive, .passive = PassiveId::Static, .desc = "Autoattacks chain on water"}, .colour = 0xc8c040, .role = Role::Tank, .autos = {.shape = AutoShape::Chain, .chain_count = 2, .chain_range = 350, .chain_pct = 55}, .q_pool = {"Lightning Bolt", "Fire Whip", "Spark Volley"}};
 
 // Azure Pyre - blue fire mage. A scholar whose cold-blue flame cuts down the healthy and the tanky.
 // Plays: poke with % max HP, wide cone with a sweet spot, a fire jet to reposition.
-inline constexpr ChampionDef kAzurePyre{.name = "Azure Pyre", .element = Element::Fire, .sub = S::BlueFire,
- .range = Range::Ranged, .resource = ResourceKind::Fuel, .ep_lvl = 340, .hp = 51'000, .hp_lvl = 8'700, .attack = 4'900,
- .attack_range = 500, .res_max = 11'000, .res_regen = 550,
- .w = {.name = "Cobalt Lance", .kind = K::Bolt, .sub = S::BlueFire, .dmg = 60, .dmg_rank = 30, .ep = 55, .range = 1'000,
-       .width = 60, .speed = 2'000, .cast_ms = 300, .cd_ms = 8'000, .cost = 30,
-       .desc = "Blue bolt that also hits for 4 % of the target's max HP", .pct_max_hp = 400},
- .e = {.name = "Flare Step", .kind = K::Dash, .sub = S::BlueFire, .dmg = 30, .dmg_rank = 15, .ep = 25, .range = 380,
-       .width = 80, .speed = 1'700, .cast_ms = 0, .cd_ms = 12'000, .cost = 25, .desc = "Short jet of blue flame"},
- .r = {.name = "Pale Sweep", .kind = K::Cone, .sub = S::BlueFire, .dmg = 85, .dmg_rank = 45, .ep = 60, .range = 540,
-       .width = 340, .cast_ms = 350, .cd_ms = 9'000, .cost = 35, .cc = C::Burn, .cc_ms = 2'000, .cc_val = 1'400,
-       .desc = "Wide blue fan; the tip hits +30 %; melts ice walls", .sweet_pct = 30},
- .t = {.name = "Hollow Heat", .kind = K::Field, .sub = S::BlueFire, .dmg = 20, .dmg_rank = 10, .ep = 12, .range = 800,
-       .radius = 210, .cast_ms = 300, .cd_ms = 14'000, .cost = 35, .dur_ms = 3'500, .cc = C::Burn, .cc_ms = 1'000,
-       .cc_val = 1'100, .desc = "A pool of blue flame, burns those inside", .burns_ground = 1},
- .y = {.name = "Zero Radiance", .kind = K::Burst, .sub = S::BlueFire, .dmg = 150, .dmg_rank = 75, .ep = 70, .range = 1'100,
-       .radius = 280, .cast_ms = 500, .cd_ms = 100'000, .cd_rank = -9'000, .cost = 60, .delay_ms = 1'000,
-       .desc = "Blue blast after 1 s; also deals 12 % of the target's max HP", .sweet_pct = 25, .ultimate = true,
-       .pct_max_hp = 1'200},
- .p = {.name = "Inner Flame", .kind = K::Passive, .passive = PassiveId::InnerFlame, .desc = "Skill hits burn for 2 s"},
- .colour = 0x4a9cff, .role = Role::Mage,
- .q_pool = {"Fire Bolt", "Fire Whip", "Spark Volley"}};
+inline constexpr ChampionDef kAzurePyre{.name = "Azure Pyre", .element = Element::Fire, .sub = S::BlueFire, .range = Range::Ranged, .resource = ResourceKind::Fuel, .ep_lvl = 340, .hp = 51'000, .hp_lvl = 8'700, .attack = 4'900, .attack_range = 500, .res_max = 11'000, .res_regen = 550, .w = {.name = "Cobalt Lance", .kind = K::Bolt, .sub = S::BlueFire, .dmg = 60, .dmg_rank = 30, .ep = 55, .range = 1'000, .width = 60, .speed = 2'000, .cast_ms = 300, .cd_ms = 8'000, .cost = 30, .desc = "Blue bolt that also hits for 4 % of the target's max HP", .pct_max_hp = 400}, .e = {.name = "Flare Step", .kind = K::Dash, .sub = S::BlueFire, .dmg = 30, .dmg_rank = 15, .ep = 25, .range = 380, .width = 80, .speed = 1'700, .cast_ms = 0, .cd_ms = 12'000, .cost = 25, .desc = "Short jet of blue flame"}, .r = {.name = "Pale Sweep", .kind = K::Cone, .sub = S::BlueFire, .dmg = 85, .dmg_rank = 45, .ep = 60, .range = 540, .width = 340, .cast_ms = 350, .cd_ms = 9'000, .cost = 35, .cc = C::Burn, .cc_ms = 2'000, .cc_val = 1'400, .desc = "Wide blue fan; the tip hits +30 %; melts ice walls", .sweet_pct = 30}, .t = {.name = "Hollow Heat", .kind = K::Field, .sub = S::BlueFire, .dmg = 20, .dmg_rank = 10, .ep = 12, .range = 800, .radius = 210, .cast_ms = 300, .cd_ms = 14'000, .cost = 35, .dur_ms = 3'500, .cc = C::Burn, .cc_ms = 1'000, .cc_val = 1'100, .desc = "A pool of blue flame, burns those inside", .burns_ground = 1}, .y = {.name = "Zero Radiance", .kind = K::Burst, .sub = S::BlueFire, .dmg = 150, .dmg_rank = 75, .ep = 70, .range = 1'100, .radius = 280, .cast_ms = 500, .cd_ms = 100'000, .cd_rank = -9'000, .cost = 60, .delay_ms = 1'000, .desc = "Blue blast after 1 s; also deals 12 % of the target's max HP", .sweet_pct = 25, .ultimate = true, .pct_max_hp = 1'200}, .p = {.name = "Inner Flame", .kind = K::Passive, .passive = PassiveId::InnerFlame, .desc = "Skill hits burn for 2 s"}, .colour = 0x4a9cff, .role = Role::Mage, .q_pool = {"Fire Bolt", "Fire Whip", "Spark Volley"}};
 
 // Cobalt Wraith - blue fire assassin. A silent flame that teleports behind its prey and finishes the wounded.
 // Plays: blink in, burst the weak (missing HP), bolts that fly on after a kill.
-inline constexpr ChampionDef kCobaltWraith{.name = "Cobalt Wraith", .element = Element::Fire, .sub = S::BlueFire,
- .body = &kSlimBody, .range = Range::Melee, .resource = ResourceKind::Rage, .ep_lvl = 260, .hp = 50'500, .hp_lvl = 8'600,
- .attack = 6'000, .attack_lvl = 340, .as = 72, .ms = 35'500, .attack_range = 45, .res_max = 10'000, .res_regen = 900,
- .w = {.name = "Phantom Flicker", .kind = K::Blink, .sub = S::BlueFire, .range = 450, .cast_ms = 0, .cd_ms = 11'000,
-       .cost = 25, .casts = 2, .recast_ms = 3'000, .desc = "Teleport in a flash; recast once within 3 s", .teleport = true},
- .e = {.name = "Soul Cut", .kind = K::Cone, .sub = S::BlueFire, .dmg = 60, .dmg_rank = 30, .ep = 45, .ad = 40, .range = 280,
-       .width = 220, .cast_ms = 150, .cd_ms = 6'000, .cost = 25,
-       .desc = "Slash that deals +20 % of the target's missing HP", .melee = true, .pct_missing_hp = 2'000},
- .r = {.name = "Wisp Dart", .kind = K::Bolt, .sub = S::BlueFire, .dmg = 70, .dmg_rank = 35, .ep = 50, .range = 900, .width = 50,
-       .speed = 2'400, .cast_ms = 200, .cd_ms = 7'000, .cost = 25,
-       .desc = "Fast dart; if it kills, it flies on", .pass_on_kill = 0xFFFF},
- .t = {.name = "Chill Burn", .kind = K::Burst, .sub = S::BlueFire, .dmg = 55, .dmg_rank = 28, .ep = 40, .range = 600,
-       .radius = 130, .cast_ms = 200, .cd_ms = 10'000, .cost = 30, .delay_ms = 450, .cc = C::Silence, .cc_ms = 1'000,
-       .desc = "Small blue blast after 0.45 s; silences"},
- .y = {.name = "Night Bloom", .kind = K::Dash, .sub = S::BlueFire, .dmg = 140, .dmg_rank = 70, .ep = 60, .ad = 50, .range = 600,
-       .width = 120, .speed = 2'200, .cast_ms = 0, .cd_ms = 80'000, .cd_rank = -8'000, .cost = 55,
-       .desc = "Strike through foes; hits +25 % of their missing HP", .ultimate = true, .pct_missing_hp = 2'500},
- .p = {.name = "Inner Flame", .kind = K::Passive, .passive = PassiveId::InnerFlame, .desc = "Skill hits burn for 2 s"},
- .colour = 0x2a60c8, .role = Role::Assassin,
- .q_pool = {"Fire Whip", "Fire Bolt", "Lightning Bolt"}};
+inline constexpr ChampionDef kCobaltWraith{.name = "Cobalt Wraith", .element = Element::Fire, .sub = S::BlueFire, .body = &kSlimBody, .range = Range::Melee, .resource = ResourceKind::Rage, .ep_lvl = 260, .hp = 50'500, .hp_lvl = 8'600, .attack = 6'000, .attack_lvl = 340, .as = 72, .ms = 35'500, .attack_range = 45, .res_max = 10'000, .res_regen = 900, .w = {.name = "Phantom Flicker", .kind = K::Blink, .sub = S::BlueFire, .range = 450, .cast_ms = 0, .cd_ms = 11'000, .cost = 25, .casts = 2, .recast_ms = 3'000, .desc = "Teleport in a flash; recast once within 3 s", .teleport = true}, .e = {.name = "Soul Cut", .kind = K::Cone, .sub = S::BlueFire, .dmg = 60, .dmg_rank = 30, .ep = 45, .ad = 40, .range = 280, .width = 220, .cast_ms = 150, .cd_ms = 6'000, .cost = 25, .desc = "Slash that deals +20 % of the target's missing HP", .melee = true, .pct_missing_hp = 2'000}, .r = {.name = "Wisp Dart", .kind = K::Bolt, .sub = S::BlueFire, .dmg = 70, .dmg_rank = 35, .ep = 50, .range = 900, .width = 50, .speed = 2'400, .cast_ms = 200, .cd_ms = 7'000, .cost = 25, .desc = "Fast dart; if it kills, it flies on", .pass_on_kill = 0xFFFF}, .t = {.name = "Chill Burn", .kind = K::Burst, .sub = S::BlueFire, .dmg = 55, .dmg_rank = 28, .ep = 40, .range = 600, .radius = 130, .cast_ms = 200, .cd_ms = 10'000, .cost = 30, .delay_ms = 450, .cc = C::Silence, .cc_ms = 1'000, .desc = "Small blue blast after 0.45 s; silences"}, .y = {.name = "Night Bloom", .kind = K::Dash, .sub = S::BlueFire, .dmg = 140, .dmg_rank = 70, .ep = 60, .ad = 50, .range = 600, .width = 120, .speed = 2'200, .cast_ms = 0, .cd_ms = 80'000, .cd_rank = -8'000, .cost = 55, .desc = "Strike through foes; hits +25 % of their missing HP", .ultimate = true, .pct_missing_hp = 2'500}, .p = {.name = "Inner Flame", .kind = K::Passive, .passive = PassiveId::InnerFlame, .desc = "Skill hits burn for 2 s"}, .colour = 0x2a60c8, .role = Role::Assassin, .q_pool = {"Fire Whip", "Fire Bolt", "Lightning Bolt"}};
 
 // Powder Saboteur - combustion mage. A demolitionist who plants delayed blasts and chains them together.
 // Plays: place bombs, recast to detonate in order, huge centre damage; fragile.
-inline constexpr ChampionDef kPowderSaboteur{.name = "Powder Saboteur", .element = Element::Fire, .sub = S::Combustion,
- .range = Range::Ranged, .resource = ResourceKind::Fuel, .ep_lvl = 330, .hp = 49'000, .hp_lvl = 8'300, .attack = 4'600,
- .def = 2'700, .attack_range = 520, .res_max = 10'000, .res_regen = 500,
- .w = {.name = "Fused Charge", .kind = K::Burst, .sub = S::Combustion, .dmg = 70, .dmg_rank = 35, .ep = 55, .range = 900,
-       .radius = 140, .cast_ms = 250, .cd_ms = 12'000, .cost = 30, .delay_ms = 1'000, .casts = 3, .recast_ms = 4'000,
-       .desc = "Plant a charge, 3 casts in 4 s; the centre hits +40 %", .sweet_pct = 40},
- .e = {.name = "Blast Hop", .kind = K::Blink, .sub = S::Combustion, .dmg = 40, .dmg_rank = 20, .ep = 30, .range = 340,
-       .radius = 120, .cast_ms = 0, .cd_ms = 13'000, .cost = 30, .knock = 100, .desc = "Blast yourself away; enemies near you are pushed"},
- .r = {.name = "Slow Match", .kind = K::Field, .sub = S::Combustion, .dmg = 16, .dmg_rank = 8, .ep = 10, .range = 800,
-       .radius = 200, .cast_ms = 300, .cd_ms = 15'000, .cost = 30, .dur_ms = 4'000, .tick_ms = 400, .cc = C::Burn,
-       .cc_ms = 800, .cc_val = 1'000, .desc = "Smouldering powder, ticks fast", .burns_ground = 1},
- .t = {.name = "Shrapnel Cone", .kind = K::Cone, .sub = S::Combustion, .dmg = 75, .dmg_rank = 40, .ep = 55, .range = 420,
-       .width = 300, .cast_ms = 250, .cd_ms = 8'000, .cost = 30, .knock = 80, .desc = "Short, wide blast of shards; the tip hits +30 %",
-       .sweet_pct = 30},
- .y = {.name = "Grand Detonation", .kind = K::Burst, .sub = S::Combustion, .dmg = 280, .dmg_rank = 140, .ep = 100, .range = 1'200,
-       .radius = 350, .cast_ms = 700, .cd_ms = 110'000, .cd_rank = -10'000, .cost = 70, .delay_ms = 1'400, .cc = C::Airborne, .cc_ms = 800,
-       .desc = "Enormous delayed explosion; the centre hits +35 %", .sweet_pct = 35, .ultimate = true},
- .p = {.name = "Inner Flame", .kind = K::Passive, .passive = PassiveId::InnerFlame, .desc = "Skill hits burn for 2 s"},
- .colour = 0xff8c2a, .role = Role::Mage,
- .q_pool = {"Fire Bolt", "Spark Volley", "Fire Whip"}};
+inline constexpr ChampionDef kPowderSaboteur{.name = "Powder Saboteur", .element = Element::Fire, .sub = S::Combustion, .range = Range::Ranged, .resource = ResourceKind::Fuel, .ep_lvl = 330, .hp = 49'000, .hp_lvl = 8'300, .attack = 4'600, .def = 2'700, .attack_range = 520, .res_max = 10'000, .res_regen = 500, .w = {.name = "Fused Charge", .kind = K::Burst, .sub = S::Combustion, .dmg = 70, .dmg_rank = 35, .ep = 55, .range = 900, .radius = 140, .cast_ms = 250, .cd_ms = 12'000, .cost = 30, .delay_ms = 1'000, .casts = 3, .recast_ms = 4'000, .desc = "Plant a charge, 3 casts in 4 s; the centre hits +40 %", .sweet_pct = 40}, .e = {.name = "Blast Hop", .kind = K::Blink, .sub = S::Combustion, .dmg = 40, .dmg_rank = 20, .ep = 30, .range = 340, .radius = 120, .cast_ms = 0, .cd_ms = 13'000, .cost = 30, .knock = 100, .desc = "Blast yourself away; enemies near you are pushed"}, .r = {.name = "Slow Match", .kind = K::Field, .sub = S::Combustion, .dmg = 16, .dmg_rank = 8, .ep = 10, .range = 800, .radius = 200, .cast_ms = 300, .cd_ms = 15'000, .cost = 30, .dur_ms = 4'000, .tick_ms = 400, .cc = C::Burn, .cc_ms = 800, .cc_val = 1'000, .desc = "Smouldering powder, ticks fast", .burns_ground = 1}, .t = {.name = "Shrapnel Cone", .kind = K::Cone, .sub = S::Combustion, .dmg = 75, .dmg_rank = 40, .ep = 55, .range = 420, .width = 300, .cast_ms = 250, .cd_ms = 8'000, .cost = 30, .knock = 80, .desc = "Short, wide blast of shards; the tip hits +30 %", .sweet_pct = 30}, .y = {.name = "Grand Detonation", .kind = K::Burst, .sub = S::Combustion, .dmg = 280, .dmg_rank = 140, .ep = 100, .range = 1'200, .radius = 350, .cast_ms = 700, .cd_ms = 110'000, .cd_rank = -10'000, .cost = 70, .delay_ms = 1'400, .cc = C::Airborne, .cc_ms = 800, .desc = "Enormous delayed explosion; the centre hits +35 %", .sweet_pct = 35, .ultimate = true}, .p = {.name = "Inner Flame", .kind = K::Passive, .passive = PassiveId::InnerFlame, .desc = "Skill hits burn for 2 s"}, .colour = 0xff8c2a, .role = Role::Mage, .q_pool = {"Fire Bolt", "Spark Volley", "Fire Whip"}};
 
 // Ember Glider - fire marksman. A sky-skimming gunner who rides hot air above walls and rains fire.
 // Plays: fly over terrain, shoot on the move, pierce-line autos; weak on the ground.
-inline constexpr ChampionDef kEmberGlider{.name = "Ember Glider", .element = Element::Fire, .sub = S::Fire,
- .body = &kSlimBody, .range = Range::Ranged, .resource = ResourceKind::Fuel, .ep_lvl = 180, .hp = 50'000, .hp_lvl = 8'400,
- .attack = 6'100, .attack_lvl = 330, .as = 70, .as_lvl = 280, .ms = 34'500, .attack_range = 540, .res_max = 10'000, .res_regen = 600,
- .w = {.name = "Thermal Lift", .kind = K::Flight, .sub = S::Fire, .cast_ms = 0, .cd_ms = 30'000, .dur_ms = 3'500, .cc_val = 20,
-       .desc = "Ride hot air over terrain for 3.5 s"},
- .e = {.name = "Spark Drop", .kind = K::Burst, .sub = S::Fire, .dmg = 55, .dmg_rank = 28, .ep = 30, .ad = 40, .range = 700,
-       .radius = 120, .cast_ms = 150, .cd_ms = 8'000, .cost = 25, .delay_ms = 350, .desc = "Drop a firebomb from above after 0.35 s",
-       .reach_height = 200},
- .r = {.name = "Cinder Volley", .kind = K::Bolt, .sub = S::Fire, .dmg = 35, .dmg_rank = 18, .ep = 20, .ad = 50, .range = 900,
-       .width = 50, .speed = 2'200, .cast_ms = 100, .cd_ms = 11'000, .cost = 30, .casts = 4, .recast_ms = 3'000,
-       .move = CastMove::Free, .desc = "4 quick shots in 3 s; you may walk while casting"},
- .t = {.name = "Smoke Trail", .kind = K::Dash, .sub = S::Fire, .dmg = 25, .dmg_rank = 12, .ep = 15, .range = 400, .width = 70,
-       .speed = 1'800, .cast_ms = 0, .cd_ms = 14'000, .cost = 25, .desc = "Quick hop that leaves a burning trail", .burns_ground = 1},
- .y = {.name = "Sunfall Barrage", .kind = K::Field, .sub = S::Fire, .dmg = 55, .dmg_rank = 28, .ep = 30, .ad = 40, .range = 1'300,
-       .radius = 330, .cast_ms = 400, .cd_ms = 95'000, .cd_rank = -9'000, .cost = 60, .dur_ms = 3'500, .tick_ms = 350,
-       .cc = C::Burn, .cc_ms = 1'000, .cc_val = 1'200, .desc = "Rain of fire for 3.5 s", .through_walls = true, .ultimate = true},
- .p = {.name = "Fire in Hand", .kind = K::Passive, .passive = PassiveId::FireInHand, .desc = "Strong light around you at night"},
- .colour = 0xff9a40, .role = Role::Marksman,
- .autos = {.move_while_attacking = true, .shape = AutoShape::Line, .line_length = 250, .line_width = 50},
- .q_pool = {"Fire Bolt", "Spark Volley", "Lightning Bolt"}};
+inline constexpr ChampionDef kEmberGlider{.name = "Ember Glider", .element = Element::Fire, .sub = S::Fire, .body = &kSlimBody, .range = Range::Ranged, .resource = ResourceKind::Fuel, .ep_lvl = 180, .hp = 50'000, .hp_lvl = 8'400, .attack = 6'100, .attack_lvl = 330, .as = 70, .as_lvl = 280, .ms = 34'500, .attack_range = 540, .res_max = 10'000, .res_regen = 600, .w = {.name = "Thermal Lift", .kind = K::Flight, .sub = S::Fire, .cast_ms = 0, .cd_ms = 30'000, .dur_ms = 3'500, .cc_val = 20, .desc = "Ride hot air over terrain for 3.5 s"}, .e = {.name = "Spark Drop", .kind = K::Burst, .sub = S::Fire, .dmg = 55, .dmg_rank = 28, .ep = 30, .ad = 40, .range = 700, .radius = 120, .cast_ms = 150, .cd_ms = 8'000, .cost = 25, .delay_ms = 350, .desc = "Drop a firebomb from above after 0.35 s", .reach_height = 200}, .r = {.name = "Cinder Volley", .kind = K::Bolt, .sub = S::Fire, .dmg = 35, .dmg_rank = 18, .ep = 20, .ad = 50, .range = 900, .width = 50, .speed = 2'200, .cast_ms = 100, .cd_ms = 11'000, .cost = 30, .casts = 4, .recast_ms = 3'000, .move = CastMove::Free, .desc = "4 quick shots in 3 s; you may walk while casting"}, .t = {.name = "Smoke Trail", .kind = K::Dash, .sub = S::Fire, .dmg = 25, .dmg_rank = 12, .ep = 15, .range = 400, .width = 70, .speed = 1'800, .cast_ms = 0, .cd_ms = 14'000, .cost = 25, .desc = "Quick hop that leaves a burning trail", .burns_ground = 1}, .y = {.name = "Sunfall Barrage", .kind = K::Field, .sub = S::Fire, .dmg = 55, .dmg_rank = 28, .ep = 30, .ad = 40, .range = 1'300, .radius = 330, .cast_ms = 400, .cd_ms = 95'000, .cd_rank = -9'000, .cost = 60, .dur_ms = 3'500, .tick_ms = 350, .cc = C::Burn, .cc_ms = 1'000, .cc_val = 1'200, .desc = "Rain of fire for 3.5 s", .through_walls = true, .ultimate = true}, .p = {.name = "Fire in Hand", .kind = K::Passive, .passive = PassiveId::FireInHand, .desc = "Strong light around you at night"}, .colour = 0xff9a40, .role = Role::Marksman, .autos = {.move_while_attacking = true, .shape = AutoShape::Line, .line_length = 250, .line_width = 50}, .q_pool = {"Fire Bolt", "Spark Volley", "Lightning Bolt"}};
 
 // Hearth Keeper - fire support. A warm healer who shields friends and burns those who step near them.
 // Plays: heal and shield allies, a slow fire ring as a boundary, few kills but many saves.
-inline constexpr ChampionDef kHearthKeeper{.name = "Hearth Keeper", .element = Element::Fire, .sub = S::Fire,
- .range = Range::Ranged, .resource = ResourceKind::Fuel, .ep_lvl = 300, .hp = 54'000, .hp_lvl = 9'200, .attack = 4'600,
- .def = 3'200, .edef = 3'200, .attack_range = 460, .res_max = 12'000, .res_regen = 700,
- .w = {.name = "Warm Embrace", .kind = K::Heal, .sub = S::Fire, .dmg = 70, .dmg_rank = 35, .ep = 50, .range = 650, .radius = 200,
-       .cast_ms = 250, .cd_ms = 12'000, .cost = 40, .ally = true, .desc = "Heals allies in a blob with gentle fire"},
- .e = {.name = "Ember Ward", .kind = K::Shield, .sub = S::Fire, .dmg = 90, .dmg_rank = 45, .ep = 45, .range = 600, .cast_ms = 0,
-       .cd_ms = 14'000, .cost = 35, .dur_ms = 3'000, .ally = true, .desc = "Shield an ally with a cloak of embers"},
- .r = {.name = "Hearth Ring", .kind = K::Field, .sub = S::Fire, .dmg = 16, .dmg_rank = 8, .ep = 10, .range = 700, .radius = 240,
-       .cast_ms = 300, .cd_ms = 16'000, .cost = 35, .dur_ms = 4'000, .cc = C::Burn, .cc_ms = 1'000, .cc_val = 900, .group = true,
-       .desc = "A ring of fire; other firebenders can feed it", .burns_ground = 0},
- .t = {.name = "Kindle Haste", .kind = K::Haste, .sub = S::Fire, .range = 500, .radius = 220, .cast_ms = 0, .cd_ms = 18'000,
-       .cost = 30, .dur_ms = 2'500, .ally = true, .cc_val = 30, .desc = "+30 % move speed for you"},
- .y = {.name = "Phoenix Hearth", .kind = K::Heal, .sub = S::Fire, .dmg = 200, .dmg_rank = 100, .ep = 90, .range = 700, .radius = 400,
-       .cast_ms = 500, .cd_ms = 100'000, .cd_rank = -9'000, .cost = 70, .ally = true,
-       .desc = "Big heal for allies; also heals 8 % of their missing HP", .ultimate = true, .pct_missing_hp = 800},
- .p = {.name = "Fire in Hand", .kind = K::Passive, .passive = PassiveId::FireInHand, .desc = "Strong light around you at night"},
- .colour = 0xffb060, .role = Role::Support,
- .q_pool = {"Fire Bolt", "Fire Whip", "Spark Volley"}};
+inline constexpr ChampionDef kHearthKeeper{.name = "Hearth Keeper", .element = Element::Fire, .sub = S::Fire, .range = Range::Ranged, .resource = ResourceKind::Fuel, .ep_lvl = 300, .hp = 54'000, .hp_lvl = 9'200, .attack = 4'600, .def = 3'200, .edef = 3'200, .attack_range = 460, .res_max = 12'000, .res_regen = 700, .w = {.name = "Warm Embrace", .kind = K::Heal, .sub = S::Fire, .dmg = 70, .dmg_rank = 35, .ep = 50, .range = 650, .radius = 200, .cast_ms = 250, .cd_ms = 12'000, .cost = 40, .ally = true, .desc = "Heals allies in a blob with gentle fire"}, .e = {.name = "Ember Ward", .kind = K::Shield, .sub = S::Fire, .dmg = 90, .dmg_rank = 45, .ep = 45, .range = 600, .cast_ms = 0, .cd_ms = 14'000, .cost = 35, .dur_ms = 3'000, .ally = true, .desc = "Shield an ally with a cloak of embers"}, .r = {.name = "Hearth Ring", .kind = K::Field, .sub = S::Fire, .dmg = 16, .dmg_rank = 8, .ep = 10, .range = 700, .radius = 240, .cast_ms = 300, .cd_ms = 16'000, .cost = 35, .dur_ms = 4'000, .cc = C::Burn, .cc_ms = 1'000, .cc_val = 900, .group = true, .desc = "A ring of fire; other firebenders can feed it", .burns_ground = 0}, .t = {.name = "Kindle Haste", .kind = K::Haste, .sub = S::Fire, .range = 500, .radius = 220, .cast_ms = 0, .cd_ms = 18'000, .cost = 30, .dur_ms = 2'500, .cc_val = 30, .ally = true, .desc = "+30 % move speed for you"}, .y = {.name = "Phoenix Hearth", .kind = K::Heal, .sub = S::Fire, .dmg = 200, .dmg_rank = 100, .ep = 90, .range = 700, .radius = 400, .cast_ms = 500, .cd_ms = 100'000, .cd_rank = -9'000, .cost = 70, .ally = true, .desc = "Big heal for allies; also heals 8 % of their missing HP", .ultimate = true, .pct_missing_hp = 800}, .p = {.name = "Fire in Hand", .kind = K::Passive, .passive = PassiveId::FireInHand, .desc = "Strong light around you at night"}, .colour = 0xffb060, .role = Role::Support, .q_pool = {"Fire Bolt", "Fire Whip", "Spark Volley"}};
 
 // Bolt Dancer - lightning assassin. A blur that snaps through lightning lines in the direction it faces.
 // Plays: facing-aimed dashes with recasts, burst on the isolated target, redirect to survive.
-inline constexpr ChampionDef kBoltDancer{.name = "Bolt Dancer", .element = Element::Fire, .sub = S::Lightning,
- .body = &kSlimBody, .range = Range::Melee, .resource = ResourceKind::Rage, .ep_lvl = 250, .hp = 49'500, .hp_lvl = 8'500,
- .attack = 6'000, .attack_lvl = 330, .as = 74, .as_lvl = 300, .ms = 36'000, .attack_range = 45, .res_max = 10'000, .res_regen = 900,
- .w = {.name = "Flash Line", .kind = K::Dash, .sub = S::Lightning, .dmg = 40, .dmg_rank = 20, .ep = 30, .ad = 30, .range = 380,
-       .width = 90, .speed = 2'400, .cast_ms = 0, .cd_ms = 8'000, .cost = 20, .casts = 3, .recast_ms = 3'000,
-       .desc = "Dash where you face, up to 3 times in 3 s", .aim = Aim::Facing, .turns_caster = false},
- .e = {.name = "Counter Spark", .kind = K::Redirect, .sub = S::Lightning, .cast_ms = 0, .cd_ms = 16'000, .dur_ms = 600,
-       .desc = "0.6 s window: lightning that hits you goes where your cursor is", .turns_caster = false},
- .r = {.name = "Shock Fan", .kind = K::Cone, .sub = S::Lightning, .dmg = 60, .dmg_rank = 30, .ep = 40, .ad = 40, .range = 300,
-       .width = 240, .cast_ms = 100, .cd_ms = 6'000, .cost = 20, .cc = C::Slow, .cc_ms = 800, .cc_val = 25,
-       .desc = "Quick fan of sparks; slows", .melee = true},
- .t = {.name = "Needle Bolt", .kind = K::Bolt, .sub = S::Lightning, .dmg = 80, .dmg_rank = 40, .ep = 50, .range = 1'100,
-       .width = 40, .speed = 3'600, .cast_ms = 250, .cd_ms = 10'000, .cost = 30,
-       .desc = "Very fast thin bolt; the last 20 % hits +40 %", .sweet_pct = 40},
- .y = {.name = "Thousand Strikes", .kind = K::Dash, .sub = S::Lightning, .dmg = 60, .dmg_rank = 30, .ep = 35, .ad = 35, .range = 330,
-       .width = 130, .speed = 2'600, .cast_ms = 0, .cd_ms = 85'000, .cd_rank = -8'000, .cost = 60, .cc = C::Stun, .cc_ms = 300,
-       .casts = 5, .recast_ms = 4'000, .desc = "5 lightning dashes in 4 s, each stuns briefly",
-       .aim = Aim::Facing, .turns_caster = false, .ultimate = true},
- .p = {.name = "Light Feet", .kind = K::Passive, .passive = PassiveId::LightFeet, .desc = "+15 move speed"},
- .colour = 0xfff080, .role = Role::Assassin,
- .q_pool = {"Lightning Bolt", "Spark Volley", "Fire Whip"}};
+inline constexpr ChampionDef kBoltDancer{.name = "Bolt Dancer", .element = Element::Fire, .sub = S::Lightning, .body = &kSlimBody, .range = Range::Melee, .resource = ResourceKind::Rage, .ep_lvl = 250, .hp = 49'500, .hp_lvl = 8'500, .attack = 6'000, .attack_lvl = 330, .as = 74, .as_lvl = 300, .ms = 36'000, .attack_range = 45, .res_max = 10'000, .res_regen = 900, .w = {.name = "Flash Line", .kind = K::Dash, .sub = S::Lightning, .dmg = 40, .dmg_rank = 20, .ep = 30, .ad = 30, .range = 380, .width = 90, .speed = 2'400, .cast_ms = 0, .cd_ms = 8'000, .cost = 20, .casts = 3, .recast_ms = 3'000, .desc = "Dash where you face, up to 3 times in 3 s", .turns_caster = false, .aim = Aim::Facing}, .e = {.name = "Counter Spark", .kind = K::Redirect, .sub = S::Lightning, .cast_ms = 0, .cd_ms = 16'000, .dur_ms = 600, .desc = "0.6 s window: lightning that hits you goes where your cursor is", .turns_caster = false}, .r = {.name = "Shock Fan", .kind = K::Cone, .sub = S::Lightning, .dmg = 60, .dmg_rank = 30, .ep = 40, .ad = 40, .range = 300, .width = 240, .cast_ms = 100, .cd_ms = 6'000, .cost = 20, .cc = C::Slow, .cc_ms = 800, .cc_val = 25, .desc = "Quick fan of sparks; slows", .melee = true}, .t = {.name = "Needle Bolt", .kind = K::Bolt, .sub = S::Lightning, .dmg = 80, .dmg_rank = 40, .ep = 50, .range = 1'100, .width = 40, .speed = 3'600, .cast_ms = 250, .cd_ms = 10'000, .cost = 30, .desc = "Very fast thin bolt; the last 20 % hits +40 %", .sweet_pct = 40}, .y = {.name = "Thousand Strikes", .kind = K::Dash, .sub = S::Lightning, .dmg = 60, .dmg_rank = 30, .ep = 35, .ad = 35, .range = 330, .width = 130, .speed = 2'600, .cast_ms = 0, .cd_ms = 85'000, .cd_rank = -8'000, .cost = 60, .cc = C::Stun, .cc_ms = 300, .casts = 5, .recast_ms = 4'000, .desc = "5 lightning dashes in 4 s, each stuns briefly", .turns_caster = false, .aim = Aim::Facing, .ultimate = true}, .p = {.name = "Light Feet", .kind = K::Passive, .passive = PassiveId::LightFeet, .desc = "+15 move speed"}, .colour = 0xfff080, .role = Role::Assassin, .q_pool = {"Lightning Bolt", "Spark Volley", "Fire Whip"}};
 
 // Pyre Colossus - fire tank with stances. A walking furnace: Space toggles guarding ember or raging inferno.
 // Plays: front-line bruiser, big burning cone, knock-ups, ground fire that never goes out.
-inline constexpr ChampionDef kPyreColossus{.name = "Pyre Colossus", .element = Element::Fire, .sub = S::Fire,
- .body = &kBroadBody, .range = Range::Melee, .resource = ResourceKind::Rage, .ep_lvl = 140, .hp = 67'000, .hp_lvl = 11'200,
- .attack = 5'800, .attack_lvl = 340, .def = 3'700, .edef = 3'000, .as = 58, .ms = 32'500, .attack_range = 60,
- .res_max = 12'000, .res_regen = 600,
- .w = {.name = "Slag Armour", .kind = K::Shield, .sub = S::Fire, .dmg = 130, .dmg_rank = 65, .ep = 40, .cast_ms = 0, .cd_ms = 18'000,
-       .cost = 30, .dur_ms = 4'000, .size_bonus = 1'200, .desc = "Molten shield; you grow a little"},
- .e = {.name = "Furnace Slam", .kind = K::Cone, .sub = S::Fire, .dmg = 80, .dmg_rank = 40, .ep = 45, .ad = 40, .range = 320,
-       .width = 280, .cast_ms = 300, .cd_ms = 9'000, .cost = 30, .cc = C::Airborne, .cc_ms = 600,
-       .desc = "Heavy fiery slam; knocks up", .melee = true, .sweet_pct = 20},
- .r = {.name = "Lava Footsteps", .kind = K::Haste, .sub = S::Fire, .cast_ms = 0, .cd_ms = 14'000, .cost = 25, .dur_ms = 3'000,
-       .cc_val = 35, .desc = "+35 % move speed; leaves burning ground", .burns_ground = 1},
- .t = {.name = "Bonfire", .kind = K::Field, .sub = S::Fire, .dmg = 20, .dmg_rank = 10, .ep = 12, .range = 400, .radius = 260,
-       .cast_ms = 250, .cd_ms = 15'000, .cost = 30, .dur_ms = 5'000, .cc = C::Burn, .cc_ms = 1'000, .cc_val = 1'200,
-       .desc = "A big long-lasting fire that burns trees", .destroys_trees = 1, .burns_ground = 1},
- .y = {.name = "Meltdown", .kind = K::Burst, .sub = S::Fire, .dmg = 200, .dmg_rank = 100, .ep = 70, .ad = 50, .range = 350,
-       .radius = 380, .cast_ms = 500, .cd_ms = 95'000, .cd_rank = -9'000, .cost = 65, .delay_ms = 600, .cc = C::Airborne, .cc_ms = 900,
-       .desc = "Erupt around yourself after 0.6 s; also hits for 6 % of max HP", .ultimate = true, .pct_max_hp = 600},
- .p = {.name = "Inner Flame", .kind = K::Passive, .passive = PassiveId::InnerFlame, .desc = "Skill hits burn for 2 s"},
- .stance = true,
- .colour = 0xb03010, .role = Role::Tank,
- .autos = {.shape = AutoShape::Splash, .splash_radius = 110, .splash_pct = 50, .hits_walls = true, .wall_pct = 100},
- .q_pool = {"Fire Whip", "Fire Bolt", "Lightning Bolt"}};
+inline constexpr ChampionDef kPyreColossus{.name = "Pyre Colossus", .element = Element::Fire, .sub = S::Fire, .body = &kBroadBody, .range = Range::Melee, .resource = ResourceKind::Rage, .ep_lvl = 140, .hp = 67'000, .hp_lvl = 11'200, .attack = 5'800, .attack_lvl = 340, .def = 3'700, .edef = 3'000, .as = 58, .ms = 32'500, .attack_range = 60, .res_max = 12'000, .res_regen = 600, .w = {.name = "Slag Armour", .kind = K::Shield, .sub = S::Fire, .dmg = 130, .dmg_rank = 65, .ep = 40, .cast_ms = 0, .cd_ms = 18'000, .cost = 30, .dur_ms = 4'000, .size_bonus = 1'200, .desc = "Molten shield; you grow a little"}, .e = {.name = "Furnace Slam", .kind = K::Cone, .sub = S::Fire, .dmg = 80, .dmg_rank = 40, .ep = 45, .ad = 40, .range = 320, .width = 280, .cast_ms = 300, .cd_ms = 9'000, .cost = 30, .cc = C::Airborne, .cc_ms = 600, .desc = "Heavy fiery slam; knocks up", .melee = true, .sweet_pct = 20}, .r = {.name = "Lava Footsteps", .kind = K::Haste, .sub = S::Fire, .cast_ms = 0, .cd_ms = 14'000, .cost = 25, .dur_ms = 3'000, .cc_val = 35, .desc = "+35 % move speed; leaves burning ground", .burns_ground = 1}, .t = {.name = "Bonfire", .kind = K::Field, .sub = S::Fire, .dmg = 20, .dmg_rank = 10, .ep = 12, .range = 400, .radius = 260, .cast_ms = 250, .cd_ms = 15'000, .cost = 30, .dur_ms = 5'000, .cc = C::Burn, .cc_ms = 1'000, .cc_val = 1'200, .desc = "A big long-lasting fire that burns trees", .destroys_trees = 1, .burns_ground = 1}, .y = {.name = "Meltdown", .kind = K::Burst, .sub = S::Fire, .dmg = 200, .dmg_rank = 100, .ep = 70, .ad = 50, .range = 350, .radius = 380, .cast_ms = 500, .cd_ms = 95'000, .cd_rank = -9'000, .cost = 65, .delay_ms = 600, .cc = C::Airborne, .cc_ms = 900, .desc = "Erupt around yourself after 0.6 s; also hits for 6 % of max HP", .ultimate = true, .pct_max_hp = 600}, .p = {.name = "Inner Flame", .kind = K::Passive, .passive = PassiveId::InnerFlame, .desc = "Skill hits burn for 2 s"}, .stance = true, .colour = 0xb03010, .role = Role::Tank, .autos = {.shape = AutoShape::Splash, .splash_radius = 110, .splash_pct = 50, .hits_walls = true, .wall_pct = 100}, .q_pool = {"Fire Whip", "Fire Bolt", "Lightning Bolt"}};
 
 // Dusk Marshal - combustion marksman. A rifleman-commander whose rounds explode and crack walls.
 // Plays: wall-hitting line autos, long targeted shot, a piercing smoke-fire volley; kite and detonate.
-inline constexpr ChampionDef kDuskMarshal{.name = "Dusk Marshal", .element = Element::Fire, .sub = S::Combustion,
- .range = Range::Ranged, .resource = ResourceKind::Fuel, .ep_lvl = 200, .hp = 51'500, .hp_lvl = 8'700, .attack = 6'300,
- .attack_lvl = 340, .as = 66, .as_lvl = 260, .ms = 33'500, .attack_range = 580, .res_max = 10'000, .res_regen = 550,
- .w = {.name = "Marked Round", .kind = K::Bolt, .sub = S::Combustion, .dmg = 90, .dmg_rank = 45, .ep = 50, .ad = 60, .range = 1'300,
-       .width = 50, .speed = 3'000, .cast_ms = 350, .cd_ms = 10'000, .cost = 35, .targeted = true,
-       .desc = "Click an enemy: a long shot that deals 6 % of its current HP too", .pct_current_hp = 600},
- .e = {.name = "Smoke Retreat", .kind = K::Blink, .sub = S::Combustion, .dmg = 30, .dmg_rank = 15, .ep = 20, .range = 360,
-       .radius = 140, .cast_ms = 0, .cd_ms = 12'000, .cost = 25, .cc = C::Blind, .cc_ms = 700, .cc_val = 50,
-       .desc = "Hop back in a puff of smoke; blinds nearby foes"},
- .r = {.name = "Volley Order", .kind = K::Wave, .sub = S::Combustion, .dmg = 50, .dmg_rank = 25, .ep = 30, .ad = 40, .range = 800,
-       .width = 240, .speed = 1'800, .cast_ms = 300, .cd_ms = 11'000, .cost = 30, .pierce = true,
-       .desc = "A wide line of shots that goes through enemies", .stop_on = 0},
- .t = {.name = "Powder Keg", .kind = K::Burst, .sub = S::Combustion, .dmg = 70, .dmg_rank = 35, .ep = 40, .ad = 30, .range = 850,
-       .radius = 150, .cast_ms = 250, .cd_ms = 12'000, .cost = 30, .delay_ms = 800,
-       .desc = "A keg explodes after 0.8 s; the centre hits +35 %", .destroys_trees = 0, .sweet_pct = 35},
- .y = {.name = "Sunset Salvo", .kind = K::Bolt, .sub = S::Combustion, .dmg = 60, .dmg_rank = 30, .ep = 35, .ad = 50, .range = 1'000,
-       .width = 70, .speed = 2'400, .cast_ms = 200, .cd_ms = 90'000, .cd_rank = -9'000, .cost = 60, .casts = 6, .recast_ms = 5'000,
-       .move = CastMove::Free, .desc = "6 explosive rounds in 5 s; walk while firing", .ultimate = true},
- .p = {.name = "Inner Flame", .kind = K::Passive, .passive = PassiveId::InnerFlame, .desc = "Skill hits burn for 2 s"},
- .colour = 0xe07830, .role = Role::Marksman,
- .autos = {.shape = AutoShape::Line, .line_length = 220, .line_width = 50, .hits_walls = true, .wall_pct = 80},
- .q_pool = {"Fire Bolt", "Lightning Bolt", "Spark Volley"}};
+inline constexpr ChampionDef kDuskMarshal{.name = "Dusk Marshal", .element = Element::Fire, .sub = S::Combustion, .range = Range::Ranged, .resource = ResourceKind::Fuel, .ep_lvl = 200, .hp = 51'500, .hp_lvl = 8'700, .attack = 6'300, .attack_lvl = 340, .as = 66, .as_lvl = 260, .ms = 33'500, .attack_range = 580, .res_max = 10'000, .res_regen = 550, .w = {.name = "Marked Round", .kind = K::Bolt, .sub = S::Combustion, .dmg = 90, .dmg_rank = 45, .ep = 50, .ad = 60, .range = 1'300, .width = 50, .speed = 3'000, .cast_ms = 350, .cd_ms = 10'000, .cost = 35, .targeted = true, .desc = "Click an enemy: a long shot that deals 6 % of its current HP too", .pct_current_hp = 600}, .e = {.name = "Smoke Retreat", .kind = K::Blink, .sub = S::Combustion, .dmg = 30, .dmg_rank = 15, .ep = 20, .range = 360, .radius = 140, .cast_ms = 0, .cd_ms = 12'000, .cost = 25, .cc = C::Blind, .cc_ms = 700, .cc_val = 50, .desc = "Hop back in a puff of smoke; blinds nearby foes"}, .r = {.name = "Volley Order", .kind = K::Wave, .sub = S::Combustion, .dmg = 50, .dmg_rank = 25, .ep = 30, .ad = 40, .range = 800, .width = 240, .speed = 1'800, .cast_ms = 300, .cd_ms = 11'000, .cost = 30, .pierce = true, .desc = "A wide line of shots that goes through enemies", .stop_on = 0}, .t = {.name = "Powder Keg", .kind = K::Burst, .sub = S::Combustion, .dmg = 70, .dmg_rank = 35, .ep = 40, .ad = 30, .range = 850, .radius = 150, .cast_ms = 250, .cd_ms = 12'000, .cost = 30, .delay_ms = 800, .desc = "A keg explodes after 0.8 s; the centre hits +35 %", .sweet_pct = 35, .destroys_trees = 0}, .y = {.name = "Sunset Salvo", .kind = K::Bolt, .sub = S::Combustion, .dmg = 60, .dmg_rank = 30, .ep = 35, .ad = 50, .range = 1'000, .width = 70, .speed = 2'400, .cast_ms = 200, .cd_ms = 90'000, .cd_rank = -9'000, .cost = 60, .casts = 6, .recast_ms = 5'000, .move = CastMove::Free, .desc = "6 explosive rounds in 5 s; walk while firing", .ultimate = true}, .p = {.name = "Inner Flame", .kind = K::Passive, .passive = PassiveId::InnerFlame, .desc = "Skill hits burn for 2 s"}, .colour = 0xe07830, .role = Role::Marksman, .autos = {.shape = AutoShape::Line, .line_length = 220, .line_width = 50, .hits_walls = true, .wall_pct = 80}, .q_pool = {"Fire Bolt", "Lightning Bolt", "Spark Volley"}};
 
 // Sunspear Zealot - fire fighter with stances. A temple spearman: spear stance pokes far, flame stance burns close.
 // Plays: Space swaps reach for burst; targeted leap, pierce thrust, burning ground trail.
-inline constexpr ChampionDef kSunspearZealot{.name = "Sunspear Zealot", .element = Element::Fire, .sub = S::Fire,
- .range = Range::Melee, .resource = ResourceKind::Fuel, .ep_lvl = 210, .hp = 57'000, .hp_lvl = 9'600, .attack = 6'400,
- .attack_lvl = 370, .as = 66, .ms = 34'000, .attack_range = 70, .res_max = 10'000, .res_regen = 600,
- .w = {.name = "Solar Thrust", .kind = K::Bolt, .sub = S::Fire, .dmg = 70, .dmg_rank = 35, .ep = 40, .ad = 50, .range = 500,
-       .width = 70, .speed = 2'800, .cast_ms = 150, .cd_ms = 7'000, .cost = 25, .pierce = true,
-       .desc = "A spear of flame that pierces the whole line"},
- .e = {.name = "Dawn Leap", .kind = K::Dash, .sub = S::Fire, .dmg = 60, .dmg_rank = 30, .ep = 35, .ad = 40, .range = 520,
-       .width = 110, .speed = 1'700, .cast_ms = 0, .cd_ms = 12'000, .cost = 30, .targeted = true,
-       .desc = "Leap at an enemy you click; burns the ground where you land", .burns_ground = 1},
- .r = {.name = "Zeal Spin", .kind = K::Cone, .sub = S::Fire, .dmg = 55, .dmg_rank = 28, .ep = 35, .ad = 45, .range = 240,
-       .width = 360, .cast_ms = 150, .cd_ms = 8'000, .cost = 25, .cc = C::Burn, .cc_ms = 1'500, .cc_val = 1'000,
-       .desc = "Wide spin; burns", .melee = true},
- .t = {.name = "Brand of Dawn", .kind = K::Burst, .sub = S::Fire, .dmg = 40, .dmg_rank = 20, .ep = 25, .range = 600,
-       .radius = 140, .cast_ms = 200, .cd_ms = 13'000, .cost = 30, .delay_ms = 600, .cc = C::Slow, .cc_ms = 1'500, .cc_val = 40,
-       .desc = "A glowing mark that slows after 0.6 s"},
- .y = {.name = "Noon Judgement", .kind = K::Dash, .sub = S::Fire, .dmg = 180, .dmg_rank = 90, .ep = 60, .ad = 70, .range = 650,
-       .width = 160, .speed = 2'000, .cast_ms = 100, .cd_ms = 85'000, .cd_rank = -8'000, .cost = 60, .cc = C::Stun, .cc_ms = 900,
-       .desc = "A blazing charge; also deals 10 % of the target's missing HP", .ultimate = true, .pct_missing_hp = 1'000},
- .p = {.name = "Inner Flame", .kind = K::Passive, .passive = PassiveId::InnerFlame, .desc = "Skill hits burn for 2 s"},
- .stance = true,
- .colour = 0xf0a020, .role = Role::Fighter,
- .autos = {.shape = AutoShape::Line, .line_length = 130, .line_width = 60},
- .q_pool = {"Fire Whip", "Fire Bolt", "Spark Volley"}};
+inline constexpr ChampionDef kSunspearZealot{.name = "Sunspear Zealot", .element = Element::Fire, .sub = S::Fire, .range = Range::Melee, .resource = ResourceKind::Fuel, .ep_lvl = 210, .hp = 57'000, .hp_lvl = 9'600, .attack = 6'400, .attack_lvl = 370, .as = 66, .ms = 34'000, .attack_range = 70, .res_max = 10'000, .res_regen = 600, .w = {.name = "Solar Thrust", .kind = K::Bolt, .sub = S::Fire, .dmg = 70, .dmg_rank = 35, .ep = 40, .ad = 50, .range = 500, .width = 70, .speed = 2'800, .cast_ms = 150, .cd_ms = 7'000, .cost = 25, .pierce = true, .desc = "A spear of flame that pierces the whole line"}, .e = {.name = "Dawn Leap", .kind = K::Dash, .sub = S::Fire, .dmg = 60, .dmg_rank = 30, .ep = 35, .ad = 40, .range = 520, .width = 110, .speed = 1'700, .cast_ms = 0, .cd_ms = 12'000, .cost = 30, .targeted = true, .desc = "Leap at an enemy you click; burns the ground where you land", .burns_ground = 1}, .r = {.name = "Zeal Spin", .kind = K::Cone, .sub = S::Fire, .dmg = 55, .dmg_rank = 28, .ep = 35, .ad = 45, .range = 240, .width = 360, .cast_ms = 150, .cd_ms = 8'000, .cost = 25, .cc = C::Burn, .cc_ms = 1'500, .cc_val = 1'000, .desc = "Wide spin; burns", .melee = true}, .t = {.name = "Brand of Dawn", .kind = K::Burst, .sub = S::Fire, .dmg = 40, .dmg_rank = 20, .ep = 25, .range = 600, .radius = 140, .cast_ms = 200, .cd_ms = 13'000, .cost = 30, .delay_ms = 600, .cc = C::Slow, .cc_ms = 1'500, .cc_val = 40, .desc = "A glowing mark that slows after 0.6 s"}, .y = {.name = "Noon Judgement", .kind = K::Dash, .sub = S::Fire, .dmg = 180, .dmg_rank = 90, .ep = 60, .ad = 70, .range = 650, .width = 160, .speed = 2'000, .cast_ms = 100, .cd_ms = 85'000, .cd_rank = -8'000, .cost = 60, .cc = C::Stun, .cc_ms = 900, .desc = "A blazing charge; also deals 10 % of the target's missing HP", .ultimate = true, .pct_missing_hp = 1'000}, .p = {.name = "Inner Flame", .kind = K::Passive, .passive = PassiveId::InnerFlame, .desc = "Skill hits burn for 2 s"}, .stance = true, .colour = 0xf0a020, .role = Role::Fighter, .autos = {.shape = AutoShape::Line, .line_length = 130, .line_width = 60}, .q_pool = {"Fire Whip", "Fire Bolt", "Spark Volley"}};
 
 // Thornwood Ranger - non-bender archer. A forest scout who snares, kites and fires on the run.
 // Plays: move-while-shooting autos, bolas and arrows from range, a roll to escape; pure skill.
-inline constexpr ChampionDef kThornwoodRanger{.name = "Thornwood Ranger", .element = Element::None, .sub = S::Physical,
- .body = &kSlimBody, .range = Range::Ranged, .resource = ResourceKind::Ammo, .mage = false, .hp = 52'000, .hp_lvl = 8'800,
- .attack = 6'400, .attack_lvl = 380, .as = 72, .as_lvl = 300, .ms = 35'000, .attack_range = 560, .res_max = 20'000, .res_regen = 1'000,
- .w = {.name = "Roll Away", .kind = K::Dash, .dmg = 0, .range = 340, .width = 60, .speed = 1'800, .cast_ms = 0, .cd_ms = 9'000,
-       .cost = 40, .desc = "A quick roll to safety"},
- .e = {.name = "Snare Arrow", .kind = K::Bolt, .dmg = 40, .dmg_rank = 20, .ad = 60, .range = 900, .width = 50, .speed = 2'200,
-       .cast_ms = 150, .cd_ms = 12'000, .cost = 50, .cc = C::Root, .cc_ms = 1'100, .desc = "A net-tipped arrow that roots"},
- .r = {.name = "Pin Down", .kind = K::Bolt, .dmg = 60, .dmg_rank = 30, .ad = 90, .range = 1'100, .width = 40, .speed = 3'000,
-       .cast_ms = 300, .cd_ms = 10'000, .cost = 50, .desc = "Long arrow; the last 20 % hits +30 %", .sweet_pct = 30},
- .t = {.name = "Fan of Arrows", .kind = K::Cone, .dmg = 50, .dmg_rank = 25, .ad = 70, .range = 600, .width = 320, .cast_ms = 200,
-       .cd_ms = 9'000, .cost = 50, .desc = "A spread of arrows in front"},
- .y = {.name = "Hunter's Moon", .kind = K::Bolt, .dmg = 150, .dmg_rank = 75, .ad = 140, .range = 1'500, .width = 60, .speed = 3'400,
-       .cast_ms = 500, .cd_ms = 90'000, .cd_rank = -9'000, .cost = 80, .cc = C::Slow, .cc_ms = 1'500, .cc_val = 40,
-       .desc = "One huge arrow that flies on when it kills", .ultimate = true, .pass_on_kill = 0xFFFF},
- .p = {.name = "Chi Flow", .kind = K::Passive, .passive = PassiveId::ChiFlow, .desc = "Hits give energy"},
- .colour = 0x4a7a3a, .role = Role::Marksman,
- .autos = {.move_while_attacking = true},
- .q_pool = {"Knife Throw", "Bolas Throw", "Chi Strike"}};
+inline constexpr ChampionDef kThornwoodRanger{.name = "Thornwood Ranger", .element = Element::None, .sub = S::Physical, .body = &kSlimBody, .range = Range::Ranged, .resource = ResourceKind::Ammo, .mage = false, .hp = 52'000, .hp_lvl = 8'800, .attack = 6'400, .attack_lvl = 380, .as = 72, .as_lvl = 300, .ms = 35'000, .attack_range = 560, .res_max = 20'000, .res_regen = 1'000, .w = {.name = "Roll Away", .kind = K::Dash, .dmg = 0, .range = 340, .width = 60, .speed = 1'800, .cast_ms = 0, .cd_ms = 9'000, .cost = 40, .desc = "A quick roll to safety"}, .e = {.name = "Snare Arrow", .kind = K::Bolt, .dmg = 40, .dmg_rank = 20, .ad = 60, .range = 900, .width = 50, .speed = 2'200, .cast_ms = 150, .cd_ms = 12'000, .cost = 50, .cc = C::Root, .cc_ms = 1'100, .desc = "A net-tipped arrow that roots"}, .r = {.name = "Pin Down", .kind = K::Bolt, .dmg = 60, .dmg_rank = 30, .ad = 90, .range = 1'100, .width = 40, .speed = 3'000, .cast_ms = 300, .cd_ms = 10'000, .cost = 50, .desc = "Long arrow; the last 20 % hits +30 %", .sweet_pct = 30}, .t = {.name = "Fan of Arrows", .kind = K::Cone, .dmg = 50, .dmg_rank = 25, .ad = 70, .range = 600, .width = 320, .cast_ms = 200, .cd_ms = 9'000, .cost = 50, .desc = "A spread of arrows in front"}, .y = {.name = "Hunter's Moon", .kind = K::Bolt, .dmg = 150, .dmg_rank = 75, .ad = 140, .range = 1'500, .width = 60, .speed = 3'400, .cast_ms = 500, .cd_ms = 90'000, .cd_rank = -9'000, .cost = 80, .cc = C::Slow, .cc_ms = 1'500, .cc_val = 40, .desc = "One huge arrow that flies on when it kills", .ultimate = true, .pass_on_kill = 0xFFFF}, .p = {.name = "Chi Flow", .kind = K::Passive, .passive = PassiveId::ChiFlow, .desc = "Hits give energy"}, .colour = 0x4a7a3a, .role = Role::Marksman, .autos = {.move_while_attacking = true}, .q_pool = {"Knife Throw", "Bolas Throw", "Chi Strike"}};
 
 // Ashgrove Spearman - non-bender spear fighter. A veteran with long reach and steady discipline.
 // Plays: poke at range with line autos, brace and counter-thrust, one vaulting charge.
-inline constexpr ChampionDef kAshgroveSpearman{.name = "Ashgrove Spearman", .element = Element::None, .sub = S::Physical,
- .range = Range::Melee, .resource = ResourceKind::Energy, .mage = false, .hp = 60'000, .hp_lvl = 10'000, .attack = 6'600,
- .attack_lvl = 400, .def = 3'400, .as = 64, .ms = 34'000, .attack_range = 90, .res_max = 20'000, .res_regen = 1'000,
- .w = {.name = "Brace", .kind = K::Shield, .dmg = 100, .dmg_rank = 50, .bonus_ad = 80, .cast_ms = 0, .cd_ms = 15'000, .cost = 40,
-       .dur_ms = 3'000, .desc = "Plant the spear: a shield for 3 s"},
- .e = {.name = "Long Thrust", .kind = K::Bolt, .dmg = 70, .dmg_rank = 35, .ad = 80, .range = 450, .width = 60, .speed = 3'000,
-       .cast_ms = 150, .cd_ms = 7'000, .cost = 40, .pierce = true, .desc = "A thrust that reaches far and hits all in line"},
- .r = {.name = "Sweeping Haft", .kind = K::Cone, .dmg = 50, .dmg_rank = 25, .ad = 70, .range = 300, .width = 340, .cast_ms = 200,
-       .cd_ms = 9'000, .cost = 45, .knock = 160, .desc = "Wide sweep that pushes enemies away", .melee = true},
- .t = {.name = "Hamstring", .kind = K::Dash, .dmg = 45, .dmg_rank = 22, .ad = 60, .range = 380, .width = 90, .speed = 1'600,
-       .cast_ms = 0, .cd_ms = 11'000, .cost = 50, .cc = C::Slow, .cc_ms = 1'800, .cc_val = 45, .desc = "Rush and cut the legs: slows"},
- .y = {.name = "Vaulting Fall", .kind = K::Burst, .dmg = 190, .dmg_rank = 95, .ad = 110, .range = 650, .radius = 200, .cast_ms = 100,
-       .cd_ms = 85'000, .cd_rank = -8'000, .cost = 80, .delay_ms = 500, .cc = C::Airborne, .cc_ms = 800,
-       .desc = "Leap down on a point after 0.5 s; also deals 8 % of current HP", .ultimate = true, .pct_current_hp = 800},
- .p = {.name = "Chi Flow", .kind = K::Passive, .passive = PassiveId::ChiFlow, .desc = "Hits give energy"},
- .colour = 0x8a8a6a, .role = Role::Fighter,
- .autos = {.shape = AutoShape::Line, .line_length = 120, .line_width = 50},
- .q_pool = {"Chi Strike", "Knife Throw", "Bolas Throw"}};
+inline constexpr ChampionDef kAshgroveSpearman{.name = "Ashgrove Spearman", .element = Element::None, .sub = S::Physical, .range = Range::Melee, .resource = ResourceKind::Energy, .mage = false, .hp = 60'000, .hp_lvl = 10'000, .attack = 6'600, .attack_lvl = 400, .def = 3'400, .as = 64, .ms = 34'000, .attack_range = 90, .res_max = 20'000, .res_regen = 1'000, .w = {.name = "Brace", .kind = K::Shield, .dmg = 100, .dmg_rank = 50, .bonus_ad = 80, .cast_ms = 0, .cd_ms = 15'000, .cost = 40, .dur_ms = 3'000, .desc = "Plant the spear: a shield for 3 s"}, .e = {.name = "Long Thrust", .kind = K::Bolt, .dmg = 70, .dmg_rank = 35, .ad = 80, .range = 450, .width = 60, .speed = 3'000, .cast_ms = 150, .cd_ms = 7'000, .cost = 40, .pierce = true, .desc = "A thrust that reaches far and hits all in line"}, .r = {.name = "Sweeping Haft", .kind = K::Cone, .dmg = 50, .dmg_rank = 25, .ad = 70, .range = 300, .width = 340, .cast_ms = 200, .cd_ms = 9'000, .cost = 45, .knock = 160, .desc = "Wide sweep that pushes enemies away", .melee = true}, .t = {.name = "Hamstring", .kind = K::Dash, .dmg = 45, .dmg_rank = 22, .ad = 60, .range = 380, .width = 90, .speed = 1'600, .cast_ms = 0, .cd_ms = 11'000, .cost = 50, .cc = C::Slow, .cc_ms = 1'800, .cc_val = 45, .desc = "Rush and cut the legs: slows"}, .y = {.name = "Vaulting Fall", .kind = K::Burst, .dmg = 190, .dmg_rank = 95, .ad = 110, .range = 650, .radius = 200, .cast_ms = 100, .cd_ms = 85'000, .cd_rank = -8'000, .cost = 80, .delay_ms = 500, .cc = C::Airborne, .cc_ms = 800, .desc = "Leap down on a point after 0.5 s; also deals 8 % of current HP", .ultimate = true, .pct_current_hp = 800}, .p = {.name = "Chi Flow", .kind = K::Passive, .passive = PassiveId::ChiFlow, .desc = "Hits give energy"}, .colour = 0x8a8a6a, .role = Role::Fighter, .autos = {.shape = AutoShape::Line, .line_length = 120, .line_width = 50}, .q_pool = {"Chi Strike", "Knife Throw", "Bolas Throw"}};
 
 // Silent Needle - non-bender chi assassin. A shadow with needles and powders that shuts down benders.
 // Plays: stance swap (needles at range / fists up close), mute and silence, smoke and an execution strike.
-inline constexpr ChampionDef kSilentNeedle{.name = "Silent Needle", .element = Element::None, .sub = S::Physical,
- .body = &kSlimBody, .range = Range::Melee, .resource = ResourceKind::Energy, .mage = false, .hp = 51'000, .hp_lvl = 8'700,
- .attack = 6'500, .attack_lvl = 400, .as = 75, .as_lvl = 300, .ms = 36'000, .attack_range = 40, .res_max = 20'000, .res_regen = 1'100,
- .w = {.name = "Shadow Step", .kind = K::Blink, .range = 400, .cast_ms = 0, .cd_ms = 12'000, .cost = 45, .teleport = true,
-       .desc = "Slip through the dark a short way"},
- .e = {.name = "Nerve Needle", .kind = K::Bolt, .dmg = 35, .dmg_rank = 18, .ad = 60, .range = 700, .width = 40, .speed = 2'600,
-       .cast_ms = 100, .cd_ms = 8'000, .cost = 40, .cc = C::Mute, .cc_ms = 1'400, .desc = "A needle that blocks chi: no bending for 1.4 s"},
- .r = {.name = "Dust Cloud", .kind = K::Field, .range = 600, .radius = 240, .cast_ms = 150, .cd_ms = 15'000, .cost = 45, .dur_ms = 3'000,
-       .cc = C::Blind, .cc_ms = 600, .cc_val = 60, .desc = "Blinding dust"},
- .t = {.name = "Pressure Palm", .kind = K::Cone, .dmg = 55, .dmg_rank = 28, .ad = 80, .range = 230, .width = 200, .cast_ms = 100,
-       .cd_ms = 7'000, .cost = 40, .cc = C::Silence, .cc_ms = 1'000, .desc = "Palm strike; the tip hits +30 %; silences",
-       .melee = true, .sweet_pct = 30},
- .y = {.name = "Final Point", .kind = K::Dash, .dmg = 120, .dmg_rank = 60, .ad = 120, .range = 500, .width = 100, .speed = 2'400,
-       .cast_ms = 0, .cd_ms = 80'000, .cd_rank = -8'000, .cost = 80, .cc = C::Stun, .cc_ms = 1'000,
-       .desc = "Dash strike; also deals 20 % of the target's missing HP", .ultimate = true, .pct_missing_hp = 2'000},
- .p = {.name = "Chi Flow", .kind = K::Passive, .passive = PassiveId::ChiFlow, .desc = "Hits give energy"},
- .stance = true,
- .colour = 0x303040, .role = Role::Assassin,
- .q_pool = {"Chi Strike", "Knife Throw", "Bolas Throw"}};
+inline constexpr ChampionDef kSilentNeedle{.name = "Silent Needle", .element = Element::None, .sub = S::Physical, .body = &kSlimBody, .range = Range::Melee, .resource = ResourceKind::Energy, .mage = false, .hp = 51'000, .hp_lvl = 8'700, .attack = 6'500, .attack_lvl = 400, .as = 75, .as_lvl = 300, .ms = 36'000, .attack_range = 40, .res_max = 20'000, .res_regen = 1'100, .w = {.name = "Shadow Step", .kind = K::Blink, .range = 400, .cast_ms = 0, .cd_ms = 12'000, .cost = 45, .desc = "Slip through the dark a short way", .teleport = true}, .e = {.name = "Nerve Needle", .kind = K::Bolt, .dmg = 35, .dmg_rank = 18, .ad = 60, .range = 700, .width = 40, .speed = 2'600, .cast_ms = 100, .cd_ms = 8'000, .cost = 40, .cc = C::Mute, .cc_ms = 1'400, .desc = "A needle that blocks chi: no bending for 1.4 s"}, .r = {.name = "Dust Cloud", .kind = K::Field, .range = 600, .radius = 240, .cast_ms = 150, .cd_ms = 15'000, .cost = 45, .dur_ms = 3'000, .cc = C::Blind, .cc_ms = 600, .cc_val = 60, .desc = "Blinding dust"}, .t = {.name = "Pressure Palm", .kind = K::Cone, .dmg = 55, .dmg_rank = 28, .ad = 80, .range = 230, .width = 200, .cast_ms = 100, .cd_ms = 7'000, .cost = 40, .cc = C::Silence, .cc_ms = 1'000, .desc = "Palm strike; the tip hits +30 %; silences", .melee = true, .sweet_pct = 30}, .y = {.name = "Final Point", .kind = K::Dash, .dmg = 120, .dmg_rank = 60, .ad = 120, .range = 500, .width = 100, .speed = 2'400, .cast_ms = 0, .cd_ms = 80'000, .cd_rank = -8'000, .cost = 80, .cc = C::Stun, .cc_ms = 1'000, .desc = "Dash strike; also deals 20 % of the target's missing HP", .ultimate = true, .pct_missing_hp = 2'000}, .p = {.name = "Chi Flow", .kind = K::Passive, .passive = PassiveId::ChiFlow, .desc = "Hits give energy"}, .stance = true, .colour = 0x303040, .role = Role::Assassin, .q_pool = {"Chi Strike", "Knife Throw", "Bolas Throw"}};
 
 inline constexpr std::array kPackC{kAshenDuelist, kVoltaicSeer, kThunderWarden, kAzurePyre, kCobaltWraith, kPowderSaboteur,
                                    kEmberGlider, kHearthKeeper, kBoltDancer, kPyreColossus, kDuskMarshal, kSunspearZealot,
