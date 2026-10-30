@@ -34,7 +34,7 @@ void Server::load_custom_champions() {
         files.push_back({e.path().filename().string(), std::string((std::istreambuf_iterator<char>(in)), {})});
     }
     std::ranges::sort(files);
-    std::erase_if(files, [](const auto& f) { return f.second.size() > 4'000; });  // [U-383] a cut file would differ on clients
+    std::erase_if(files, [](const auto& f) { return f.second.size() > 16'000; });  // [U-383][U-425] the .champ limit (sent whole)
     auto name_of = [](const std::string& text) {
         ChampionDef d;
         return parse_champion_text(text, d).empty() ? std::string(d.name) : std::string();
@@ -115,7 +115,7 @@ void Server::send_custom_champions(Player& p) {
     w.put<std::uint8_t>(std::uint8_t(std::min(custom_files_.size(), cap)));
     for (std::size_t i = 0; i < custom_files_.size() && i < cap; ++i) {
         w.str(custom_files_[i].first);
-        w.str(custom_files_[i].second);
+        w.long_str(custom_files_[i].second);  // [U-425] (was cut at 4 000 bytes → bigger files were dropped)
     }
     send(p.peer, w, true);
 }

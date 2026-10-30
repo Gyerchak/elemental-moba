@@ -43,7 +43,7 @@ void App::options(bool in_game) {
                     set_.companion = (set_.companion + 1) % int(CompanionKind::Count), changed = true;
                 y += 30;
             }
-            if (button(ren_, ui_, x, y, 640, 26, std::format("{}: {}", tr("Rule set (practice / hosting)"), tr(kRuleSetNames[std::clamp(set_.ruleset, 0, 2)])), false))
+            if (button(ren_, ui_, x, y, 640, 26, std::format("{}: {}", tr("Systems (practice / hosting)"), tr(kRuleSetNames[std::clamp(set_.ruleset, 0, 2)])), false))
                 set_.ruleset = (set_.ruleset + 1) % int(RuleSet::Count), changed = true;  // [U-416]
             y += 30;
             toggle(tr("Show other players' own emotes"), set_.show_other_emotes);  // [U-414]

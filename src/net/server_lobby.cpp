@@ -25,12 +25,14 @@ void Server::receive(int pid, Reader& r) {
         case Msg::SkinUpload: on_skin(p, r); break;
         case Msg::EmoteUpload: on_emote(p, r); break;  // [U-414]
         case Msg::LobbyConfig: {  // [U-422] the owner chooses the map + rule set (before the match; not in queue mode)
-            const std::uint8_t m = r.get<std::uint8_t>(), rs = r.get<std::uint8_t>();
+            const std::uint8_t m = r.get<std::uint8_t>(), rs = r.get<std::uint8_t>(), md = r.get<std::uint8_t>();
             if (r.bad() || world_ || cfg_.queue_mode || pid != owner_) break;
             cfg_.map = std::clamp<int>(m, 0, int(maps().size()) - 1);
             cfg_.ruleset = std::uint8_t(std::min<int>(rs, 2));
+            cfg_.mode = std::uint8_t(std::min<int>(md, int(GameMode::Count) - 1));  // [U-454]
             set_map(cfg_.map);
-            send_chat(Chat::System, "server", std::format("Map: {} — rules: {}", cur_map().name, kRuleSetNames[cfg_.ruleset]), nullptr, nullptr);
+            send_chat(Chat::System, "server", std::format("Map: {} — mode: {} — systems: {}", cur_map().name, kGameModeNames[cfg_.mode],
+                                                          kRuleSetNames[cfg_.ruleset]), nullptr, nullptr);
             send_lobby();
             break;
         }
@@ -49,7 +51,7 @@ void Server::receive(int pid, Reader& r) {
             if (r.bad() || !cfg_.queue_mode || world_ || (p.slot.plays && lobby_deadline_ms_ >= 0)) break;
             p.slot.queued = on != 0;
             p.slot.q_map = std::uint8_t(std::min<int>(m, int(maps().size()) - 1));
-            p.slot.q_rules = std::uint8_t(std::min<int>(rs, 2));
+            p.slot.q_rules = std::uint8_t(std::min<int>(rs, int(GameMode::Count) - 1));  // (the game mode)
             try_pop_queue();
             send_lobby();
             break;
@@ -342,7 +344,7 @@ void Server::try_pop_queue() {
         if (int(same.size()) < std::min(cfg_.queue_min, team_cap)) continue;
         if (int(same.size()) > team_cap) same.resize(std::size_t(team_cap));
         cfg_.map = a.slot.q_map;
-        cfg_.ruleset = a.slot.q_rules;
+        cfg_.mode = std::uint8_t(std::min<int>(a.slot.q_rules, int(GameMode::Count) - 1));  // [U-454] the queue is map + game mode
         set_map(cfg_.map);
         std::shuffle(same.begin(), same.end(), std::mt19937{std::random_device{}()});  // random teams
         for (Player& p : players_) p.slot.plays = false;
@@ -354,45 +356,61 @@ void Server::try_pop_queue() {
         }
         lobby_deadline_ms_ = wall_ms() + std::int64_t(std::max(cfg_.pick_seconds, 60)) * 1000;
         send_chat(Chat::System, "server", std::format("Match found: {} — {} ({} players). Pick your champions!", cur_map().name,
-                                                      kRuleSetNames[cfg_.ruleset], same.size()), nullptr, nullptr);
+                                                      kGameModeNames[cfg_.mode], same.size()), nullptr, nullptr);
         return;
     }
 }
 
 // ---------------------------------------------------------------- lobby state for everyone
 void Server::send_lobby() {
-    Writer w;
-    w.put(Msg::Lobby);
     std::vector<const LobbySlot*> slots;
     for (std::size_t i = 0; i < players_.size(); ++i) {
         Player& p = players_[i];
         p.slot.host = int(i) == owner_;  // [U-422] the owner flag is the "host" flag of the lobby
         if (p.connected && p.joined) slots.push_back(&p.slot);
     }
-    w.put<std::uint8_t>(std::uint8_t(slots.size()));
-    for (const LobbySlot* s : slots) {
-        w.put(s->id);
-        w.str(s->name);
-        w.put(s->team);
-        w.put(s->champ);
-        w.put(s->q);
-        w.put(s->f);
-        w.put(s->g);
-        w.put<std::uint8_t>(s->ready);
-        w.put<std::uint8_t>(s->bot);
-        w.put<std::uint8_t>(s->host);
-        w.put(s->ban);
-        w.put(s->platform);
-        w.put<std::uint8_t>(s->has_skin);
-        w.put<std::int32_t>(s->lp);
-        w.put<std::uint8_t>(s->queued), w.put(s->q_map), w.put(s->q_rules), w.put<std::uint8_t>(s->plays);  // [U-423]
+    // [U-454] Blind Pick: before the match nobody sees the other team's picks → one message per player
+    const bool blind = cfg_.mode == std::uint8_t(GameMode::BlindPick) && !world_;
+    auto build = [&](int viewer_team) {
+        Writer w;
+        w.put(Msg::Lobby);
+        w.put<std::uint8_t>(std::uint8_t(slots.size()));
+        for (const LobbySlot* s : slots) {
+            const bool hide = blind && viewer_team >= 0 && s->team != viewer_team;
+            w.put(s->id);
+            w.str(s->name);
+            w.put(s->team);
+            w.put(hide ? std::int8_t(-1) : s->champ);
+            w.put(s->q);
+            w.put(s->f);
+            w.put(s->g);
+            w.put<std::uint8_t>(s->ready);
+            w.put<std::uint8_t>(s->bot);
+            w.put<std::uint8_t>(s->host);
+            w.put(hide ? std::int8_t(-1) : s->ban);
+            w.put(s->platform);
+            w.put<std::uint8_t>(s->has_skin);
+            w.put<std::int32_t>(s->lp);
+            w.put<std::uint8_t>(s->queued), w.put(s->q_map), w.put(s->q_rules), w.put<std::uint8_t>(s->plays);  // [U-423]
+        }
+        w.put<std::uint8_t>(in_match.load());
+        w.put(phase_);
+        w.put<std::uint8_t>(cfg_.bans);
+        w.put<std::uint16_t>(std::uint16_t(lobby_deadline_ms_ < 0 ? 0 : std::max<std::int64_t>(1, (lobby_deadline_ms_ - wall_ms()) / 1000)));  // [U-276]
+        w.put<std::uint8_t>(std::uint8_t(cfg_.map)), w.put(cfg_.ruleset), w.put<std::uint8_t>(cfg_.queue_mode);  // [U-420][U-422][U-423]
+        w.put(cfg_.mode);  // [U-454]
+        return w;
+    };
+    if (!blind) {
+        Writer w = build(-1);
+        broadcast(w, true);
+        return;
     }
-    w.put<std::uint8_t>(in_match.load());
-    w.put(phase_);
-    w.put<std::uint8_t>(cfg_.bans);
-    w.put<std::uint16_t>(std::uint16_t(lobby_deadline_ms_ < 0 ? 0 : std::max<std::int64_t>(1, (lobby_deadline_ms_ - wall_ms()) / 1000)));  // [U-276]
-    w.put<std::uint8_t>(std::uint8_t(cfg_.map)), w.put(cfg_.ruleset), w.put<std::uint8_t>(cfg_.queue_mode);  // [U-420][U-422][U-423]
-    broadcast(w, true);
+    for (Player& p : players_)
+        if (p.connected && p.joined) {
+            Writer w = build(p.slot.team);
+            send(p.peer, w, true);
+        }
 }
 
 }  // namespace em::net

@@ -35,6 +35,7 @@ struct AppOptions {
     std::string name;          // nickname override
     bool starter = true;       // autotest: this client presses Start
     bool windowed = false;     // force a window (tests / two screens)
+    int shots = 1;             // [U-446] autotest: this many screenshots, one per frame
     bool shot_select = false;  // autotest: screenshot of champion select (loadout open) instead of the match, then quit
 };
 
@@ -94,6 +95,8 @@ private:
     void custom_champions();
     void interactions();  // [U-397]
     int queue_map_ = 0, queue_rules_ = 0;  // [U-423] my queue choice
+    float info_scroll_ = 0;
+    int shots_taken_ = 0;  // [U-446]                 // [U-424] the champion list in Menu → Champions
     float interactions_scroll_ = 0;
     // ---- shared
     void ingame_menu();  // Esc in a match: live options, leave [U-207]

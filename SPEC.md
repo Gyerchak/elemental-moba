@@ -616,5 +616,43 @@ Additions outside the plan live in `ENGINE-EXTRAS.md`, never here.
 - [U-422] **Lobby owner** chooses the map; **transfer the owner role** to a chosen player; **quit** the lobby; **invite** to the lobby.
 - [U-423] **Matchmaking on servers**: first pick the map / mode (like LoL), then queue with other people; the server makes random teams.
 
+## 37. Round 15 (2026-10-30)
+
+- [U-424] Menu → all champions: the list does not scroll and hides a button — fit it to the screen + scrolling.
+- [U-425] The two copied champions still show in the own-champions pick list after a restart.
+- [U-426] Skills like Heat Draw must not be castable when there is nothing they would act on (no skill burned on nothing) — a system rule for every such skill.
+- [U-427] Use FL Studio yourself.
+- [U-428] Graphic glitches on screen are still present.
+- [U-429] The player can walk away from the companion while recalling; companion speed 1 500; choose the companion in the champion-select lobby too.
+- [U-430] In game: own-team portraits a bit lower (they overlap the selected unit's stats); respawn windows higher (they hide the bottom info).
+- [U-431] Some skills target "visible enemies"; some should also target SENSED enemies — a mechanic.
+- [U-432] Setups: room for graphics + the graphics; a setup is tied to its champions automatically and picked first in a match; runes + masteries can be tweaked in champion select without overwriting the saved setups.
+- [U-433] Skill charges (like LoL ammo skills).
+- [U-434] Pillar raise and alike: more visible; knock up only enemies (self / allies not); the caster is rooted 0.3 s on cast for such skills; clearer ranges / hitbox display for every skill (e.g. Lift and Throw).
+- [U-435] Walls are neutral: the owner and the own team damage them too. A skill option to pass through walls without damaging them.
+- [U-436] Drawing skills: better range display, thinner walls; the creator's team sees them at once (no vision needed).
+- [U-437] The other earthbending Q skills asked before, and other wall / structure-making skills.
+- [U-438] Wall cracking must be visible with HP, natural walls too.
+- [U-439] New terrain (natural walls, trees growing back) pushes stuck units out to the closest free spot (skills that trap on purpose excepted).
+- [U-440] Elevation stacks additively (1 + 1 = 2 where they overlap), each part with its own timer.
+- [U-441] Host a server in the local LAN network.
+
+## 38. Round 16 (2026-10-30)
+
+- [U-442] The two copied champions still did not appear in the pick list.
+- [U-443] Every wall is rotatable: its angle follows how it is cast. The map's own walls form natural shapes like real rocks / walls.
+- [U-444] Recharging skills (cooldowns / charges): a better, more accurate, more informative animation (like LoL).
+- [U-445] The music is mixed oddly.
+- [U-446] Whole-screen graphic glitches: important — search deeply for the cause.
+- [U-447] "Quick cast all" as a button on the bottom bar next to the autoattack switch, with its own key (N).
+- [U-448] Non-benders: no Q to switch to a magic stance; they get a magic stance with a WHOLE SET of skills from the cosmic event at 60:00, with the stance switch.
+- [U-449] Practice: bots get random champions (not the same teams every time).
+- [U-450] Quick cast must handle the new skill mechanics (source first, drawn, steered …).
+- [U-451] Skill previews show every part of a skill (e.g. the burning ground of a fire cone).
+- [U-452] A HOLD key for quick cast (e.g. holding the level-up modifier + the skill when there is nothing to level).
+- [U-453] The range view (` / Ctrl+`) also shows the hitboxes of visible skills (own and enemy).
+- [U-454] One unified game (every system on), with an easy switch to only LoL-like or only Dota-like code — or rather: a choice of GAME MODES (a different thing).
+- [U-455] Fix the new map: it should be a unique place of its own.
+
 ---
 *Hubert continues editing the plan later — new ideas get the next free `[U-xx]` number.*

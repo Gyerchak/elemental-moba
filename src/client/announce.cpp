@@ -278,8 +278,8 @@ void GameView::draw_death_recap(NetClient& net, double now_s) {
     // short line under "respawn in"
     const std::string line = std::format("{} {} — {} {} {:.1f} s ({} {}, {} {}, {} {})", tr("Killed by"), killer_name, total,
                                          tr("damage in"), span_s, phys, tr("physical"), total - phys, tr("elemental"), dot, tr("over time"));
-    text(r_, (W - text_w(line, 1.5f)) / 2, H / 2 - 18, line, {255, 220, 200}, 1.5f);
-    if (button(r_, ui, W / 2 - 90, H / 2 + 2, 180, 22, show_recap_ ? tr("Hide death recap") : tr("Death recap ▸"), show_recap_)) show_recap_ = !show_recap_;
+    text(r_, (W - text_w(line, 1.5f)) / 2, H * 0.3f - 18, line, {255, 220, 200}, 1.5f);
+    if (button(r_, ui, W / 2 - 90, H * 0.3f + 2, 180, 22, show_recap_ ? tr("Hide death recap") : tr("Death recap ▸"), show_recap_)) show_recap_ = !show_recap_;
     if (!show_recap_) return;
 
     // full window: one row per (source unit, what) with a bar; then a timeline graph
@@ -308,7 +308,7 @@ void GameView::draw_death_recap(NetClient& net, double now_s) {
     }
     std::ranges::sort(rows, std::greater{}, &Row::dmg);
     const float w = 640, x = (W - w) / 2;
-    float y = H / 2 + 30;
+    float y = H * 0.3f + 30;  // [U-430] higher: the bottom HUD stays readable
     const float rows_h = float(std::min<std::size_t>(rows.size(), 12)) * 20;
     const float cc_h = ccs.empty() ? 0.f : 18.f + float(ccs.size()) * 14.f;
     const float h_total = 40 + rows_h + 110 + cc_h;
@@ -380,7 +380,7 @@ void GameView::draw_death_recap(NetClient& net, double now_s) {
             yy -= hh;
         }
     }
-    mouse_on_hud_ |= hover(ui, x, H / 2 + 30, w, h_total);
+    mouse_on_hud_ |= hover(ui, x, H * 0.3f + 30, w, h_total);
 }
 
 }  // namespace em

@@ -45,7 +45,9 @@ private:
     void rebuild_textures(NetClient& net, std::int64_t now_ms, bool force);
     // world_draw.cpp
     void draw_world(NetClient& net, double now_s);
-    void terrain_begin();                               // [U-389]
+    void terrain_begin(NetClient& net);                 // [U-389]
+    void draw_wall_cracks(int x, int y, float top);     // [U-438]
+    std::unordered_map<std::uint32_t, std::uint8_t> wall_pct_;
     void terrain_until(NetClient& net, float screen_y);
     void draw_terrain_row(NetClient& net, int y);
     bool terr_on_ = false;
@@ -173,6 +175,7 @@ private:
     std::unordered_map<std::uint32_t, AnimMem> anim_mem_;
     std::unordered_map<std::uint32_t, double> fx_born_;
     int sent_companion_ = -1;  // [U-407]
+    float info_bottom_ = 0;    // [U-430] bottom of the selected unit's info panel (last frame)
     std::vector<net::NetFx> fx_draw_;                 // [U-389] this frame's effects at their delayed positions
     std::vector<net::NetCompanion> comp_draw_;
     std::vector<std::uint32_t> comp_prev_;  // [U-407] companions seen last frame (a new one plays its call)

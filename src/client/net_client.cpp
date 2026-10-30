@@ -193,10 +193,10 @@ void NetClient::send_own_emote(std::uint8_t idx, const std::vector<std::uint8_t>
     send_raw(w, true);
 }
 
-void NetClient::send_lobby_config(int map_index, int rules) {
+void NetClient::send_lobby_config(int map_index, int rules, int game_mode) {
     Writer w;
     w.put(Msg::LobbyConfig);
-    w.put(std::uint8_t(map_index)), w.put(std::uint8_t(rules));
+    w.put(std::uint8_t(map_index)), w.put(std::uint8_t(rules)), w.put(std::uint8_t(game_mode));
     send_raw(w, true);
 }
 void NetClient::send_transfer_owner(std::uint8_t slot_id) {
@@ -298,6 +298,7 @@ void NetClient::handle(const std::uint8_t* data, std::size_t n, double now_s) {
                 const std::uint8_t m = r.get<std::uint8_t>();
                 ruleset = r.get<std::uint8_t>();
                 queue_mode = r.get<std::uint8_t>() != 0;
+                mode = r.get<std::uint8_t>();  // [U-454]
                 if (!r.bad() && state != State::Match && maps()[std::min<std::size_t>(m, maps().size() - 1)].id != map) use_map(m);
             }
             if (state == State::Match && !lobby_in_match && winner >= 0) back_in_lobby = true;
@@ -345,7 +346,8 @@ void NetClient::handle(const std::uint8_t* data, std::size_t n, double now_s) {
                 const CellChange c = r.get<CellChange>();
                 if (!Grid::in_bounds(c.x, c.y)) continue;
                 grid.at(c.x, c.y) = Cell(c.raw);
-                if (c.pub) seen.at(c.x, c.y) = Cell(c.raw);  // [U-288] changes by time: every map, seen or not
+                // [U-288] changes by time: every map, seen or not; [U-436] my team's own bending: mine at once
+                if ((c.pub & 1) || (my_team >= 0 && my_team <= 1 && (c.pub & (2 << my_team)))) seen.at(c.x, c.y) = Cell(c.raw);
             }
             grid_dirty = true;
             break;
@@ -451,7 +453,7 @@ void NetClient::handle(const std::uint8_t* data, std::size_t n, double now_s) {
             const int n = r.get<std::uint8_t>();
             std::vector<std::pair<std::string, std::string>> files;
             for (int i = 0; i < n && !r.bad(); ++i) {
-                std::string f = r.str(), text = r.str();
+                std::string f = r.str(), text = r.long_str();  // [U-425]
                 std::erase_if(f, [](char c) { return !(std::isalnum(static_cast<unsigned char>(c)) || c == '_' || c == '-' || c == '.'); });
                 if (f.size() > 6 && f.ends_with(".champ")) files.push_back({f, text});
             }

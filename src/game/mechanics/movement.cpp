@@ -205,6 +205,15 @@ void World::step_units() {
             recompute_stats(u);
         }
         regen(u);
+        if (u.kind == UnitKind::Champion)  // [U-433] charges come back one by one
+            for (std::size_t sl = 0; sl < u.skill.size(); ++sl) {
+                AbilityRt& a = u.ab[sl];
+                const SkillDef* d = u.skill[sl];
+                if (!d || d->charges == 0 || a.charges_used == 0 || now_ms < a.charge_next_ms) continue;
+                --a.charges_used;
+                a.charge_next_ms = a.charges_used > 0 ? now_ms + d->charge_ms : 0;
+                if (a.cd_end_ms > now_ms + d->charge_gap_ms) a.cd_end_ms = now_ms + d->charge_gap_ms;  // a charge is ready again
+            }
         resolve_overlaps(u);  // [X-94]
         // [U-188][U-189] water: riding needs water under you; otherwise deep water = swimming
         if (u.st.has(StatusKind::WaterRide) && !on_any_water(u)) u.st.remove(StatusKind::WaterRide);
@@ -356,7 +365,8 @@ void World::step_units() {
             }
             case OrderKind::Cast: {  // targeted skill: walk into range, then cast
                 Unit* t = find(u.order.target);
-                if (!t || !t->alive || !visible_to(u.team, *t)) {
+                const SkillDef* od = u.order.slot < u.skill.size() ? u.skill[u.order.slot] : nullptr;
+                if (!t || !t->alive || !od || !can_target(u, *od, *t)) {  // [U-431] seen, or sensed
                     u.order = {};
                     break;
                 }

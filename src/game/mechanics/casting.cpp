@@ -51,6 +51,10 @@ void World::finish_cast(Unit& u) {
         a.mc.try_cast(md, now_ms);
         a.cd_end_ms = a.mc.casts_used >= d.casts ? now_ms + r.cooldown_ms : now_ms + d.recast_ms + r.cooldown_ms;
         if (a.mc.casts_used >= d.casts) a.mc = {};
+    } else if (d.charges > 0) {  // [U-433] one charge used; empty → wait for the next charge
+        if (a.charges_used == 0) a.charge_next_ms = now_ms + d.charge_ms;
+        a.charges_used = std::uint8_t(std::min<int>(a.charges_used + 1, d.charges));
+        a.cd_end_ms = a.charges_used < d.charges ? now_ms + d.charge_gap_ms : a.charge_next_ms;
     } else {
         a.cd_end_ms = now_ms + r.cooldown_ms;
     }
@@ -60,6 +64,11 @@ void World::finish_cast(Unit& u) {
     u.cycle_boost = cycle_bonus;
     cast_skill(u, s, u.cast.x, u.cast.y, u.cast.target);
     if (water_free && u.cast.sx >= 0) take_from_source(u, u.cast.sx, u.cast.sy);  // [U-339]
+    {  // [U-434] shaping the ground holds the bender in place a moment
+        const bool shapes = d.kind == SkillKind::Pillar || d.kind == SkillKind::Wall || d.kind == SkillKind::Boulder || d.kind == SkillKind::StonePush;
+        const int root = d.self_root_ms >= 0 ? d.self_root_ms : shapes ? 300 : 0;
+        if (root > 0) u.st.add(StatusKind::Root, now_ms + root, 0, u.id);
+    }
     u.cycle_boost = false;
     if (has_passive(u, PassiveId::ElementalCycle) && !cycle_bonus) {
         const Element el = base_element(d.sub);
@@ -236,7 +245,7 @@ void World::cast_skill(Unit& u, Slot slot, std::int32_t tx, std::int32_t ty, std
             // [U-380] the wall standard: segments of 100, 33 / 66 / 99 thick, 1 / 2 levels, HP per segment (+ per rank)
             const int rank = std::max<int>(1, u.ab[std::size_t(slot)].rank);
             const bool metal = wall_kind_of(d.sub) == Wall::Metal;  // [U-388] small, strong
-            const WallSpec ws{.thick = (d.wall_thick ? std::clamp<int>(d.wall_thick, 1, 3) : metal ? 1 : 2) * kWallThickStep,
+            const WallSpec ws{.thick = (d.wall_thick ? std::clamp<int>(d.wall_thick, 1, 3) : metal || d.control == 2 ? 1 : 2) * kWallThickStep,  // drawn: thin [U-436]
                               .level = d.wall_level ? std::clamp<int>(d.wall_level, 1, 2) : 2,
                               .hp = (d.wall_hp ? d.wall_hp : d.sub == SubElement::Ice ? kIceWallSegHp : metal ? kMetalSegHp : kWallSegHp) +
                                     d.wall_hp_rank * (rank - 1)};

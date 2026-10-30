@@ -14,6 +14,11 @@ void World::call_companion(Unit& u) {
     if (in_base(u)) return refuse(u, "you are already at home");
     const auto [fx_, fy_] = fountain(u.team);
     companions.push_back({u.id, u.companion, fx_, fy_, false});
+    // [U-429] from the call on, the champion waits for the animal: no walking away, no actions (pings / emotes only)
+    u.riding = true;
+    u.order = {};
+    u.path.clear();
+    u.casting = false;
     add_feed(std::format("{} calls the {}", u.name, kCompanionNames[std::size_t(u.companion)]));
 }
 
@@ -26,6 +31,7 @@ void World::step_companions() {
             c.owner = 0;
             continue;
         }
+        u->riding = true;  // (waiting or riding: the champion never walks on its own) [U-429]
         std::int32_t tx = u->ux(), ty = u->uy();
         if (c.carrying) std::tie(tx, ty) = fountain(u->team);
         const std::int64_t d = isqrt(dist2(c.x, c.y, tx, ty));

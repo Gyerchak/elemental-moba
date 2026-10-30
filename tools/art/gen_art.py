@@ -95,6 +95,12 @@ def jobs(only):
             fx = ELEMENT_FX.get(element, ELEMENT_FX["None"])
             yield "skill", ident, (f"square ability icon for a game, '{name}': {desc}. {fx}, bold silhouette, centered, "
                                    f"dark vignette background, {STYLE}"), 512, 512
+        elif kind == "rune" and "rune" in only:  # [U-432]
+            yield "rune", ident, (f"square game rune icon: a glowing carved stone rune called '{name}', single object, centered, "
+                                  f"dark background, rpg icon, {STYLE}"), 512, 512
+        elif kind == "mastery" and "mastery" in only:
+            yield "mastery", ident, (f"square game talent icon: '{name}' ({desc} mastery), symbolic emblem, centered, "
+                                     f"dark background, rpg icon, {STYLE}"), 512, 512
         elif kind == "item" and "item" in only:
             yield "item", ident, (f"square item icon for a game: {name}, a single object, centered, dark background, "
                                   f"rpg inventory icon, {STYLE}"), 512, 512

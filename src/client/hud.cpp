@@ -347,6 +347,10 @@ void GameView::draw_bottom_panel(NetClient& net, double now_s, Ui& ui) {
         }
         if (me.stolen_ms > 0 && me.stolen_slot == i) text(r_, sx + 2, sy + 38, "STOLEN", {255, 80, 255});
         if (me.recast[i] > 0 && d && d->casts > 1) text(r_, sx + 30, sy + 2, std::format("{}/{}", me.recast[i], d->casts), {255, 255, 120});
+        if (me.charges[i] != 255) {  // [U-433] charges ready (a small badge)
+            fill_rect(r_, sx + 34, sy + 32, 15, 15, {20, 20, 30, 230});
+            text(r_, sx + 37, sy + 35, std::format("{}", me.charges[i]), me.charges[i] > 0 ? Rgba{140, 230, 255} : Rgba{150, 150, 150});
+        }
         if (d && me.s_cost[i] > 0 && me.res < me.s_cost[i] * 100 && cd.resource != ResourceKind::Rage)  // no resource
             fill_rect(r_, sx, sy, 50, 50, cd.resource == ResourceKind::Fuel ? Rgba{140, 30, 30, 90} : Rgba{20, 40, 140, 90});  // fuel: HP pays
         rect(r_, sx, sy, 50, 50, pending_ == i ? Rgba{255, 255, 255} : Rgba{95, 95, 125});
@@ -460,7 +464,9 @@ void GameView::draw_portraits(NetClient& net, Ui& ui) {
         if (r == net.roster.end() || s.id == net.my_unit) continue;
         const bool ally = r->second.team == net.my_team;
         const float sz = 44;
-        const float x = ally ? 8 : W - sz - 74, y = ally ? 76 + float(na++) * 60 : 180 + float(ne++) * 60;
+        // [U-430] my allies' portraits: under the info panel of a selected unit (they overlapped its stats)
+        const float ally_top = selected_ ? std::max(76.f, info_bottom_ + 10) : 76.f;
+        const float x = ally ? 8 : W - sz - 74, y = ally ? ally_top + float(na++) * 60 : 180 + float(ne++) * 60;
         const DrawUnit* du = nullptr;
         for (const DrawUnit& d : draw_)
             if (d.u.id == s.id) du = &d;
@@ -602,6 +608,7 @@ void GameView::draw_tooltip(NetClient& net, Ui& ui) {
     for (const auto& l : L) lw = std::max(lw, text_w(l) + 12);
     fill_rect(r_, x, y, lw, float(L.size()) * 12 + 8, {8, 8, 14, 225});
     for (std::size_t i = 0; i < L.size(); ++i) text(r_, x + 6, y + 5 + float(i) * 12, L[i], {225, 225, 235});
+    info_bottom_ = y + float(L.size()) * 12 + 8;  // [U-430] the ally portraits go below this
 }
 
 // ------------------------------------------------------------------ gold / XP pop-ups [U-159]

@@ -3,6 +3,7 @@
 #include "client/auto_play.hpp"
 
 #include <algorithm>
+#include <cstdlib>
 #include <cmath>
 #include <format>
 
@@ -131,7 +132,7 @@ void GameView::reset() {
     pending_ = -1;
     show_shop_ = show_score_ = chat_open_ = false;
     last_fog_ = -1;
-    cam_lock_ = false;  // LoL-like: free camera, starts on your champion; Y = lock
+    cam_lock_ = std::getenv("EM_CAM_LOCK") != nullptr;  // LoL-like: free camera, starts on your champion; Y = lock (tests: EM_CAM_LOCK)
     cam_started_ = false;
     auto_sent_ = false;
     selected_ = 0;
@@ -299,7 +300,18 @@ void GameView::cast_at_cursor(NetClient& net, int slot) {
     const SkillDef* d = skill_of(net, slot);
     if (d && d->targeted) {
         const DrawUnit* t = unit_at(wx, wy, true, champs_only());  // X held: champions only [U-162]
-        if (!t || t->u.team == net.my_team) return hint("click on a visible enemy");
+        if (!t || t->u.team == net.my_team) {
+            // [U-431] no visible enemy: a fresh sense wave (seismic / heat / sound) under the cursor = a sensed enemy;
+            // the server checks if this skill may target sensed enemies
+            bool wave = false;
+            for (const LocalWave& lw : net.waves)
+                if (last_frame_ - lw.born < 1.0 && (float(lw.w.x) - wx) * (float(lw.w.x) - wx) + (float(lw.w.y) - wy) * (float(lw.w.y) - wy) <= 110.f * 110.f)
+                    wave = true;
+            if (!wave) return hint("click on a visible (or sensed) enemy");
+            c.target = 0;  // the server picks the sensed enemy nearest the click
+            net.send_cmd(c);
+            return;
+        }
         c.target = t->u.id;
     }
     net.send_cmd(c);
@@ -730,10 +742,15 @@ void GameView::frame(NetClient& net, double now_s, Ui& ui) {
         const float pan = 1400.f * float(std::min(frame_ms_, 50.0)) / 1000.f / std::max(0.2f, view_.zoom * 1.6f);
         const bool* ks = SDL_GetKeyboardState(nullptr);
         const float sg = view_.flip ? -1.f : 1.f;  // pan in SCREEN directions
-        if (ui.mx < 6 || ks[SDL_SCANCODE_LEFT]) view_.cx -= pan * sg;
-        if (ui.mx > float(w) - 6 || ks[SDL_SCANCODE_RIGHT]) view_.cx += pan * sg;
-        if (ui.my < 6 || ks[SDL_SCANCODE_UP]) view_.cy -= pan * sg / view_.gy;
-        if (ui.my > float(h) - 6 || ks[SDL_SCANCODE_DOWN]) view_.cy += pan * sg / view_.gy;
+        // [U-446] edge panning only while THIS window has the mouse and the keyboard: a mouse outside the window (another
+        // screen, alt-tab, the window corner) left the last position at an edge and the camera slid away to a map
+        // corner — the whole screen showed the void
+        SDL_Window* focus = SDL_GetMouseFocus();
+        const bool edge_ok = focus && focus == SDL_GetKeyboardFocus() && ui.mx >= 0 && ui.my >= 0 && ui.mx <= float(w) && ui.my <= float(h);
+        if ((edge_ok && ui.mx < 6) || ks[SDL_SCANCODE_LEFT]) view_.cx -= pan * sg;
+        if ((edge_ok && ui.mx > float(w) - 6) || ks[SDL_SCANCODE_RIGHT]) view_.cx += pan * sg;
+        if ((edge_ok && ui.my < 6) || ks[SDL_SCANCODE_UP]) view_.cy -= pan * sg / view_.gy;
+        if ((edge_ok && ui.my > float(h) - 6) || ks[SDL_SCANCODE_DOWN]) view_.cy += pan * sg / view_.gy;
         view_.cx = std::clamp(view_.cx, 0.f, float(kMapUnits));
         view_.cy = std::clamp(view_.cy, 0.f, float(kMapUnits));
     }
@@ -1124,7 +1141,7 @@ void GameView::draw_hud(NetClient& net, double now_s, Ui& ui) {
     if (mu && !mu->alive && net.winner < 0) {
         fill_rect(r_, 0, 0, W, H, {40, 40, 40, 90});
         const std::string rs = std::format("{} {:.0f} s", tr("Respawn in"), std::max(0.0, me.respawn_ms / 1000.0 - since));
-        text(r_, (W - text_w(rs, 3)) / 2, H / 2 - 60, rs, {255, 255, 255}, 3);
+        text(r_, (W - text_w(rs, 3)) / 2, H * 0.3f - 60, rs, {255, 255, 255}, 3);  // [U-430] higher
         draw_death_recap(net, now_s);  // [U-262]
     } else {
         show_recap_ = false;

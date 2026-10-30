@@ -106,8 +106,21 @@ void App::champion_info() {
     SDL_GetRenderOutputSize(ren_, &w, &h);
     const float W = float(w), H = float(h);
     text(ren_, 20, 14, tr("Champions — every number"), {255, 200, 120}, 2.5f);
-    for (int c = 0; c < int(champions().size()); ++c)
-        if (button(ren_, ui_, 20, 56 + float(c) * 30, 200, 26, champions()[std::size_t(c)].name, info_champ_ == c)) info_champ_ = c;
+    {  // [U-424] the champion list scrolls (mouse wheel) inside its column and never covers the Back button
+        const float top = 56, bottom = H - 64, row = 30;
+        const bool over = ui_.mx < 230 && ui_.my > top && ui_.my < bottom;
+        if (over) info_scroll_ = info_scroll_ - ui_.wheel * 60;
+        info_scroll_ = std::clamp(info_scroll_, 0.f, std::max(0.f, float(champions().size()) * row - (bottom - top)));
+        const SDL_Rect clip{0, int(top), 230, int(bottom - top)};
+        SDL_SetRenderClipRect(ren_, &clip);
+        for (int c = 0; c < int(champions().size()); ++c) {
+            const float by = top + float(c) * row - info_scroll_;
+            if (by < top - row || by > bottom) continue;
+            const bool inside = ui_.my >= top && ui_.my <= bottom;  // a click outside the clipped list is not for it
+            if (button(ren_, ui_, 20, by, 200, 26, champions()[std::size_t(c)].name, info_champ_ == c) && inside) info_champ_ = c;
+        }
+        SDL_SetRenderClipRect(ren_, nullptr);
+    }
     const ChampionDef& c = champions()[std::size_t(info_champ_)];
     view_->draw_icon(info_champ_, 240, 56, 72, false);
     text(ren_, 324, 60, std::format("{} — {} · {}", c.name, tr(role_name(c.role)), tr(element_name(c.element))), hex(c.colour), 2);
@@ -155,7 +168,9 @@ void App::custom_champions() {
     // [U-353] the files are read once a second (not every frame); a change applies AT ONCE (no restart)
     if (now_s_ - custom_scan_t_ > 1.0) custom_scan_ = scan_custom_champions(), custom_scan_t_ = now_s_;
     // never while a server of this game runs (it shares the roster) or while I am connected to one (champion numbers)
-    const bool can_change = !server_ && net_.state == NetClient::State::Idle;
+    // locked only while I am really IN a server's lobby / match (after leaving or being refused it is free again) [U-425]
+    const bool can_change = !server_ && net_.state != NetClient::State::Lobby && net_.state != NetClient::State::Match &&
+                            net_.state != NetClient::State::Connecting;
     for (const CustomChampionFile& f : custom_scan_) {
         const bool on = std::ranges::find(set_.custom_champions, f.file) != set_.custom_champions.end();
         if (button(ren_, ui_, 20, y, 300, 26, std::format("{}  {}", f.ok ? "" : "[!]", f.file), on, f.ok && can_change)) {

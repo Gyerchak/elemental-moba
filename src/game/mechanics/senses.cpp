@@ -93,7 +93,7 @@ void World::step_senses() {
                         return true;
                 return false;
             };
-            for (const Unit& o : units) {
+            for (Unit& o : units) {
                 if (!o.alive || o.team == team || o.is_structure() || o.kind == UnitKind::Inhibitor) continue;
                 const bool loud = o.casting || o.windup_end_ms > 0 || now_ms - o.attack_ready_ms < 300;
                 const bool steps = now_ms - o.last_move_ms < 400;
@@ -103,6 +103,7 @@ void World::step_senses() {
                 const std::int32_t jx = std::int32_t(mix_hash(o.id + 9, std::uint32_t(now_ms / 400)) % 81) - 40;
                 const std::int32_t jy = std::int32_t(mix_hash(o.id + 99, std::uint32_t(now_ms / 400)) % 81) - 40;
                 waves.push_back({{loud ? WaveKind::SoundLoud : WaveKind::Sound, o.ux() + jx, o.uy() + jy}, now_ms, team, 0});
+                o.sensed_until[std::size_t(team) & 1] = now_ms + 600;  // [U-431]
             }
             for (const Effect& e : fx)  // explosions, fields, storms
                 if (!e.dead && e.team != team && (e.kind == FxKind::Burst || e.kind == FxKind::Field || e.kind == FxKind::Tornado) &&
@@ -136,7 +137,7 @@ void World::step_senses() {
         const VisionMap& vis = vision[std::size_t(s.team)];
         if (use_seis || use_heat) {
             const std::int64_t range = use_seis ? kSeismicRange : kHeatRange;
-            for (const Unit& o : units) {
+            for (Unit& o : units) {
                 if (!o.alive || o.team == s.team || o.is_structure() || o.kind == UnitKind::Inhibitor) continue;
                 if (dist2(o.ux(), o.uy(), s.ux(), s.uy()) > range * range) continue;
                 if (visible_to(s.team, o)) continue;  // vision already shows it
@@ -144,10 +145,14 @@ void World::step_senses() {
                 const std::int32_t jx = std::int32_t(mix_hash(o.id, std::uint32_t(now_ms / 500)) % 49) - 24;
                 const std::int32_t jy = std::int32_t(mix_hash(o.id + 77, std::uint32_t(now_ms / 500)) % 49) - 24;
                 const bool moving = now_ms - o.last_move_ms < 400;
-                if (use_seis && seismic_feels(o.flying(), o.st.has(StatusKind::Airborne), moving))
+                if (use_seis && seismic_feels(o.flying(), o.st.has(StatusKind::Airborne), moving)) {
                     waves.push_back({{WaveKind::Seismic, o.ux() + jx, o.uy() + jy}, now_ms, s.team, 0});
-                if (use_heat && heat_feels(o.st.has(StatusKind::Frozen)))
+                    o.sensed_until[std::size_t(s.team) & 1] = now_ms + 600;  // [U-431]
+                }
+                if (use_heat && heat_feels(o.st.has(StatusKind::Frozen))) {
                     waves.push_back({{WaveKind::Heat, o.ux() + jx, o.uy() + jy}, now_ms, s.team, 0});
+                    o.sensed_until[std::size_t(s.team) & 1] = now_ms + 900;
+                }
             }
             if (use_heat)  // enemy fire skills are heat sources too
                 for (const Effect& e : fx)

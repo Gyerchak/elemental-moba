@@ -7,6 +7,7 @@
 #include <enet/enet.h>
 
 #include <algorithm>
+#include <random>
 #include <bit>
 #include <chrono>
 #include <format>
@@ -47,6 +48,7 @@ void Server::start_match() {
     mc.first_wave_ms = cfg_.first_wave_ms;
     mc.ruleset = cfg_.ruleset;  // [U-416]
     mc.map = std::uint8_t(cfg_.map);  // [U-420]
+    mc.mode = cfg_.mode;              // [U-454]
     mc.seed = std::uint32_t(std::chrono::steady_clock::now().time_since_epoch().count() | 1);
     world_ = std::make_unique<World>(mc);
     // [U-276] skill-based matchmaking: humans are split into two teams of equal strength (snake draft by MMR)
@@ -66,10 +68,19 @@ void Server::start_match() {
     int count[2] = {};
     std::vector<bool> taken(champions().size(), false);  // [U-08] a character only once per game
     for (std::size_t c = 0; c < taken.size(); ++c) taken[c] = champion_banned(int(c));  // [U-181] bans
+    // [U-449][U-454] a random order of the free champions: bots (and All Random players) get different ones every match
+    std::vector<int> random_pool;
+    for (int c = 0; c < int(taken.size()); ++c) random_pool.push_back(c);
+    std::shuffle(random_pool.begin(), random_pool.end(), std::mt19937{std::random_device{}()});
+    auto next_random = [&] {
+        for (int c : random_pool)
+            if (!taken[std::size_t(c)]) return c;
+        return int(world_->random() % taken.size());
+    };
     for (Player& p : players_) {
         if (!p.connected || !p.slot.plays) continue;  // [U-423] waiting players stay in the lobby
         const int team = std::clamp<int>(p.slot.team, 0, 1);
-        int champ = p.slot.champ;
+        int champ = cfg_.mode == std::uint8_t(GameMode::AllRandom) ? next_random() : p.slot.champ;  // [U-454]
         if (champ < 0 || taken[std::size_t(champ)])
             for (int c = 0; c < int(taken.size()); ++c)
                 if (!taken[std::size_t(c)]) {
@@ -84,13 +95,7 @@ void Server::start_match() {
     const int per_team = std::max({cur_map().team_size, count[0], count[1]});  // [U-420] 5 v 5, 3 v 3 …
     for (int team = 0; team < 2; ++team)
         for (; count[team] < per_team; ++count[team]) {
-            int champ = 0;
-            for (int c = int(taken.size()) - 1; c >= 0; --c)
-                if (!taken[std::size_t(c)]) {
-                    champ = c;
-                    break;
-                }
-            if (std::ranges::all_of(taken, [](bool b) { return b; })) champ = int(world_->random() % taken.size());
+            const int champ = next_random();  // [U-449] random bots (were always the same, from the end of the list)
             taken[std::size_t(champ)] = true;
             world_->add_champion(Team(team), champ, -1, -1, -1, true, -1,
                                  std::format("Bot {}", champions()[std::size_t(champ)].name), bot_loadout(champ));
@@ -399,6 +404,10 @@ void Server::send_snapshot(Player& p) {
         m.cd_left_ms[i] = std::int32_t(std::max<std::int64_t>(0, a.cd_end_ms - W.now_ms));
         m.cd_total_ms[i] = me->skill[std::size_t(i)] ? std::int32_t(W.resolved(*me, Slot(i)).cooldown_ms) : 0;
         m.recast[i] = a.mc.casts_used;
+        {  // [U-433]
+            const SkillDef* cd = me->skill[std::size_t(i)];
+            m.charges[i] = cd && cd->charges ? std::uint8_t(cd->charges - a.charges_used) : 255;
+        }
         if (me->skill[std::size_t(i)]) {
             const ResolvedAbility ra = W.resolved(*me, Slot(i));
             m.s_range[i] = std::int32_t(ra.range);

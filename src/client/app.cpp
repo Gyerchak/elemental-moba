@@ -200,13 +200,15 @@ int App::run() {
         frame(now_s_);
         // autotest: screenshot + quit
         if (opt_.autotest_s > 0 && screen_ == Screen::Game && match_start_s_ >= 0 && now_s_ - match_start_s_ >= opt_.autotest_s && !shot_done_) {
+            // [U-446] --shots N: N frames in a row (shot_00.bmp …) → frame-to-frame glitches (flicker, jumps) can be compared
             if (!opt_.shot.empty())
                 if (SDL_Surface* s = SDL_RenderReadPixels(ren_, nullptr)) {
-                    SDL_SaveBMP(s, opt_.shot.c_str());
+                    std::string f = opt_.shot;
+                    if (opt_.shots > 1) f = std::format("{}_{:02}.bmp", f.substr(0, f.rfind('.')), shots_taken_);
+                    SDL_SaveBMP(s, f.c_str());
                     SDL_DestroySurface(s);
                 }
-            shot_done_ = true;
-            quit_ = true;
+            if (++shots_taken_ >= std::max(1, opt_.shots)) shot_done_ = true, quit_ = true;
         }
         SDL_RenderPresent(ren_);
         gfx::end_frame_text();

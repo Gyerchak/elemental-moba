@@ -52,7 +52,9 @@ void outlined(SDL_Renderer* r, float x, float y, std::string_view s, Rgba c, flo
 // [U-389] terrain models (trees, bushes, rocks, walls) are drawn ROW BY ROW interleaved with the units (see
 // draw_units): a unit standing behind a tree / wall is now hidden by it, one in front covers it. Rows reach further
 // on the side where tall models stand below the screen edge (their tops still show) → no pop-in.
-void GameView::terrain_begin() {
+void GameView::terrain_begin(NetClient& net) {
+    wall_pct_.clear();  // [U-438] damaged wall cells this frame
+    for (const auto& wh : net.cur.walls) wall_pct_[std::uint32_t(wh.y) * kGridSize + std::uint32_t(wh.x)] = wh.pct;
     terr_on_ = view_.hz > 0 && set_.tree_models && view_.zoom >= 0.2f;
     if (!terr_on_) return;
     const int up = int(std::ceil(300.f * view_.hz / std::max(0.1f, view_.gy) / kCellUnits)) + 1;  // tall models
@@ -102,18 +104,22 @@ void GameView::draw_terrain_row(NetClient& net, int y) {
                 fill_rect(r_, sx - 17 * z, top, 34 * z, gy - top, {104, 98, 90, 255});
                 fill_rect(r_, sx - 17 * z, top - 7 * z * view_.gy, 34 * z, 14 * z * view_.gy, {146, 140, 128, 255});
                 line(r_, sx - 6 * z, top + 6 * z, sx + 4 * z, gy - 6 * z, {80, 76, 70, 200});
+                draw_wall_cracks(x, y, top);
             } else if (c.wall() == Wall::Stone) {  // raised block
                 const float top = view_.sy_h(wy, 60);
                 fill_rect(r_, sx - 16 * z, top, 32 * z, gy - top, {84, 78, 70, 255});
                 fill_rect(r_, sx - 16 * z, top - 6 * z * view_.gy, 32 * z, 12 * z * view_.gy, {120, 112, 100, 255});
+                draw_wall_cracks(x, y, top);
             } else if (c.wall() == Wall::Ice) {
                 const float top = view_.sy_h(wy, 50);
                 fill_rect(r_, sx - 16 * z, top, 32 * z, gy - top, {190, 235, 250, 170});
+                draw_wall_cracks(x, y, top);
             } else if (c.wall() == Wall::Metal) {  // [U-288] steel plates with a shine
                 const float top = view_.sy_h(wy, 70);
                 fill_rect(r_, sx - 16 * z, top, 32 * z, gy - top, {120, 126, 138, 255});
                 fill_rect(r_, sx - 16 * z, top - 6 * z * view_.gy, 32 * z, 12 * z * view_.gy, {190, 196, 210, 255});
                 line(r_, sx - 10 * z, top + 4 * z, sx - 10 * z, gy - 4 * z, {225, 230, 240, 200});
+                draw_wall_cracks(x, y, top);
             }
         }
 }
@@ -172,24 +178,27 @@ void GameView::draw_wall_damage(NetClient& net) {
         if (!pushed && t < 0.6f)  // dust at the foot
             ground_fill(r_, view_, wx, wy, 20.f + 40.f * t, {150, 140, 125, std::uint8_t(120 * (1.f - t / 0.6f))}, 18);
     }
-    for (const auto& wh : net.cur.walls) {
-        const float wx = float(wh.x * kCellUnits + 16), wy = float(wh.y * kCellUnits + 16);
-        const float sx = view_.sx(wx), gy = view_.sy(wy), top = view_.sy_h(wy, 60);
-        // [U-379] three states: untouched (< 1/3 of the HP lost) · mildly cracked (1/3 … 2/3) · almost torn apart (> 2/3)
-        const int lost = 100 - wh.pct;
-        const int state = lost * 3 < 100 ? 0 : lost * 3 < 200 ? 1 : 2;
-        if (state == 0) continue;
-        fill_rect(r_, sx - 16 * z, top, 32 * z, gy - top, {20, 20, 20, std::uint8_t(state == 1 ? 40 : 120)});
-        const int cracks = state == 1 ? 2 : 5;
-        for (int k = 0; k < cracks; ++k) {
-            const float cx = sx + float((wh.x * 7 + k * 11) % 20 - 10) * z;
-            line(r_, cx, top + 2, cx + 5 * z, top + (gy - top) * 0.4f, {10, 10, 10, 230});
-            line(r_, cx + 5 * z, top + (gy - top) * 0.4f, cx - 3 * z, gy - 2, {10, 10, 10, 230});
-        }
-        if (state == 2)  // chunks already missing at the top edge
-            for (int k = 0; k < 3; ++k)
-                fill_rect(r_, sx + float((wh.y * 5 + k * 9) % 24 - 12) * z, top - 1, 6 * z, 7 * z, {0, 0, 0, 160});
+}
+
+// [U-379][U-438] the crack look of one damaged wall cell, drawn right ON the wall (inside its terrain row: drawn
+// before, the wall itself covered it). Three states: untouched (< 1/3 lost) · mildly cracked · almost torn apart.
+void GameView::draw_wall_cracks(int x, int y, float top) {
+    const auto it = wall_pct_.find(std::uint32_t(y) * kGridSize + std::uint32_t(x));
+    if (it == wall_pct_.end()) return;
+    const float z = view_.zoom;
+    const float sx = view_.sx(float(x * kCellUnits + 16)), gy = view_.sy(float(y * kCellUnits + 16));
+    const int lost = 100 - it->second;
+    const int state = lost * 3 < 100 ? 0 : lost * 3 < 200 ? 1 : 2;
+    if (state == 0) return;
+    fill_rect(r_, sx - 16 * z, top, 32 * z, gy - top, {20, 20, 20, std::uint8_t(state == 1 ? 40 : 120)});
+    const int cracks = state == 1 ? 2 : 5;
+    for (int k = 0; k < cracks; ++k) {
+        const float cx = sx + float((x * 7 + k * 11) % 20 - 10) * z;
+        line(r_, cx, top + 2, cx + 5 * z, top + (gy - top) * 0.4f, {10, 10, 10, 230});
+        line(r_, cx + 5 * z, top + (gy - top) * 0.4f, cx - 3 * z, gy - 2, {10, 10, 10, 230});
     }
+    if (state == 2)  // chunks already missing at the top edge
+        for (int k = 0; k < 3; ++k) fill_rect(r_, sx + float((y * 5 + k * 9) % 24 - 12) * z, top - 1, 6 * z, 7 * z, {0, 0, 0, 160});
 }
 
 // ---------------------------------------------------------------- clouds: steam, smoke, sand, snow [U-241]
@@ -356,7 +365,8 @@ void GameView::draw_units(NetClient& net, double now_s) {
         float H = height_of(u) * float(u.size_pct) / 100.f;
         float lift = anim == AnimSlot::FlySelf ? 60.f : anim == AnimSlot::FlyEnemy ? 40.f : 0.f;
         if (anim == AnimSlot::Swim) H *= 0.45f;                                                        // half under water
-        if (u.riding) lift += 45.f;  // [U-407] on the companion's back
+        if (u.riding && std::ranges::any_of(comp_draw_, [&](const net::NetCompanion& c) { return c.owner == u.id && c.carrying; }))
+            lift += 45.f;  // [U-407] on the companion's back (not while only waiting for it [U-429])
         if (anim == AnimSlot::Emote && u.emote == 2) lift += 8.f * float(std::abs(std::sin(now_s * 9)));  // dance bob
         const Rgba edge = kind == UnitKind::Champion ? (u.id == net.my_unit ? Rgba{255, 230, 80} : Rgba{20, 20, 20}) : Rgba{30, 30, 30, 200};
         const SpriteSheet* sheet = nullptr;
@@ -864,8 +874,7 @@ void GameView::draw_world(NetClient& net, double now_s) {
     for (const DrawUnit& du : draw_)  // enemy turret ranges, for my safety
         if (du.u.alive && du.u.kind == std::uint8_t(UnitKind::Turret) && du.u.team != net.my_team)
             ground_ring(r_, view_, du.x, du.y, 680 + 75, {255, 80, 60, 70}, 64);
-    terrain_begin();  // [U-389] the terrain rows are drawn between the units (draw_units)
-    draw_wall_damage(net);  // [U-288]
+    terrain_begin(net);  // [U-389] the terrain rows are drawn between the units (draw_units); cracks with them [U-438]
     draw_clouds(net);
     // skills [U-131]: fluid body + exact edge
     for (const auto& f : fx_draw_) {
@@ -916,6 +925,7 @@ void GameView::draw_world(NetClient& net, double now_s) {
     draw_ghosts(net);
     draw_companions(net, now_s);  // [U-407] under the riders
     draw_units(net, now_s);
+    draw_wall_damage(net);  // [U-288][U-341] falling pieces fly over everything
     draw_paths(net);
     draw_pings(net);
     draw_waves(net, now_s);

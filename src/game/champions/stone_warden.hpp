@@ -22,6 +22,6 @@ inline constexpr ChampionDef kStoneWarden{.name = "Stone Warden", .element = Ele
        .cc_ms = 1'000, .knock = 150, .pierce = true, .desc = "Rolling earth wave, knocks up", .ground = true, .ultimate = true},
  .p = {.name = "Rooted", .kind = K::Passive, .passive = PassiveId::Rooted, .desc = "+20 % tenacity"},
  .colour = 0xa08050, .role = Role::Tank,
- .q_pool = {"Lift and Throw", "Raise Stone", "Stone Push"}};  // [U-270] 3 Q options
+ .q_pool = {"Lift and Throw", "Raise Stone", "Stone Push", "Stone Wall", "Earth Pillar"}};  // [U-270] 3 Q options
 
 }  // namespace em::data

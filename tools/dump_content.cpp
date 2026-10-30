@@ -1,5 +1,6 @@
 // Prints every champion, skill and item as TSV: kind \t id \t element \t name \t description.
 // Used by tools/art/gen_art.py to build the ComfyUI prompt list (one icon / splash / texture per line).
+#include "game/loadout/loadout.hpp"
 #include "game/reference/interactions.hpp"
 #include <string_view>
 #include <cctype>
@@ -45,6 +46,14 @@ int main(int argc, char** argv) {
     for (int q = 0; q < int(q_options().size()); ++q) skill(q_options()[std::size_t(q)], q_option_element(q), "");
     for (const data::SpecialRow& r : data::kSpecialRows) skill(r.def, r.element, "");
     for (const ItemDef& i : kItems) std::println("item\t{}\tNone\t{}\t", slug(i.name), i.name);
+    // [U-432] runes + masteries (icons for the setup editor)
+    for (const auto& sec : kClassicRunes)
+        for (const RuneDef& r : sec) std::println("rune\t{}\tNone\t{}\t", slug(r.name), r.name);
+    for (const RuneDef& r : kQuints) std::println("rune\t{}\tNone\t{}\t", slug(r.name), r.name);
+    for (const MasteryTree& t : kMasteryTrees_)
+        for (const auto& tier : t.tiers)
+            for (const MasteryDef& m : tier)
+                if (m.max_rank) std::println("mastery\t{}\tNone\t{}\t{}", slug(m.name), m.name, t.name);
     // [U-304] hitbox circles (forward, side, radius in game units) → tools/art builds models that match them
     for (const auto& [name, b] : {std::pair{"humanoid", &kHumanoidBody}, {"slim", &kSlimBody}, {"broad", &kBroadBody},
                                   {"minion", &kMinionBody}, {"beast", &kBeastBody}}) {

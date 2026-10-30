@@ -39,7 +39,7 @@ def main():
         magick(src, PACK / "champions" / cid / "skins" / "shadow" / "splash.png", "-resize", "300x438", "-modulate", "55,70,90",
                "-colors", "200")
         n += 2
-    for cat, sub, size in (("skill", "icons/skills", "96x96"), ("item", "icons/items", "96x96"), ("source", "icons/sources", "96x96"),
+    for cat, sub, size in (("skill", "icons/skills", "96x96"), ("item", "icons/items", "96x96"), ("source", "icons/sources", "96x96"), ("rune", "icons/runes", "96x96"), ("mastery", "icons/masteries", "96x96"),
                            ("texture", "textures", "256x256"), ("screen", "screens", "1216x832")):
         for src in sorted((RAW / cat).glob("*.png")):
             magick(src, PACK / sub / f"{src.stem}.png", "-resize", size)

@@ -60,7 +60,8 @@ void World::set_cell(int cx, int cy, Cell c) {
     if (!Grid::in_bounds(cx, cy) || grid.at(cx, cy) == c) return;
     grid.at(cx, cy) = c;
     clearance_dirty = true;
-    cell_changes.push_back({std::int16_t(cx), std::int16_t(cy), c.raw(), std::uint8_t(cell_public_)});
+    cell_changes.push_back({std::int16_t(cx), std::int16_t(cy), c.raw(),
+                            std::uint8_t((cell_public_ ? 1 : 0) | (cell_team_ != Team::Neutral ? 2 << (int(cell_team_) & 1) : 0))});
     if (c.wall() == Wall::None) walls.erase(std::uint32_t(cy) * kGridSize + std::uint32_t(cx));  // [U-288]
 }
 
@@ -330,6 +331,7 @@ bool World::can_cast_now(const Unit& u, Slot s, std::string* why, std::int32_t s
     const bool water_free = water_skill(*d) && water_sourced(u, *d, sx, sy);
     if (water_skill(*d) && u.water_max > 0 && !water_free && u.water < elements::kAvatarWaterCost)
         return no("not enough water: bend it from a source (river, sea, pole ice, a puddle, an ice wall)");
+    if (const std::string_view w = nothing_to_act_on(u, *d, sx, sy); !w.empty()) return no(w.data());  // [U-426]
     if (u.st.has(StatusKind::Swimming) && d->kind != SkillKind::WaterSpout && d->kind != SkillKind::IcePath)
         return no("swimming: no spells (only water mobility skills)");  // [U-188]
     const bool recast = d->casts > 1 && a.mc.casts_used > 0 && a.mc.casts_used < d->casts && now_ms <= a.mc.window_end_ms;
@@ -342,6 +344,54 @@ bool World::can_cast_now(const Unit& u, Slot s, std::string* why, std::int32_t s
     const std::int64_t life = u.stats.resource == ResourceKind::Fuel ? std::max<std::int64_t>(0, u.hp - 100) / kLifePerFuel : 0;
     if (cost > 0 && !free_fuel && u.stats.resource != ResourceKind::Rage && u.res + life < cost) return no("not enough resource");
     return true;
+}
+
+bool World::can_target(const Unit& caster, const SkillDef& d, const Unit& t) const {
+    if (visible_to(caster.team, t)) return true;
+    const bool senses = has_passive(caster, PassiveId::SeismicSense) || has_passive(caster, PassiveId::HeatSense) ||
+                        has_passive(caster, PassiveId::WindSense);
+    const bool allowed = d.sensed_target == 1 || (d.sensed_target < 0 && senses);
+    return allowed && sensed_by(caster.team, t);
+}
+
+std::string_view World::nothing_to_act_on(const Unit& u, const SkillDef& d, std::int32_t sx, std::int32_t sy) const {
+    const std::int32_t reach = std::max<std::int32_t>(d.radius, 96);
+    auto cells_near = [&](auto&& pred) {  // any matching cell within `reach` of the caster
+        const int r = reach / kCellUnits + 1, cx = u.ux() / kCellUnits, cy = u.uy() / kCellUnits;
+        for (int y = cy - r; y <= cy + r; ++y)
+            for (int x = cx - r; x <= cx + r; ++x)
+                if (Grid::in_bounds(x, y) && (x - cx) * (x - cx) + (y - cy) * (y - cy) <= r * r && pred(grid.at(x, y))) return true;
+        return false;
+    };
+    auto cloud_near = [&](std::initializer_list<CloudKind> kinds) {
+        for (const Cloud& c : clouds)
+            if (std::ranges::find(kinds, c.kind) != kinds.end() && dist2(c.x, c.y, u.ux(), u.uy()) <= std::int64_t(reach + c.radius) * (reach + c.radius))
+                return true;
+        return false;
+    };
+    switch (d.kind) {
+        case SkillKind::IcePath:
+            if (fire_family(d.sub)) {  // Heat Draw: lava, steam or ice to draw the heat / water from
+                if (!cells_near([](Cell c) { return c.surface() == Surface::Magma; }) && !cloud_near({CloudKind::Steam, CloudKind::IcePatch}))
+                    return "nothing to draw heat from here (no lava, steam or ice near you)";
+            } else if (!cells_near([](Cell c) { return c.surface() == Surface::Water || c.surface() == Surface::DeepWater; })) {
+                return "no water near you to freeze";
+            }
+            return {};
+        case SkillKind::WaterSpout:
+            if (!on_any_water(u)) return "needs water under you";
+            return {};
+        case SkillKind::StonePush:
+            for (const Effect& f : fx)
+                if (!f.dead && f.kind == FxKind::Boulder && f.vx == 0 && f.vy == 0 &&
+                    dist2(f.ux(), f.uy(), u.ux(), u.uy()) <= std::int64_t(d.range) * d.range)
+                    return {};
+            return "no lifted stone in reach (lift one first — yours or an ally's)";
+        case SkillKind::MoveWater:
+            if (water_sourced(u, d, sx, sy) || u.stats.resource == ResourceKind::Water || u.water_max > 0) return {};
+            return "no water to move (pick a river, the sea, a puddle or ice)";
+        default: return {};
+    }
 }
 
 void World::recompute_stats(Unit& u) {
@@ -530,8 +580,13 @@ void World::command(std::uint32_t id, const Cmd& c) {
             const SkillDef* d = u.skill[std::size_t(s)];
             if (d->targeted) {  // walk into range first
                 const Unit* t = find(c.target);
-                if (!t || t->team == u.team || !visible_to(u.team, *t)) {
-                    refuse(u, std::format("{}: click on a visible enemy", d->name));
+                if (!t && c.target == 0)  // [U-431] a click on a sense wave: the sensed enemy nearest that point
+                    for (const Unit& o : units)
+                        if (o.alive && o.team != u.team && o.team != Team::Neutral && sensed_by(u.team, o) &&
+                            dist2(o.ux(), o.uy(), c.x, c.y) <= 110LL * 110 && (!t || dist2(o.ux(), o.uy(), c.x, c.y) < dist2(t->ux(), t->uy(), c.x, c.y)))
+                            t = &o;
+                if (!t || t->team == u.team || !can_target(u, *d, *t)) {
+                    refuse(u, std::format("{}: click on a visible (or sensed) enemy", d->name));
                     break;
                 }
                 u.order = {OrderKind::Cast, c.target, t->ux(), t->uy(), std::uint8_t(s)};

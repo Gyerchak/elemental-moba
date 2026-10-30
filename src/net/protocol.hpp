@@ -16,7 +16,7 @@
 
 namespace em::net {
 
-inline constexpr std::uint16_t kProtocol = 11;  // 11: rule sets, own emotes [U-414][U-416]  // 7: ten item slots [U-322]; 8: cast sources [U-340]; 9: camps, jungle buffs [U-364..U-366]; 10: bounties, companions [U-407][U-413]
+inline constexpr std::uint16_t kProtocol = 12;  // 12: maps, lobby owner / queue, charges [U-420..U-433]  // 11: rule sets, own emotes [U-414][U-416]  // 7: ten item slots [U-322]; 8: cast sources [U-340]; 9: camps, jungle buffs [U-364..U-366]; 10: bounties, companions [U-407][U-413]
 inline constexpr std::string_view kVersion = "official-0.1";  // [U-95][X-14]
 inline constexpr std::uint16_t kDefaultPort = 7777;
 inline constexpr int kMaxPlayers = 32;  // [U-09]
@@ -95,6 +95,12 @@ public:
         put<std::uint16_t>(std::uint16_t(std::min<std::size_t>(s.size(), 4'000)));
         buf.insert(buf.end(), s.begin(), s.begin() + std::min<std::size_t>(s.size(), 4'000));
     }
+    // [U-425] a long text (own champion files: up to 16 000 bytes, the .champ limit) — never cut
+    void long_str(std::string_view s) {
+        const std::size_t n = std::min<std::size_t>(s.size(), 16'000);
+        put<std::uint32_t>(std::uint32_t(n));
+        buf.insert(buf.end(), s.begin(), s.begin() + std::ptrdiff_t(n));
+    }
     std::vector<std::uint8_t> buf;
 };
 
@@ -111,6 +117,16 @@ public:
         std::memcpy(&v, d_.data() + pos_, sizeof(T));
         pos_ += sizeof(T);
         return v;
+    }
+    std::string long_str() {  // [U-425]
+        const std::uint32_t n = get<std::uint32_t>();
+        if (n > 16'000 || pos_ + n > d_.size()) {
+            bad_ = true;
+            return {};
+        }
+        std::string s(reinterpret_cast<const char*>(d_.data() + pos_), n);
+        pos_ += n;
+        return s;
     }
     std::string str() {
         const std::uint16_t n = get<std::uint16_t>();
@@ -326,6 +342,7 @@ struct NetMe {
     std::int32_t jbuff_ms;        // … time left
     std::int32_t water, water_max;  // [U-339] the Avatar's carried water
     std::int16_t lion_stacks[2];    // [U-364] Lion Turtle stacks per team
+    std::uint8_t charges[kSkillSlots];  // [U-433] charges ready per skill (255 = the skill has no charges)
 };
 
 // [U-407] a travel companion on its way (or carrying its rider home)

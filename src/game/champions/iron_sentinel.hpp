@@ -23,6 +23,6 @@ inline constexpr ChampionDef kIronSentinel{.name = "Iron Sentinel", .element = E
        .desc = "Ring of metal walls around a point", .ultimate = true},
  .p = {.name = "Metal Skin", .kind = K::Passive, .passive = PassiveId::MetalSkin, .desc = "+15 defence"},
  .colour = 0xb8c0c8, .role = Role::Fighter,
- .q_pool = {"Metal Cable", "Iron Cleave", "Heavy Stone"}};  // [U-270] 3 Q options
+ .q_pool = {"Lift and Throw", "Raise Stone", "Stone Push", "Stone Wall", "Earth Pillar", "Metal Cable"}};  // [U-270] 3 Q options
 
 }  // namespace em::data

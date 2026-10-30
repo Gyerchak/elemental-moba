@@ -221,6 +221,9 @@ void App::champ_select() {
     draw_team(pick_team_, 16);
     draw_team(1 - pick_team_, W - 266);
     if (button(ren_, ui_, 16, H - 46, 250, 32, tr("Switch team"))) pick_team_ = 1 - pick_team_, send_pick();
+    // [U-429] the travel companion (recall) — also in Options → Game; sent when the match starts
+    if (button(ren_, ui_, 16, H - 82, 250, 30, std::format("{}: {}", tr("Companion"), tr(kCompanionNames[std::size_t(std::clamp(set_.companion, 0, 5))])), false))
+        set_.companion = (std::clamp(set_.companion, 0, 5) + 1) % int(CompanionKind::Count), set_.save();
 
     // ---- filters [U-180]
     const float gx = 290, gw = W - 580;
@@ -408,7 +411,7 @@ void App::champ_select() {
     const float chat_y = 86 + 58.f * 6;
     if (button(ren_, ui_, 16, chat_y - 26, 120, 22, tr("Team chat"), chat_channel_ == net::Chat::Team)) chat_channel_ = net::Chat::Team;
     if (button(ren_, ui_, 140, chat_y - 26, 126, 22, tr("Lobby chat"), chat_channel_ == net::Chat::Lobby)) chat_channel_ = net::Chat::Lobby;
-    draw_chat_box(16, chat_y, 250, H - chat_y - 56, chat_channel_);
+    draw_chat_box(16, chat_y, 250, H - chat_y - 92, chat_channel_);  // (room for the companion button [U-429])
 
     // ---- ready / start / leave
     const float bx = W - 266;
@@ -422,20 +425,24 @@ void App::champ_select() {
                 if (s.id == net_.my_id) queued = s.queued;
             if (button(ren_, ui_, bx, H - 278, 250, 26, std::format("{}: {}", tr("Queue map"), maps()[std::size_t(queue_map_)].name), false, !queued))
                 queue_map_ = (queue_map_ + 1) % int(maps().size());
-            if (button(ren_, ui_, bx, H - 248, 250, 26, std::format("{}: {}", tr("Mode"), tr(kRuleSetNames[queue_rules_])), false, !queued))
-                queue_rules_ = (queue_rules_ + 1) % int(RuleSet::Count);
+            if (button(ren_, ui_, bx, H - 248, 250, 26, std::format("{}: {}", tr("Mode"), tr(kGameModeNames[queue_rules_])), false, !queued))
+                queue_rules_ = (queue_rules_ + 1) % int(GameMode::Count);  // [U-454] the queue is map + game mode
             int same = 0;
             for (const auto& s : net_.lobby) same += s.queued && s.q_map == queue_map_ && s.q_rules == queue_rules_;
             if (button(ren_, ui_, bx, H - 218, 250, 30, queued ? std::format("{} ({} {})", tr("Leave the queue"), same, tr("in it"))
                                                               : std::format("{} ({} {})", tr("Find a match"), same, tr("waiting")), queued))
                 net_.send_queue(!queued, queue_map_, queue_rules_);
         } else {
-            if (button(ren_, ui_, bx, H - 248, 250, 26, std::format("{}: {}", tr("Map"), md.name), false, i_own))
-                net_.send_lobby_config((map_index(md.id) + 1) % int(maps().size()), net_.ruleset);
-            if (button(ren_, ui_, bx, H - 218, 250, 26, std::format("{}: {}", tr("Rules"), tr(kRuleSetNames[std::min<int>(net_.ruleset, 2)])), false, i_own))
-                net_.send_lobby_config(map_index(md.id), (net_.ruleset + 1) % int(RuleSet::Count));
+            if (button(ren_, ui_, bx, H - 278, 250, 26, std::format("{}: {}", tr("Map"), md.name), false, i_own))
+                net_.send_lobby_config((map_index(md.id) + 1) % int(maps().size()), net_.ruleset, net_.mode);
+            // [U-454] the game mode (how champions are chosen) and — separately — which systems are on
+            if (button(ren_, ui_, bx, H - 248, 250, 26, std::format("{}: {}", tr("Mode"), tr(kGameModeNames[std::min<int>(net_.mode, 2)])), false, i_own))
+                net_.send_lobby_config(map_index(md.id), net_.ruleset, (net_.mode + 1) % int(GameMode::Count));
+            if (button(ren_, ui_, bx, H - 218, 250, 26, std::format("{}: {}", tr("Systems"), tr(kRuleSetNames[std::min<int>(net_.ruleset, 2)])), false, i_own))
+                net_.send_lobby_config(map_index(md.id), (net_.ruleset + 1) % int(RuleSet::Count), net_.mode);
         }
-        text(ren_, bx, H - 300, fit_text(std::string(md.desc), 250), {150, 160, 180});
+        text(ren_, bx, H - 314, fit_text(std::string(md.desc), 250), {150, 160, 180});
+        text(ren_, bx, H - 300, fit_text(tr(kGameModeDescs[std::min<int>(net_.queue_mode ? queue_rules_ : net_.mode, 2)]), 250), {150, 160, 180});
         // [U-422] invite: a join link to the clipboard (paste it into Multiplayer → Direct connect)
         if (button(ren_, ui_, bx, H - 186, 120, 30, tr("Invite"))) {
             const std::string link = std::format("em-join://{}:{}", invite_address(net_.address), net_.port);

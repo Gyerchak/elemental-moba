@@ -91,7 +91,8 @@ inline constexpr QOptionRow kQOptions[] = {
         .desc = "Dash strike: blocks chi = no bending 1.5 s [U-77]"}},
     // (first made for Chi Blocker)
     {Element::None, {.name = "Knife Throw", .kind = K::Bolt, .dmg = 60, .dmg_rank = 35, .ad = 90, .range = 850, .width = 50,
-        .speed = 2'000, .cast_ms = 150, .cd_ms = 5'000, .cost = 40, .desc = "Thrown knife"}},
+        .speed = 2'000, .cast_ms = 150, .cd_ms = 5'000, .cost = 40, .desc = "Thrown knife — 3 charges, one back every 6 s [U-433]",
+        .charges = 3, .charge_ms = 6'000}},
     // [U-270] third non-bender option (Claude idea)
     {Element::None, {.name = "Bolas Throw", .kind = K::Bolt, .dmg = 45, .dmg_rank = 25, .ad = 70, .range = 750, .width = 70,
         .speed = 1'600, .cast_ms = 200, .cd_ms = 9'000, .cost = 45, .cc = C::Slow, .cc_ms = 1'500, .cc_val = 35,
@@ -108,6 +109,14 @@ inline constexpr QOptionRow kQOptions[] = {
     {Element::Earth, {.name = "Stone Push", .kind = K::StonePush, .sub = S::Earth, .dmg = 120, .dmg_rank = 55, .ep = 60, .ad = 30,
         .range = 900, .width = 66, .speed = 1'400, .cast_ms = 200, .cd_ms = 7'000, .cc = C::Stun, .cc_ms = 900,
         .desc = "Click a lifted stone (yours or anyone's), then where it flies: a strong hit + stun. Needs a lifted stone nearby"}},
+    // [U-437] structure-making Qs: a short stone wall and an earth pillar (earth), an ice block (water)
+    {Element::Earth, {.name = "Stone Wall", .kind = K::Wall, .sub = S::Earth, .dmg = 0, .ep = 0, .ad = 10, .range = 650, .width = 200,
+        .cast_ms = 250, .cd_ms = 12'000, .dur_ms = 4'000, .desc = "Two pieces of stone wall (level 1, 300 HP each)", .wall_level = 1}},
+    {Element::Earth, {.name = "Earth Pillar", .kind = K::Pillar, .sub = S::Earth, .dmg = 60, .dmg_rank = 30, .ep = 40, .ad = 20, .range = 650,
+        .radius = 70, .cast_ms = 350, .cd_ms = 10'000, .dur_ms = 2'500, .cc = C::Airborne, .cc_ms = 600,
+        .desc = "A pillar rises: enemies on it are thrown up (allies are never lifted)", .ground = true}},
+    {Element::Water, {.name = "Ice Block", .kind = K::Wall, .sub = S::Ice, .ep = 0, .range = 600, .width = 100, .cast_ms = 250,
+        .cd_ms = 10'000, .cost = 320, .dur_ms = 3'000, .desc = "One block of ice (100 HP) from a water source", .wall_level = 1}},
 };
 
 }  // namespace em::data

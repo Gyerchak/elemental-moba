@@ -58,7 +58,18 @@ struct Ctx {
     Ui& ui;
     std::vector<std::string> tip;  // the hover tooltip, drawn last
     bool changed = false;
+    Resources* res = nullptr;  // [U-432] icons of runes / masteries (icons/runes/<name>.png, icons/masteries/<name>.png)
     bool left(float x, float y, float w, float h) const { return ui.clicked && hover(ui, x, y, w, h); }
+    // a square icon; returns how much room it took (0 when the pack has no picture yet)
+    float icon(const char* folder, std::string_view name, float x, float y, float s, bool dim) const {
+        SDL_Texture* t = res ? res->texture(std::format("icons/{}/{}.png", folder, Resources::slug(name))) : nullptr;
+        if (!t) return 0;
+        const SDL_FRect d{x, y, s, s};
+        if (dim) SDL_SetTextureColorMod(t, 110, 110, 110);
+        SDL_RenderTexture(r, t, nullptr, &d);
+        if (dim) SDL_SetTextureColorMod(t, 255, 255, 255);
+        return s + 4;
+    }
     bool right(float x, float y, float w, float h) const { return ui.rclicked && hover(ui, x, y, w, h); }
 };
 
@@ -91,8 +102,9 @@ float tab_runes(Ctx& c, float x, float y, float w, Loadout& lo) {
             fill_rect(c.r, cx, y, cw, 46, n ? Rgba{70, 50, 30, 235} : hv ? Rgba{60, 60, 80, 235} : Rgba{34, 34, 46, 225});
             rect(c.r, cx, y, cw, 46, n ? kKindColour[k] : Rgba{100, 100, 130});
             fill_rect(c.r, cx, y, 4, 46, kKindColour[k]);
-            text(c.r, cx + 9, y + 5, fit_text(tr(d.name), cw - 44), {235, 235, 240});
-            text(c.r, cx + 9, y + 24, fit_text(fmt_mod(d.mod), cw - 14), {170, 210, 170});
+            const float ic = c.icon("runes", d.name, cx + 7, y + 3, 40, n == 0);  // [U-432]
+            text(c.r, cx + 9 + ic, y + 5, fit_text(tr(d.name), cw - 44 - ic), {235, 235, 240});
+            text(c.r, cx + 9 + ic, y + 24, fit_text(fmt_mod(d.mod), cw - 14 - ic), {170, 210, 170});
             if (n) text(c.r, cx + cw - 30, y + 5, std::format("x{}", n), {255, 220, 120});
             if (c.left(cx, y, cw, 46) && used < kClassicSlots) ++n, c.changed = true, c.ui.clicked = false;
             if (c.right(cx, y, cw, 46) && n > 0) --n, c.changed = true, c.ui.rclicked = false;
@@ -154,8 +166,9 @@ float tab_masteries(Ctx& c, float x, float y, float w, Loadout& lo, int& tree) {
             Rgba bg = !open ? Rgba{24, 24, 28, 230} : rank ? Rgba{75, 52, 28, 235} : hv ? Rgba{62, 62, 84, 235} : Rgba{40, 40, 56, 230};
             fill_rect(c.r, nx, y, nw, nh, bg);
             rect(c.r, nx, y, nw, nh, !open ? Rgba{55, 55, 62} : rank ? Rgba{255, 190, 90} : Rgba{110, 110, 140});
-            text(c.r, nx + 6, y + 5, fit_text(tr(d.name), nw - 12), open ? Rgba{235, 235, 240} : Rgba{100, 100, 108});
-            text(c.r, nx + 6, y + 26, fit_text(fmt_mod(d.mod), nw - 60), open ? Rgba{170, 210, 170} : Rgba{90, 100, 90});
+            const float ic = c.icon("masteries", d.name, nx + 4, y + 4, 38, !open || rank == 0);  // [U-432]
+            text(c.r, nx + 6 + ic, y + 5, fit_text(tr(d.name), nw - 56 - ic), open ? Rgba{235, 235, 240} : Rgba{100, 100, 108});
+            text(c.r, nx + 6 + ic, y + 26, fit_text(fmt_mod(d.mod), nw - 60 - ic), open ? Rgba{170, 210, 170} : Rgba{90, 100, 90});
             for (int p = 0; p < d.max_rank; ++p) {  // pips + the number
                 const float px = nx + nw - 8 - float(d.max_rank - p) * 9;
                 fill_rect(c.r, px, y + 27, 7, 7, p < rank ? Rgba{255, 210, 90} : Rgba{50, 50, 60});
@@ -249,7 +262,7 @@ float tab_spec(Ctx& c, float x, float y, float w, Loadout& lo) {
 
 // ---------------------------------------------------------------- tab 3 + 4 are App members (they use the item browser / shop_)
 void App::setup_editor(float x, float y, float w, float h, SavedSetup& s) {
-    Ctx c{ren_, ui_, {}, false};
+    Ctx c{ren_, ui_, {}, false, &res_};
     int sw = 0, sh = 0;
     SDL_GetRenderOutputSize(ren_, &sw, &sh);
     // ---- tabs

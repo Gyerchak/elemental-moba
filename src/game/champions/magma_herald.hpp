@@ -23,6 +23,6 @@ inline constexpr ChampionDef kMagmaHerald{.name = "Magma Herald", .element = Ele
        .desc = "Eruption at a point", .ultimate = true},
  .p = {.name = "Molten", .kind = K::Passive, .passive = PassiveId::Molten, .desc = "Lava fields last +1 s"},
  .colour = 0xe04010, .role = Role::Mage,
- .q_pool = {"Lava Glob", "Magma Spit", "Rock Throw"}};  // [U-270] 3 Q options
+ .q_pool = {"Lift and Throw", "Raise Stone", "Stone Push", "Stone Wall", "Earth Pillar", "Lava Glob"}};  // [U-270] 3 Q options
 
 }  // namespace em::data

@@ -99,6 +99,11 @@ void World::raise_ring(std::int32_t x, std::int32_t y, std::int32_t radius, std:
 
 void World::raise_segment(std::int32_t x, std::int32_t y, Dir along, Wall kind, std::int32_t life_ms, Team by_team, bool earthbending,
                           const WallSpec& ws) {
+    struct TeamMark {  // [U-436] the cells changed here show at once on by_team's map
+        Team& t;
+        ~TeamMark() { t = Team::Neutral; }
+    } mark{cell_team_};
+    cell_team_ = by_team;
     const Dir side{-along.y, along.x};
     std::vector<std::uint32_t> cells;
     const int half_t = std::max(8, ws.thick / 2);
@@ -160,15 +165,21 @@ void World::raise_segment(std::int32_t x, std::int32_t y, Dir along, Wall kind, 
 }
 
 void World::raise_pillar(std::int32_t x, std::int32_t y, std::int32_t radius, std::int32_t life_ms, Team by_team) {
+    struct TeamMark {  // [U-436] the cells changed here show at once on by_team's map
+        Team& t;
+        ~TeamMark() { t = Team::Neutral; }
+    } mark{cell_team_};
+    cell_team_ = by_team;
     const int r = radius / kCellUnits;
     const int ccx = x / kCellUnits, ccy = y / kCellUnits;
     for (int cy = ccy - r; cy <= ccy + r; ++cy)
         for (int cx = ccx - r; cx <= ccx + r; ++cx) {
             if (!Grid::in_bounds(cx, cy) || (cx - ccx) * (cx - ccx) + (cy - ccy) * (cy - ccy) > r * r || protected_cell(cx, cy)) continue;
-            Cell c = grid.at(cx, cy);
-            remember(cell_timers, cx, cy, c.raw(), now_ms + life_ms, CellTimerKind::Restore);
-            c.set_temp_elevation(c.elevation() + 2);  // [U-45][U-93] 2 levels: cannot walk up
-            set_cell(cx, cy, c);
+            // [U-434] never under the caster's own team (the knock-up is for enemies; allies are not lifted / trapped)
+            const Circle cell{cx * kCellUnits + kCellUnits / 2, cy * kCellUnits + kCellUnits / 2, kCellUnits / 2};
+            if (std::ranges::any_of(units, [&](const Unit& o) { return o.alive && o.team == by_team && !o.is_structure() && touches(hitbox(o), cell); }))
+                continue;
+            raise_ground(cx, cy, 2, now_ms + life_ms);  // [U-45][U-93] 2 levels: cannot walk up; [U-440] adds to earlier raises
             earth_events.push_back({cx, cy});
             earth_event_team.push_back(by_team);
         }
@@ -346,6 +357,7 @@ void World::lava_melts_walls() {
 void World::step_terrain() {
     std::erase_if(clouds, [&](const Cloud& c) { return c.until_ms <= now_ms; });
     lava_melts_walls();
+    step_elevation();  // [U-440]
     if (tick % cfg.tick_hz == 0) std::erase_if(segs, [&](const auto& kv) { return kv.second.until_ms + 1'000 < now_ms; });  // [U-380]
     for (std::size_t i = 0; i < cell_timers.size();) {
         CellTimer& t = cell_timers[i];
@@ -376,6 +388,13 @@ void World::step_terrain() {
             wall_breaks.push_back({t.x, t.y, 0, 0, std::uint8_t(was.wall()), now_ms});  // [U-341] crumbles by time
         set_cell(t.x, t.y, Cell(t.raw));
         cell_public_ = false;
+        // [U-439] terrain that comes BACK by itself (a map rock, a tree regrowing): whoever stands there is moved to the
+        // closest free spot. (Walls made by skills trap on purpose; they are raised, not restored.)
+        if (const Cell back(t.raw); back.wall() != Wall::None || back.tree() == Tree::Alive || back.walk() == Walk::Blocked) {
+            const Circle cell{t.x * kCellUnits + kCellUnits / 2, t.y * kCellUnits + kCellUnits / 2, kCellUnits / 2};
+            for (Unit& o : units)
+                if (o.alive && !o.flying() && !o.is_structure() && o.kind != UnitKind::Inhibitor && touches(hitbox(o), cell)) place_on_walkable(o);
+        }
         t = cell_timers.back();
         cell_timers.pop_back();
     }
@@ -409,6 +428,36 @@ void World::drop_rock(std::int32_t x, std::int32_t y, bool magma) {
     set_cell(cx, cy, c);
     add_wall_cell(cx, cy, Wall::Stone);
     if (magma) glows.push_back({{x, y, 96, 80}, now_ms + 3'000});
+}
+
+// [U-440] raised ground in layers: 1 + 1 = 2 where two raises overlap; each layer ends on its own time
+void World::raise_ground(int cx, int cy, int amount, std::int64_t until_ms) {
+    if (!Grid::in_bounds(cx, cy) || amount == 0) return;
+    elev_layers_.push_back({std::int16_t(cx), std::int16_t(cy), std::int8_t(amount), until_ms});
+    apply_elevation(cx, cy);
+}
+
+void World::apply_elevation(int cx, int cy) {
+    Cell c = grid.at(cx, cy);
+    if (c.wall() != Wall::None) return;  // a wall segment keeps its own height
+    int sum = 0;
+    for (const ElevLayer& l : elev_layers_)
+        if (l.x == cx && l.y == cy && l.until_ms > now_ms) sum += l.amount;
+    if (sum == 0) c.clear_temp_elevation();
+    else c.set_temp_elevation(c.elevation() + sum);
+    set_cell(cx, cy, c);
+}
+
+void World::step_elevation() {
+    std::vector<std::pair<int, int>> ended;
+    std::erase_if(elev_layers_, [&](const ElevLayer& l) {
+        if (l.until_ms > now_ms) return false;
+        ended.push_back({l.x, l.y});
+        return true;
+    });
+    cell_public_ = true;  // (ground sinking back by time: every map shows it, like walls falling)
+    for (const auto& [x, y] : ended) apply_elevation(x, y);
+    cell_public_ = false;
 }
 
 bool World::rock_source_at(std::int32_t x, std::int32_t y) const {

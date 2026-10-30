@@ -136,7 +136,7 @@ std::string parse_text(const std::string& text, ChampionDef& out) {
         else if (k == "resource_regen") ok = number(out.res_regen, 100);
         else if (k == "hp_per_level") ok = number(out.hp_lvl, 100);
         else if (k == "attack_per_level") ok = number(out.attack_lvl, 100);
-        else if (k == "q1" || k == "q2" || k == "q3") {  // the 3 Q options (names of existing Q skills)
+        else if (k.size() == 2 && k[0] == 'q' && k[1] >= '1' && k[1] <= '6') {  // the Q options q1 … q6 (names of existing Q skills)
             const bool known = std::ranges::any_of(q_options(), [&](const SkillDef& q) { return q.name == v; });
             if (!known) return std::format("line {}: '{}' is not a Q option", n, v);
             out.q_pool[std::size_t(k[1] - '1')] = keep(v);
@@ -220,6 +220,11 @@ std::string parse_text(const std::string& text, ChampionDef& out) {
             else if (f == "wall_hp_rank") ok = num(sk.wall_hp_rank, 0, 30'000);
             else if (f == "wall_segs") ok = num(sk.wall_segs, 0, 20);
             else if (f == "control") ok = num(sk.control, 0, 2);
+            else if (f == "sensed_target") ok = num(sk.sensed_target, -1, 1);  // [U-431]
+            else if (f == "self_root_ms") ok = num(sk.self_root_ms, -1, 5'000);  // [U-434]
+            else if (f == "charges") ok = num(sk.charges, 0, 9);               // [U-433]
+            else if (f == "charge_ms") ok = num(sk.charge_ms, 0, 600'000);
+            else if (f == "charge_gap_ms") ok = num(sk.charge_gap_ms, 0, 10'000);
             // [U-416] passive procs with their own cooldown
             else if (f == "proc") ok = num(sk.proc, 0, 4);
             else if (f == "proc_cd_ms") ok = num(sk.proc_cd_ms, 0, 600'000);

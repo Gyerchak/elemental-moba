@@ -80,6 +80,8 @@ struct AbilityRt {
     std::int64_t cd_end_ms = 0;
     MulticastState mc;           // [U-106]
     std::uint32_t boulder = 0;   // [U-27] raised boulder waiting for its push
+    std::uint8_t charges_used = 0;       // [U-433] charges spent (0 = all ready) …
+    std::int64_t charge_next_ms = 0;     // … the next one comes back then
 };
 
 // [X-94] Collision layers. Every check uses the whole body border, not the centre [U-130].
@@ -239,6 +241,7 @@ struct Unit {
     CompanionKind companion = CompanionKind::SkyBison;  // [U-407] chosen travel animal
     bool riding = false;                // [U-407] carried home by the companion: no moving, casting or attacking
     std::int64_t proc_ready_ms = 0;     // [U-416] the passive's own cooldown (procs)
+    std::array<std::int64_t, 2> sensed_until{};  // [U-431] sensed by team 0 / 1 (seismic, heat, sound) until then
     std::uint8_t steer_slot = 0;        // [U-402] steering this skill's projectiles …
     std::int32_t steer_x = 0, steer_y = 0;
     std::int64_t steer_until = 0;       // … while the key is held (refreshed by every Steer command)
@@ -334,7 +337,13 @@ struct WaveOut {
 struct CellChange {
     std::int16_t x = 0, y = 0;
     std::uint32_t raw = 0;
-    std::uint8_t pub = 0, pad[3]{};  // [U-288] 1 = a change by time (regrowth, a wall falling): every map shows it at once
+    std::uint8_t pub = 0, pad[3]{};  // [U-288] bit 1 = a change by time: every map shows it at once; [U-436] bit 2 / 4 = only
+                                     // the Fire / Earth team's map (its own bending: the creator's team sees it without vision)
+};
+struct ElevLayer {  // [U-440] one raise of the ground on one cell: they ADD UP and each ends on its own
+    std::int16_t x = 0, y = 0;
+    std::int8_t amount = 0;
+    std::int64_t until_ms = 0;
 };
 struct WallCell {  // [U-288] a player-made wall cell
     std::int32_t hp = 0, max = 0;
@@ -424,19 +433,25 @@ struct MatchConfig {
     bool practice = false;                       // [U-100] cheats allowed
     std::uint32_t seed = 1;
     bool classic_recall = false;                 // [U-407] true = the old 6 s recall channel instead of a companion
-    // [U-416] rule set: Elemental (this game) or a classic one that switches on what LoL / Dota have and this game
-    // leaves out: lifesteal, omnivamp, healing reduction (both), denying own minions (Dota)
+    // [U-416][U-454] ONE unified game: every system is on (vamp, healing reduction, denies, the elemental systems).
+    // `ruleset` only narrows it down when wanted: only the LoL-like code (no denies) or only the Dota-like code.
     std::uint8_t ruleset = 0;                    // RuleSet
+    std::uint8_t mode = 0;                       // [U-454] GameMode (how champions are picked) — a different thing
     std::uint8_t map = 0;                        // [U-420] index in maps() (game/match/maps.hpp)
 };
-enum class RuleSet : std::uint8_t { Elemental, LeagueLike, DotaLike, Count };
-inline constexpr const char* kRuleSetNames[] = {"Elemental", "LoL-like", "Dota-like"};
-[[nodiscard]] constexpr bool classic_rules(std::uint8_t r) { return r == std::uint8_t(RuleSet::LeagueLike) || r == std::uint8_t(RuleSet::DotaLike); }
-[[nodiscard]] constexpr bool denies_allowed(std::uint8_t r) { return r == std::uint8_t(RuleSet::DotaLike); }
+enum class RuleSet : std::uint8_t { AllSystems, LeagueLike, DotaLike, Count };
+inline constexpr const char* kRuleSetNames[] = {"All systems", "LoL-like only", "Dota-like only"};
+[[nodiscard]] constexpr bool classic_rules(std::uint8_t) { return true; }  // [U-454] vamp + healing reduction: always on
+[[nodiscard]] constexpr bool denies_allowed(std::uint8_t r) { return r != std::uint8_t(RuleSet::LeagueLike); }  // LoL has no denies
+// [U-454] game modes: how the champions are chosen (maps and systems are separate choices)
+enum class GameMode : std::uint8_t { Classic, BlindPick, AllRandom, Count };
+inline constexpr const char* kGameModeNames[] = {"Classic", "Blind Pick", "All Random"};
+inline constexpr const char* kGameModeDescs[] = {"pick your champion, see the others' picks", "nobody sees the enemy picks until the match",
+                                                 "everyone gets a random champion"};
 
 // [U-407] Travel companions: recall calls the chosen animal from the base; it runs to the champion and carries them
 // home. Cannot be interrupted or cancelled; the rider can be hit and killed on the way.
-inline constexpr std::int32_t kCompanionSpeed = 1'000;  // units / s, both ways
+inline constexpr std::int32_t kCompanionSpeed = 1'500;  // units / s, both ways [U-429]
 struct Companion {
     std::uint32_t owner = 0;
     CompanionKind kind = CompanionKind::SkyBison;
@@ -483,6 +498,11 @@ public:
     [[nodiscard]] std::pair<std::int32_t, std::int32_t> fountain(Team t) const;  // units
     [[nodiscard]] std::int32_t attack_period_ms(const Unit& u) const;
     [[nodiscard]] bool can_cast_now(const Unit& u, Slot s, std::string* why = nullptr, std::int32_t sx = -1, std::int32_t sy = -1) const;
+    // [U-426] a skill that only acts on something in the world (lava, water, a lifted stone…) is refused when there is
+    // nothing — it is never "burned" on nothing (no cooldown, no cost). Returns the reason, or "" when it may be cast.
+    [[nodiscard]] bool sensed_by(Team t, const Unit& o) const { return t != Team::Neutral && o.sensed_until[std::size_t(t) & 1] > now_ms; }
+    [[nodiscard]] bool can_target(const Unit& caster, const SkillDef& d, const Unit& t) const;  // [U-431] seen, or sensed if allowed
+    [[nodiscard]] std::string_view nothing_to_act_on(const Unit& u, const SkillDef& d, std::int32_t sx, std::int32_t sy) const;
     [[nodiscard]] PassiveId special_passive(const Unit& u) const;  // seismic / heat sense from F/G
     [[nodiscard]] bool has_passive(const Unit& u, PassiveId p) const;
     // ---- water and elevation [U-188..U-191]
@@ -583,7 +603,11 @@ public:
     std::vector<std::uint8_t> struct_block;  // cells under alive structures (never bendable) [X-95]
     std::vector<std::uint8_t> clearance;     // cells to the nearest blocker (Chebyshev, max 7) for A*
     std::vector<Circle> rock_bodies_;
-    std::vector<Effect> fx_pending_;         // [U-383] effects made while the effect loop runs (added after it)        // [U-386] stone skills (boulders) this tick: they block like walls (kCollWall)
+    std::vector<Effect> fx_pending_;
+    std::vector<ElevLayer> elev_layers_;     // [U-440]
+    void raise_ground(int cx, int cy, int amount, std::int64_t until_ms);  // adds a layer
+    void apply_elevation(int cx, int cy);    // the cell's height = its ground + every active layer
+    void step_elevation();         // [U-383] effects made while the effect loop runs (added after it)        // [U-386] stone skills (boulders) this tick: they block like walls (kCollWall)
     bool clearance_dirty = true;
     void rebuild_collision_maps();
     [[nodiscard]] int body_violations(const Unit& u, std::int32_t x_sub, std::int32_t y_sub) const;
@@ -650,6 +674,7 @@ public:
     // [U-288] walls with HP
     std::unordered_map<std::uint32_t, WallCell> walls;  // key = y × kGridSize + x
     bool cell_public_ = false;                           // set_cell: the change is public (by time / destruction)
+    Team cell_team_ = Team::Neutral;                     // [U-436] set_cell: this team made it → its map shows it at once
     void add_wall_cell(int cx, int cy, Wall kind);
     void damage_wall(int cx, int cy, std::int32_t amount, Dir from = {});  // ≤ 0 HP → the cell falls (public)
     std::vector<WallBreak> wall_breaks;  // [U-341] the last second of falling wall pieces (for the animation)

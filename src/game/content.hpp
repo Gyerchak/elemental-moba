@@ -149,7 +149,17 @@ struct SkillDef {
     std::uint8_t wall_thick = 0, wall_level = 0;
     std::int16_t wall_hp = 0, wall_hp_rank = 0;
     std::uint8_t wall_segs = 0;
-    bool lift_beside = false;
+    bool lift_beside = false;    // [U-406] Boulder: lift the stone right beside the caster (not at the cursor)
+    // [U-431] a targeted skill on an enemy that is only SENSED (seismic / heat / sound, not seen): −1 = yes when the
+    // caster has a sense passive, 0 = never (visible enemies only), 1 = always
+    std::int8_t sensed_target = -1;
+    // [U-433] charges (LoL ammo skills): up to `charges` casts stored, one comes back every charge_ms (0 = no charges);
+    // between two casts at least charge_gap_ms
+    std::uint8_t charges = 0;
+    std::int32_t charge_ms = 0, charge_gap_ms = 300;
+    // [U-434] the caster stays rooted this long after the cast (−1 = default: 300 ms for skills that shape the ground —
+    // pillars, walls, lifting / pushing stones — else 0)
+    std::int16_t self_root_ms = -1;
     // [U-402] mouse control while the cast key is HELD: 1 = steer — the projectile turns towards the cursor (turn
     // speed steer_turn, Q14 per tick); 2 = draw — the wall follows the mouse path, raised when the key is released
     // (max length = width). Casting locks (rooted / slowed / free) stay per skill (`move`).
@@ -260,7 +270,7 @@ struct ChampionDef {
     bool avatar = false;                                 // [U-279][U-07] Avatar type: max one per team
     bool dark = false;                                   // [U-07] a Dark Avatar (avatar = true too); max one per team
     std::uint8_t unique_group = 0;                       // [U-08] normal + dark versions share a group ≠ 0: one per game
-    std::array<std::string_view, 3> q_pool{};
+    std::array<std::string_view, 6> q_pool{};  // [U-270][U-437] the Q options of this champion (3 … 6)
     // [U-296] non-benders awaken at the planetary alignment (60:00): this element (None = from the damage taken from
     // champions: rest of ÷ 4 → 0 air, 1 water, 2 earth, 3 fire) and this own set for Q W E R (empty = the element's
     // basic set). Predisposed non-benders can have their own set here.

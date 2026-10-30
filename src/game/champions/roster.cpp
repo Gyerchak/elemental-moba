@@ -62,7 +62,9 @@ constexpr bool roster_ok() {
     for (const ChampionDef& c : kRoster) {
         int n = 0;
         for (std::size_t q = 0; q < std::size(data::kQOptions); ++q) n += q_ok(c, q);
-        if (n != 3) return false;  // [U-270] every built-in champion: exactly 3 Q options (names must exist + fit the kit)
+        int listed = 0;
+        for (auto nm : c.q_pool) listed += !nm.empty();
+        if (n < 3 || (listed > 0 && n != listed)) return false;  // [U-270][U-437] 3 … 6 Q options; every listed name exists + fits
     }
     return true;
 }
