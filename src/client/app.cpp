@@ -288,6 +288,7 @@ void App::frame(double now_s) {
         case Screen::Setups: setups_screen(); break;
         case Screen::ChampionInfo: champion_info(); break;
         case Screen::CustomChampions: custom_champions(); break;
+        case Screen::Interactions: interactions(); break;
         case Screen::Game: {
             gfx::Ui dead = ui_;  // the match keeps running under the menu, but clicks belong to the menu
             dead.clicked = dead.rclicked = false;

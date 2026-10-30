@@ -501,6 +501,25 @@ void GameView::handle_event(const SDL_Event& e, NetClient& net) {
         net.send_cmd({.kind = CmdKind::Ping, .slot = std::uint8_t(k), .x = std::int32_t(view_.wx(ping_x_)), .y = std::int32_t(view_.wy(ping_y_))});
         return;
     }
+    // [U-414] emote wheel: hold Ctrl, press the RIGHT button, drag towards an emote, release
+    if (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN && e.button.button == SDL_BUTTON_RIGHT && (SDL_GetModState() & SDL_KMOD_CTRL)) {
+        emote_wheel_ = true;
+        ping_x_ = e.button.x;
+        ping_y_ = e.button.y;
+        if (ui_) ui_->rclicked = false;
+        return;
+    }
+    if (e.type == SDL_EVENT_MOUSE_BUTTON_UP && e.button.button == SDL_BUTTON_RIGHT && emote_wheel_) {
+        emote_wheel_ = false;
+        if (ui_) ui_->rclicked = false;
+        const float dx = e.button.x - ping_x_, dy = e.button.y - ping_y_;
+        if (dx * dx + dy * dy > 30 * 30) {  // 6 sectors of 60°, the first one straight up, clockwise
+            const float a = std::atan2(dx, -dy);  // 0 = up
+            const int k = (int(std::lround(a / 1.0472f)) % 6 + 6) % 6;
+            net.send_cmd({.kind = CmdKind::Emote, .slot = std::uint8_t(k)});
+        }
+        return;
+    }
     if (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {  // [U-164] left + right together = camera on me
         const SDL_MouseButtonFlags b = SDL_GetMouseState(nullptr, nullptr);
         if (set_.both_buttons_center && (b & SDL_BUTTON_LMASK) && (b & SDL_BUTTON_RMASK)) both_down_ = true;

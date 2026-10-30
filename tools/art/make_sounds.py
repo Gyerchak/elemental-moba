@@ -283,6 +283,24 @@ def effects():
     save(SND / "world" / "recall.wav", (tone(n(2.0), 300, 600) * 0.5 + noise(n(2.0), 3) * 0.2) * env(n(2.0), 0.3, 0.8) * 0.5)
     save(SND / "world" / "footstep.wav", noise(n(0.08), 12) * env(n(0.08), 0.002, 40) * 0.5)
     save(SND / "world" / "splash.wav", noise(n(0.4), 5) * env(n(0.4), 0.005, 8) * 0.6)
+    # [U-414] emote sounds (sounds/emote_<name>.wav — a resource pack can replace each one)
+    ha = np.concatenate([tone(n(0.09), f, f * 0.9) * env(n(0.09), 0.003, 14) for f in (880, 820, 760, 700, 640)])
+    save(SND / "emote_laugh.wav", ha * 0.6)
+    save(SND / "emote_taunt.wav", np.concatenate([tone(n(0.18), 392, 392, "square") * env(n(0.18), 0.005, 9),
+                                                  tone(n(0.3), 330, 300, "square") * env(n(0.3), 0.005, 6)]) * 0.35)
+    save(SND / "emote_dance.wav", np.concatenate([tone(n(0.1), f, f) * env(n(0.1), 0.004, 10) for f in (523, 659, 784, 659, 523, 784)]) * 0.5)
+    save(SND / "emote_joke.wav", tone(n(0.6), 300, 1400) * env(n(0.6), 0.02, 3) * 0.4)  # slide whistle
+    save(SND / "emote_wave.wav", sum(tone(n(0.8), f, f) * env(n(0.8), 0.003, 4) for f in (1046, 1318)) * 0.3)
+    save(SND / "emote_cheer.wav", room(bp(noise(n(1.0), 2), 600, 3000) * env(n(1.0), 0.1, 2.5)) * 0.7)
+    # [U-407] companions arriving: one call per animal (sounds/companion_<kind>.wav)
+    low = lambda f0, f1, d: room(tone(n(d), f0, f1) * env(n(d), 0.08, 2.0) + lp(noise(n(d), 3), 400) * env(n(d), 0.05, 3) * 0.4)
+    save(SND / "companion_0.wav", finish(low(90, 70, 1.4), 0.7))                       # sky bison: deep groan
+    save(SND / "companion_1.wav", finish(np.concatenate([low(260, 180, 0.35), low(240, 170, 0.45)]), 0.6))  # bear-dog: two barks
+    save(SND / "companion_2.wav", finish(tone(n(0.4), 900, 1500) * env(n(0.4), 0.01, 7) * 0.6, 0.5))  # monkey-cat squeak
+    save(SND / "companion_3.wav", finish(room(bp(noise(n(0.9), 1), 300, 1800) * env(n(0.9), 0.02, 4)), 0.6))  # shirshu sniff
+    save(SND / "companion_4.wav", finish(room(lp(noise(n(1.2), 8), 300) * env(n(1.2), 0.05, 2)), 0.8))  # badgermole digging
+    save(SND / "companion_5.wav", finish(room(tone(n(1.5), 180, 90, "square") * env(n(1.5), 0.05, 2) * 0.4
+                                              + bp(noise(n(1.5), 2), 800, 4000) * env(n(1.5), 0.2, 2) * 0.5), 0.7))  # dragon roar
     print("effects done", flush=True)
 
 

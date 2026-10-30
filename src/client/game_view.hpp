@@ -152,6 +152,8 @@ private:
     gfx::Ui* ui_ = nullptr;
     bool mouse_on_hud_ = false;
     bool ping_wheel_ = false, swallow_click_ = false;  // [U-246]
+    bool emote_wheel_ = false;                         // [U-414]
+    std::unordered_map<std::uint32_t, std::uint8_t> emote_seen_;  // [U-414] last emote per unit (its sound once)
     float ping_x_ = 0, ping_y_ = 0;
     std::vector<std::pair<std::uint32_t, std::int64_t>> pings_seen_;
     std::unordered_map<std::uint32_t, std::uint16_t> cc_max_;
@@ -169,6 +171,7 @@ private:
     int sent_companion_ = -1;  // [U-407]
     std::vector<net::NetFx> fx_draw_;                 // [U-389] this frame's effects at their delayed positions
     std::vector<net::NetCompanion> comp_draw_;
+    std::vector<std::uint32_t> comp_prev_;  // [U-407] companions seen last frame (a new one plays its call)
     std::unordered_map<std::uint32_t, float> companion_last_x_, companion_last_y_;  // facing of the companion models
     std::unordered_map<std::uint32_t, int> companion_dir_;
     // [U-402] mouse control while a cast key is held

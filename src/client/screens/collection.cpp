@@ -4,6 +4,7 @@
 #include <format>
 
 #include "client/app.hpp"
+#include "game/reference/interactions.hpp"
 #include "client/custom_champions.hpp"
 #include "client/item_browser.hpp"
 #include "client/locale.hpp"
@@ -199,4 +200,30 @@ void App::custom_champions() {
     if (button(ren_, ui_, 20, H - 52, 200, 36, tr("Back"))) go(Screen::Menu);
 }
 
+}  // namespace em
+
+namespace em {
+// [U-397] every interaction of the systems, generated from the game's own tables (game/reference/interactions.cpp)
+void App::interactions() {
+    int w = 0, h = 0;
+    SDL_GetRenderOutputSize(ren_, &w, &h);
+    const float W = float(w), H = float(h);
+    static const std::vector<std::string> lines = interaction_lines();
+    text(ren_, 20, 14, tr("Interactions"), {255, 200, 120}, 3);
+    text(ren_, 20, 52, tr("Every rule of the systems, straight from the game's tables. Mouse wheel = scroll."), {170, 170, 190});
+    const float top = 80, bottom = H - 64, row = 18;
+    interactions_scroll_ = std::clamp(interactions_scroll_ - ui_.wheel * 60, 0.f, std::max(0.f, float(lines.size()) * row - (bottom - top)));
+    const SDL_Rect clip{0, int(top), int(W), int(bottom - top)};
+    SDL_SetRenderClipRect(ren_, &clip);
+    float y = top - interactions_scroll_;
+    for (const std::string& ln : lines) {
+        if (y > top - row && y < bottom) {
+            if (ln.starts_with("## ")) text(ren_, 20, y + 2, ln.substr(3), {255, 210, 120}, 1.2f);
+            else text(ren_, 36, y, fit_text(ln, W - 60), {225, 225, 235});
+        }
+        y += ln.starts_with("## ") ? row + 8 : row;
+    }
+    SDL_SetRenderClipRect(ren_, nullptr);
+    if (button(ren_, ui_, 20, H - 52, 200, 36, tr("Back"))) go(Screen::Menu);
+}
 }  // namespace em

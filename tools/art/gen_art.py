@@ -48,6 +48,15 @@ SOURCES = {  # [U-335] death recap icons for damage that is not a skill / item
     "passive": "a glowing inner aura", "other": "a question mark carved in stone", "skill": "a glowing spell scroll",
     "item": "a treasure pouch",
 }
+EMOTES = {  # [U-414] emote pictures (emotes/<name>/emote.png + icon.png); a resource pack can replace them
+    "laugh": "a cartoon face laughing with tears of joy", "taunt": "a cocky smirking face with a raised eyebrow",
+    "dance": "a small happy figure dancing with music notes", "joke": "a jester mask winking", "wave": "a friendly waving hand",
+    "cheer": "two raised fists with confetti",
+}
+PINGS = {  # [U-414] ping wheel icons (icons/pings/<kind>.png)
+    "1": "a red warning triangle with an exclamation mark", "2": "a yellow question mark over an empty footprint",
+    "3": "a green arrow running forward", "4": "an orange shield with a helping hand", "5": "a purple fishing hook with bait",
+}
 SCREENS = {
     "menu": "epic landscape, four nations, water tribe glacier, earth kingdom walls, fire nation volcano, air temple mountains, sunset",
     "loading_1": "two armies of elemental benders facing each other across a river valley, dramatic sky",
@@ -95,6 +104,12 @@ def jobs(only):
     if "source" in only:
         for ident, what in SOURCES.items():
             yield "source", ident, f"square game icon: {what}, centered, dark background, {STYLE}", 512, 512
+    if "emote" in only:
+        for ident, what in EMOTES.items():
+            yield "emote", ident, f"square game emote sticker: {what}, bold outline, centered, plain dark background, {STYLE}", 512, 512
+    if "ping" in only:
+        for ident, what in PINGS.items():
+            yield "ping", ident, f"square flat game ping icon: {what}, simple bold shape, centered, transparent-looking dark background", 512, 512
     if "screen" in only:
         for ident, what in SCREENS.items():
             yield "screen", ident, f"{what}, wide establishing shot, {STYLE}", 1216, 832

@@ -56,6 +56,8 @@ void App::menu() {
     ry += bh + gap;
     if (button(ren_, ui_, rx, ry, bw, bh, tr("Own champions"))) back_ = Screen::Menu, go(Screen::CustomChampions);  // [U-210]
     ry += bh + gap;
+    if (button(ren_, ui_, rx, ry, bw, bh, tr("Interactions (every rule)"))) back_ = Screen::Menu, interactions_scroll_ = 0, go(Screen::Interactions);  // [U-397]
+    ry += bh + gap;
     // [U-95] version: official or an own version (versions/<name>/version.txt); a click = the next one
     if (const auto all = list_versions();
         button(ren_, ui_, rx, ry, bw, bh, std::format("{}: {}", tr("Version"), set_.version)) && all.size() > 1) {  // only official: nothing, no message

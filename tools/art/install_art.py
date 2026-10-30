@@ -44,6 +44,13 @@ def main():
         for src in sorted((RAW / cat).glob("*.png")):
             magick(src, PACK / sub / f"{src.stem}.png", "-resize", size)
             n += 1
+    for src in sorted((RAW / "emote").glob("*.png")):  # [U-414]
+        magick(src, PACK / "emotes" / src.stem / "emote.png", "-resize", "96x96")
+        magick(src, PACK / "emotes" / src.stem / "icon.png", "-resize", "48x48")
+        n += 2
+    for src in sorted((RAW / "ping").glob("*.png")):
+        magick(src, PACK / "icons" / "pings" / f"{src.stem}.png", "-resize", "48x48")
+        n += 1
     # the old generated BMPs are replaced by the PNGs (the game tries .png first)
     print(f"{n} pictures installed into {PACK}")
 

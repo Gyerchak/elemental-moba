@@ -48,7 +48,7 @@ private:
     enum class Screen {
         Menu, Options, Multiplayer, ServerEdit, HostMatch, HostServer, ServerRunning,
         ChampSelect, Loading, Game, PostGame,
-        Items, Setups, ChampionInfo, CustomChampions,
+        Items, Setups, ChampionInfo, CustomChampions, Interactions,
     };
     // ---- app.cpp
     void frame(double now_s);
@@ -89,6 +89,8 @@ private:
     void setups_screen();
     void champion_info();
     void custom_champions();
+    void interactions();  // [U-397]
+    float interactions_scroll_ = 0;
     // ---- shared
     void ingame_menu();  // Esc in a match: live options, leave [U-207]
 

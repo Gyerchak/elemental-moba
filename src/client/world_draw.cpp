@@ -327,6 +327,11 @@ void GameView::draw_units(NetClient& net, double now_s) {
         if (am.was_alive && !u.alive) am.died = now_s;
         am.was_alive = u.alive != 0;
         if (u.casting && !am.was_casting) am.cast_from = now_s;
+        if (auto& es = emote_seen_[u.id]; u.emote != es) {  // [U-414] a new emote: its own sound (sounds/emote_<name>.wav)
+            es = u.emote;
+            if (u.emote < std::size(kEmoteNames))
+                audio_.play(res_.sound("emote_" + std::string(kEmoteNames[u.emote])), SoundCat::Ui, 0.8f);  // sounds/emote_<name>.wav
+        }
         am.was_casting = u.casting != 0;
         if (!u.alive && kind == UnitKind::Champion && now_s - am.died > 2.0) continue;
         const AnimSlot anim = anim_of(u);
@@ -494,9 +499,18 @@ void GameView::draw_units(NetClient& net, double now_s) {
                         break;
                     case AnimSlot::Emote:
                         if (u.emote < std::size(kEmoteNames)) {
-                            const std::string e = tr(kEmoteNames[u.emote]);
-                            fill_rect(r_, hx_s - text_w(e) / 2 - 4, hy_s - 40 * z - 14, text_w(e) + 8, 14, {255, 255, 255, 220});
-                            text(r_, hx_s - text_w(e) / 2, hy_s - 40 * z - 11, e, {20, 20, 20});
+                            // [U-414] the emote's picture from the resource pack (emotes/<name>/emote.png; a pack can reskin it),
+                            // else its name in a bubble
+                            const std::string id(kEmoteNames[u.emote]);
+                            if (SDL_Texture* pic = res_.texture("emotes/" + id + "/emote.png")) {
+                                const float s2 = 56 * std::max(0.6f, z);
+                                const SDL_FRect d{std::round(hx_s - s2 / 2), std::round(hy_s - 40 * z - s2), s2, s2};
+                                SDL_RenderTexture(r_, pic, nullptr, &d);
+                            } else {
+                                const std::string e = tr(id);
+                                fill_rect(r_, hx_s - text_w(e) / 2 - 4, hy_s - 40 * z - 14, text_w(e) + 8, 14, {255, 255, 255, 220});
+                                text(r_, hx_s - text_w(e) / 2, hy_s - 40 * z - 11, e, {20, 20, 20});
+                            }
                         }
                         break;
                     default: break;
@@ -613,12 +627,21 @@ void GameView::draw_paths(NetClient& net) {
 // stands on its back while it carries them home
 void GameView::draw_companions(NetClient& net, double now_s) {
     const float z = view_.zoom;
+    struct KeepPrev {  // the owners seen this frame become "seen before" for the next frame
+        GameView& g;
+        ~KeepPrev() {
+            g.comp_prev_.clear();
+            for (const auto& c : g.comp_draw_) g.comp_prev_.push_back(c.owner);
+        }
+    } keep{*this};
     for (const auto& c : comp_draw_) {
         const float wx = float(c.x), wy = float(c.y);
         const float sx = view_.sx(wx), gy = view_.sy(wy);
         if (sx < -200 || gy < -200 || sx > view_.sw + 200 || gy > view_.sh + 200) continue;
         const float bob = float(std::sin(now_s * 10)) * 3 * z;
         const CompanionKind k = CompanionKind(std::min<int>(c.kind, int(CompanionKind::Count) - 1));
+        if (std::ranges::find(comp_prev_, c.owner) == comp_prev_.end())  // [U-407] its call when it shows up (sounds/companion_<kind>.wav)
+            audio_.play(res_.sound(std::format("companion_{}", int(k))), SoundCat::Effects, 0.8f);
         const bool flies = k == CompanionKind::SkyBison || k == CompanionKind::Dragon;
         const float h = flies ? 70.f : 0.f, top = view_.sy_h(wy, h) + bob;
         ground_fill(r_, view_, wx, wy, flies ? 60.f : 40.f, {0, 0, 0, 70}, 18);  // shadow
@@ -878,12 +901,49 @@ void GameView::draw_world(NetClient& net, double now_s) {
         fill_circle(r_, view_.sx(float(f.x)), view_.sy_h(float(f.y), 160), 6, {240, 230, 200, 255}, 8),
             text(r_, view_.sx(float(f.x)) + 8, view_.sy_h(float(f.y), 160) - 4, tr("falcon"), {240, 230, 200});
     if (now_s - click_t_ < 0.5) ground_ring(r_, view_, click_x_, click_y_, float(18 * (1 - (now_s - click_t_) * 2)) + 4, {120, 255, 120, 220});
-    if (ping_wheel_ && ui_) {  // [U-246] the wheel while dragging
+    if (ping_wheel_ && ui_) {  // [U-246][U-414] the wheel while dragging: icons (icons/pings/<kind>.png), the chosen one lit
         const float cx = ping_x_, cy = ping_y_;
+        fill_circle(r_, cx, cy, 110, {0, 0, 0, 110}, 40);
         circle(r_, cx, cy, 70, {255, 255, 255, 160}, 40);
-        const struct { const char* n; float dx, dy; } opts[] = {{"danger", 0, -80}, {"on my way", 80, 0}, {"assist me", 0, 80},
-                                                                {"enemy missing", -80, 0}, {"bait", -60, -60}};
-        for (const auto& o : opts) outlined(r_, cx + o.dx - text_w(tr(o.n)) / 2, cy + o.dy, tr(o.n), {255, 255, 255, 255}, 1);
+        // same sectors as the release code: up danger, right on my way, down assist, left missing, up-left bait
+        const float dx = ui_->mx - cx, dy = ui_->my - cy;
+        int pick = 0;
+        if (dx * dx + dy * dy > 30 * 30) {
+            const float a = std::atan2(dy, dx);
+            pick = a < -2.36f ? 2 : a < -1.96f ? 5 : a < -0.78f ? 1 : a < 0.78f ? 3 : a < 2.36f ? 4 : 2;
+        }
+        static constexpr Rgba kCol[] = {{120, 220, 255}, {255, 70, 70}, {255, 220, 60}, {90, 220, 120}, {255, 150, 60}, {200, 120, 255}};
+        const struct { int k; float dx, dy; } opts[] = {{1, 0, -80}, {3, 80, 0}, {4, 0, 80}, {2, -80, 0}, {5, -60, -60}};
+        for (const auto& o : opts) {
+            const bool lit = pick == o.k;
+            const float ox = cx + o.dx, oy = cy + o.dy;
+            fill_circle(r_, ox, oy, lit ? 24.f : 19.f, with_alpha(kCol[o.k], lit ? 230 : 140), 20);
+            if (SDL_Texture* ic = res_.texture(std::format("icons/pings/{}.png", o.k))) {
+                const SDL_FRect d{ox - 16, oy - 16, 32, 32};
+                SDL_RenderTexture(r_, ic, nullptr, &d);
+            }
+            const std::string n = tr(kPingNames[std::size_t(o.k)]);
+            outlined(r_, ox - text_w(n) / 2, oy + 26, n, {255, 255, 255, 255}, 1);
+        }
+        line(r_, cx, cy, ui_->mx, ui_->my, {255, 255, 255, 200});
+    }
+    if (emote_wheel_ && ui_) {  // [U-414] the emote wheel: 6 emotes, pictures from the resource pack
+        const float cx = ping_x_, cy = ping_y_;
+        fill_circle(r_, cx, cy, 120, {0, 0, 0, 110}, 40);
+        const float dx = ui_->mx - cx, dy = ui_->my - cy;
+        const int pick = dx * dx + dy * dy > 30 * 30 ? (int(std::lround(std::atan2(dx, -dy) / 1.0472f)) % 6 + 6) % 6 : -1;
+        for (int k = 0; k < 6; ++k) {
+            const float a = float(k) * 1.0472f, ox = cx + std::sin(a) * 85, oy = cy - std::cos(a) * 85;
+            const bool lit = pick == k;
+            fill_circle(r_, ox, oy, lit ? 30.f : 24.f, lit ? Rgba{255, 230, 120, 230} : Rgba{60, 60, 80, 200}, 20);
+            const std::string id(kEmoteNames[std::size_t(k)]);
+            if (SDL_Texture* pic = res_.texture("emotes/" + id + "/icon.png")) {
+                const SDL_FRect d{ox - 20, oy - 20, 40, 40};
+                SDL_RenderTexture(r_, pic, nullptr, &d);
+            } else {
+                outlined(r_, ox - text_w(tr(id)) / 2, oy - 5, tr(id), {255, 255, 255, 255}, 1);
+            }
+        }
         line(r_, cx, cy, ui_->mx, ui_->my, {255, 255, 255, 200});
     }
 }
