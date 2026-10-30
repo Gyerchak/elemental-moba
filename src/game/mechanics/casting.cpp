@@ -86,7 +86,7 @@ void World::cast_skill(Unit& u, Slot slot, std::int32_t tx, std::int32_t ty, std
     // [U-340] source first: a water skill bent from a chosen source starts there, +25 % range
     const bool from_source = water_skill(d) && u.cast.sx >= 0 && u.cast.slot == std::uint8_t(slot) &&
                              water_source_at(u.cast.sx, u.cast.sy) != WaterSource::None && water_sourced(u, d, u.cast.sx, u.cast.sy);
-    // [U-378] rock bending (Taliyah W-like): an earth bolt / wave picks up a chosen rock and throws IT
+    // [U-378] rock bending (lift a rock, then throw it): an earth bolt / wave picks up a chosen rock and throws IT
     const bool from_rock = !from_source && d.sub == SubElement::Earth && source_first(d) && u.cast.sx >= 0 &&
                            u.cast.slot == std::uint8_t(slot) && rock_source_at(u.cast.sx, u.cast.sy) &&
                            dist2(u.cast.sx, u.cast.sy, u.ux(), u.uy()) <=
@@ -102,7 +102,7 @@ void World::cast_skill(Unit& u, Slot slot, std::int32_t tx, std::int32_t ty, std
     // [U-264] sky events (planetary alignment) stretch durations; damage-over-time has its own %
     const bool dot_skill = d.kind == SkillKind::Field && d.dmg > 0;
     const std::int32_t dur_ms = std::int32_t(std::int64_t(d.dur_ms) * (dot_skill ? r.dot_pct : r.dur_pct) / 100);
-    // [U-184] aim: at the cursor (normal) or where the champion faces (Cassiopeia-like)
+    // [U-184] aim: at the cursor (normal) or where the champion faces
     if (d.aim == Aim::Facing) {
         const std::int64_t len = std::max<std::int64_t>(1, isqrt(dist2(tx, ty, ox, oy)));
         tx = ox + std::int32_t(u.face.x * len / kOne);
@@ -235,9 +235,12 @@ void World::cast_skill(Unit& u, Slot slot, std::int32_t tx, std::int32_t ty, std
             if (d.sub == SubElement::Ice && !from_source) use_water_source(u);  // [U-294] a puddle / ice patch used as the source is gone
             // [U-380] the wall standard: segments of 100, 33 / 66 / 99 thick, 1 / 2 levels, HP per segment (+ per rank)
             const int rank = std::max<int>(1, u.ab[std::size_t(slot)].rank);
-            const WallSpec ws{.thick = (d.wall_thick ? std::clamp<int>(d.wall_thick, 1, 3) : 2) * kWallThickStep,
+            const bool metal = wall_kind_of(d.sub) == Wall::Metal;  // [U-388] small, strong
+            const WallSpec ws{.thick = (d.wall_thick ? std::clamp<int>(d.wall_thick, 1, 3) : metal ? 1 : 2) * kWallThickStep,
                               .level = d.wall_level ? std::clamp<int>(d.wall_level, 1, 2) : 2,
-                              .hp = (d.wall_hp ? d.wall_hp : d.sub == SubElement::Ice ? kIceWallSegHp : kWallSegHp) + d.wall_hp_rank * (rank - 1)};
+                              .hp = (d.wall_hp ? d.wall_hp : d.sub == SubElement::Ice ? kIceWallSegHp : metal ? kMetalSegHp : kWallSegHp) +
+                                    d.wall_hp_rank * (rank - 1)};
+            const std::int32_t wall_len = d.wall_segs ? d.wall_segs * kWallSegLen : metal ? kWallSegLen : std::int32_t(r.width);
             if (d.radius > 0) {  // ring [Iron Prison]
                 raise_ring(px, py, std::int32_t(r.radius), wall_kind_of(d.sub) == Wall::Metal ? dur_ms * kMetalWallLifePct / 100 : dur_ms, u.team,
                            wall_kind_of(d.sub), ws);
@@ -250,7 +253,7 @@ void World::cast_skill(Unit& u, Slot slot, std::int32_t tx, std::int32_t ty, std
                 spawn_fx(e);
             } else {
                 const Dir along{-dir.y, dir.x};
-                raise_wall(px, py, along, std::int32_t(r.width), wall_kind_of(d.sub),
+                raise_wall(px, py, along, wall_len, wall_kind_of(d.sub),
                            wall_kind_of(d.sub) == Wall::Metal ? dur_ms * kMetalWallLifePct / 100 : dur_ms, u.team,
                            base_element(d.sub) == Element::Earth, ws);
             }
@@ -398,6 +401,28 @@ void World::cast_skill(Unit& u, Slot slot, std::int32_t tx, std::int32_t ty, std
             u.st.add(StatusKind::WaterRide, now_ms + dur_ms, 0, u.id);
             u.st.add(StatusKind::Haste, now_ms + dur_ms, d.cc_val, u.id);
             break;
+        case SkillKind::MoveWater: {  // [U-398] the water is MOVED: taken from the source, laid down at the target
+            const std::int32_t rad = std::int32_t(std::max<std::int64_t>(48, r.radius));
+            const std::int32_t life = dur_ms > 0 ? dur_ms : std::int32_t(elements::kPuddleMs);
+            std::size_t pi = 0;
+            switch (from_source ? water_source_at(u.cast.sx, u.cast.sy, &pi) : WaterSource::None) {
+                case WaterSource::Patch: clouds[pi].until_ms = now_ms; break;                               // the puddle moves
+                case WaterSource::Lasting: drain_water(u.cast.sx, u.cast.sy, rad, life); break;              // the river gives it
+                case WaterSource::IceWall: damage_wall(u.cast.sx / kCellUnits, u.cast.sy / kCellUnits, rad); break;  // melted off
+                default: break;  // from carried water (paid as the skill's cost)
+            }
+            add_cloud(u.source_ice ? CloudKind::IcePatch : CloudKind::Puddle, px, py, rad, life);
+            if (d.dmg > 0 || d.cc != StatusKind::Count || d.knock > 0) {  // the wave of water lands: a hit there
+                e.kind = FxKind::Burst;
+                e.x = px * kSub;
+                e.y = py * kSub;
+                e.radius = rad;
+                e.arm_ms = now_ms + d.delay_ms;
+                e.end_ms = e.arm_ms + 300;
+                spawn_fx(e);
+            }
+            break;
+        }
         case SkillKind::IcePath:
             if (fire_family(d.sub)) {  // [U-225] Heat Draw: pull the heat out of lava → stone ground, fuel back
                 cool_lava(u.ux(), u.uy(), std::int32_t(r.radius));

@@ -22,6 +22,10 @@ inline constexpr int kMetalWallLifePct = 150;
 // HP per segment 300 (ice 100) — per skill / per rank in SkillDef. (wall_max_hp above = single cells: lava rocks,
 // thrown rocks; natural rocks × 2.)
 inline constexpr int kWallSegLen = 100, kWallThickStep = 33, kWallSegHp = 300, kIceWallSegHp = 100;
+// [U-388] metal is rare: by default a metal wall is ONE thin segment (100 × 33) with 600 HP. It attracts lightning:
+// a lightning bolt / wave within kMetalPull units bends towards the nearest metal wall cell; where it strikes the metal,
+// everything within kMetalSplash units of that wall cell is hit too.
+inline constexpr int kMetalSegHp = 600, kMetalPull = 192, kMetalSplash = 33, kMetalTurnPerTick = 1'400;  // turn: Q14 (≈ 5°)
 struct WallSpec {
     int thick = 66;   // units
     int level = 2;    // levels above the ground

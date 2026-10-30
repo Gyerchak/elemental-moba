@@ -80,7 +80,7 @@ static_assert(effective_defence(100, 10, 0.3, 0.4, 20) > 17.7 && effective_defen
     if (stat == "element resist") return "adds up per element, max 60 %";
     if (stat == "slow resist") return "adds up, max 80 % (ice and other slows apart)";
     if (stat == "model size") return "adds up, never below 50 %";
-    if (stat == "penetration") return "% first, then flat (LoL order)";
+    if (stat == "penetration") return "% first, then flat";
     return "adds up";
 }
 

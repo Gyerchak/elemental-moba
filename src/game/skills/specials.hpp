@@ -45,7 +45,7 @@ constexpr SpecialRow kSpecialRows[] = {
                       .dur_ms = 2'500, .desc = "Freeze yourself: untouchable, no heat [U-143]"}},
     {Element::Water, {.name = "Water Spout", .kind = K::WaterSpout, .sub = S::Water, .cast_ms = 0, .cd_ms = 30'000,
                       .dur_ms = 6'000, .cc_val = 20,
-                      .desc = "Ride a water column over water (Korra): faster, cast freely, melee / ground can't reach you [U-189]"}},
+                      .desc = "Ride a water column over water: faster, cast freely, melee / ground can't reach you [U-189]"}},
     {Element::Water, {.name = "Ice Path", .kind = K::IcePath, .sub = S::Ice, .radius = 160, .cast_ms = 0, .cd_ms = 20'000,
                       .dur_ms = 6'000, .desc = "Freeze the water around you into walkable ice for 6 s [U-188]"}},
     {Element::Water, {.name = "Iceberg", .kind = K::Wall, .sub = S::Ice, .range = 700, .radius = 150, .cast_ms = 400,
@@ -104,7 +104,12 @@ constexpr SpecialRow kSpecialRows[] = {
     // [U-288] metalbending wall (earth; appended at the end so saved picks keep their numbers)
     {Element::Earth, {.name = "Metal Wall", .kind = K::Wall, .sub = S::Metal, .range = 700, .width = 320, .cast_ms = 300,
                       .cd_ms = 30'000, .dur_ms = 4'000,
-                      .desc = "Metalbending: the strongest wall (480 HP per piece, stands 6 s); metalbenders break it 2× faster [U-288]"}},
+                      .desc = "Metalbending: one small, very strong piece (600 HP); lightning bends towards it [U-288][U-388]"}},
+    // [U-398] move water on the ground (appended at the end)
+    {Element::Water, {.name = "Draw Stream", .kind = K::MoveWater, .sub = S::Water, .range = 800, .radius = 96, .cast_ms = 350,
+                      .cd_ms = 12'000, .cost = 40, .dur_ms = 15'000,
+                      .desc = "Pick water (river, sea, puddle, ice), then a place: the water flows there as a puddle source for 15 s. "
+                              "Without a source it uses 40 carried water"}},
 };
 
 }  // namespace em::data

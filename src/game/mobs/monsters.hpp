@@ -77,6 +77,10 @@ inline constexpr std::array kMonsters = {
     MonsterDef{.name = "Knowledge Seeker", .spirit = true, .hp = 220'000, .attack = 5'000, .defence = 2'500, .elemental_defence = 3'500,
                .attack_speed = 60, .attack_range = 350, .range = Range::Ranged, .sight = 700, .gold = 100, .xp = 220,
                .respawn_ms = 150'000, .buff = JungleBuff::Wisdom, .buff_ms = 90'000},
+    // [U-401] dark spirits guard the spirit portals (aggressive, pass through units, curse = slow)
+    MonsterDef{.name = "Dark Spirit", .body = &kSlimBody, .aggressive = true, .spirit = true, .hp = 160'000, .attack = 5'500,
+               .defence = 2'000, .elemental_defence = 4'000, .move_speed = 33'000, .attack_speed = 70, .attack_range = 300,
+               .range = Range::Ranged, .model_size = 1'000, .sight = 750, .gold = 90, .xp = 180, .patience = 900, .respawn_ms = 180'000},
     // [U-364] epic monsters (Claude ideas): a stacking team buff and a gold one
     MonsterDef{.name = "Lion Turtle", .body = &kBeastBody, .boss = true, .hp = 900'000, .attack = 10'000, .defence = 7'000,
                .elemental_defence = 7'000, .move_speed = 20'000, .attack_speed = 45, .attack_range = 120, .model_size = 9'000,

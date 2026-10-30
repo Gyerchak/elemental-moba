@@ -128,7 +128,8 @@ void World::path_to(Unit& u, std::int32_t tx, std::int32_t ty) {
         // Each search may explore only what is left of this tick's budget; a search that runs out returns the
         // best part of the way (towards the goal) and the unit asks again later.
         int used = 0;
-        bool ok = find_path(grid, sx, sy, gx, gy, u.path, std::min(60'000, path_budget_), clearance.data(), k, &used);
+        const int body_r = int(body_reach(*u.body, size_pct(u)));  // [U-394] thin passes the body fits through
+        bool ok = find_path(grid, sx, sy, gx, gy, u.path, std::min(60'000, path_budget_), clearance.data(), k, &used, body_r);
         path_budget_ -= used;
         // [U-357] the second try is only one size thinner (was: the thinnest, which led bodies into gaps they
         // could not pass → units scraping along walls). The player still reaches the exact spot: the last step
@@ -183,6 +184,9 @@ void World::follow_path(Unit& u) {
 
 void World::step_units() {
     const std::int32_t tick_ms = std::int32_t(1'000 / cfg.tick_hz);
+    rock_bodies_.clear();  // [U-386]
+    for (const Effect& f : fx)
+        if (!f.dead && f.kind == FxKind::Boulder) rock_bodies_.push_back({f.ux(), f.uy(), f.radius});
     for (std::size_t i = 0; i < units.size(); ++i) {
         Unit& u = units[i];
         if (!u.alive) {
@@ -324,6 +328,7 @@ void World::step_units() {
                 if (champions()[std::size_t(u.champ)].autos.move_while_attacking) attack_on_the_move(u);  // [U-217]
                 break;
             case OrderKind::Attack: update_attack(u); break;
+            case OrderKind::AttackWall: update_attack_wall(u); break;  // [U-393]
             case OrderKind::AttackMove: {
                 // nearest visible enemy within 600 → attack it. slot bit 1 = champions only [X-98];
                 // bit 2 = nearest to the CLICKED point instead of to me [U-303] (an option in Controls)

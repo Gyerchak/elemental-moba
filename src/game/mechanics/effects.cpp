@@ -225,6 +225,31 @@ void World::step_effects() {
             e.nhit = 0;
         }
         const std::int32_t step = std::int32_t(isqrt(std::int64_t(e.vx) * e.vx + std::int64_t(e.vy) * e.vy));
+        // [U-388] metal attracts lightning: the bolt bends towards the nearest metal wall cell within kMetalPull
+        if (e.sub == SubElement::Lightning && (e.kind == FxKind::Bolt || e.kind == FxKind::Wave) && step > 0 && e.travel_left > 0) {
+            const int r = kMetalPull / kCellUnits, ccx = e.ux() / kCellUnits, ccy = e.uy() / kCellUnits;
+            std::int64_t best = -1;
+            int bx = 0, by = 0;
+            for (int y = ccy - r; y <= ccy + r; ++y)
+                for (int x = ccx - r; x <= ccx + r; ++x) {
+                    if (!Grid::in_bounds(x, y) || grid.at(x, y).wall() != Wall::Metal) continue;
+                    const std::int64_t d2 = dist2(x * kCellUnits + 16, y * kCellUnits + 16, e.ux(), e.uy());
+                    if (d2 <= std::int64_t(kMetalPull) * kMetalPull && (best < 0 || d2 < best)) best = d2, bx = x, by = y;
+                }
+            if (best >= 0) {
+                const Dir want = dir_of(std::int64_t(bx * kCellUnits + 16) - e.ux(), std::int64_t(by * kCellUnits + 16) - e.uy());
+                const std::int64_t cross = std::int64_t(e.dir.x) * want.y - std::int64_t(e.dir.y) * want.x;
+                const std::int64_t dot = (std::int64_t(e.dir.x) * want.x + std::int64_t(e.dir.y) * want.y) / kOne;
+                Dir nd = want;
+                if (dot < kOne - kMetalTurnPerTick / 8) {  // turn a little each tick (a curve, not a snap)
+                    const std::int64_t s = cross >= 0 ? kMetalTurnPerTick : -kMetalTurnPerTick, c = kOne - s * s / (2 * kOne);
+                    nd = dir_of((e.dir.x * c - e.dir.y * s) / kOne, (e.dir.x * s + e.dir.y * c) / kOne);
+                }
+                e.dir = nd;
+                e.vx = nd.x * step / kOne;
+                e.vy = nd.y * step / kOne;
+            }
+        }
         if (e.travel_left > 0) {
             e.x += e.vx;
             e.y += e.vy;
@@ -281,6 +306,14 @@ void World::step_effects() {
                 const WallHit h = wall_hit(c.wall() == Wall::Ice ? WallKind::Ice : WallKind::Stone, ai);
                 // [U-288] a skill that does not pass over / through damages the wall cell (HP; fire melts ice fast)
                 if (h == WallHit::Melts || h == WallHit::Stopped) hit_wall(e, owner, cx, cy);
+                if (c.wall() == Wall::Metal && e.sub == SubElement::Lightning) {  // [U-388] the strike hits around the metal
+                    e.x = (cx * kCellUnits + 16) * kSub;
+                    e.y = (cy * kCellUnits + 16) * kSub;
+                    e.radius = kCellUnits / 2 + kMetalSplash;
+                    effect_hits(e);
+                    e.dead = true;
+                    continue;
+                }
                 if (h == WallHit::Melts) {  // [U-15][U-16] fire / water on ice: the skill is spent on the ice
                     e.dead = true;
                     continue;

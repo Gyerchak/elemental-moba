@@ -289,6 +289,41 @@ void World::update_attack(Unit& u) {
     fire_auto(u, *t);
 }
 
+// [U-393] autoattacks on a wall cell (champions whose AutoAttackDef has hits_walls): walk in range, hit it at the
+// autoattack speed with wall_pct % of the autoattack, by the element rules of walls (wall_effect_pct).
+void World::update_attack_wall(Unit& u) {
+    const int cx = u.order.x / kCellUnits, cy = u.order.y / kCellUnits;
+    if (u.kind != UnitKind::Champion || !Grid::in_bounds(cx, cy) || grid.at(cx, cy).wall() == Wall::None) {
+        u.order = {};
+        u.windup_end_ms = 0;
+        return;
+    }
+    const AutoAttackDef& a = champions()[std::size_t(u.champ)].autos;
+    const std::int32_t wx = cx * kCellUnits + kCellUnits / 2, wy = cy * kCellUnits + kCellUnits / 2;
+    const std::int64_t gap = isqrt(dist2(u.ux(), u.uy(), wx, wy)) - body_reach(*u.body, size_pct(u)) - kCellUnits / 2;
+    if (gap > u.attack_range) {
+        u.windup_end_ms = 0;
+        if (now_ms - u.repath_ms > 300) path_to(u, wx, wy);
+        follow_path(u);
+        return;
+    }
+    turn_towards(u, dir_of(std::int64_t(wx) - u.ux(), std::int64_t(wy) - u.uy()));
+    const bool elemental = champions()[std::size_t(u.champ)].element != Element::None;
+    if (!u.st.can_attack(elemental) || u.st.has(StatusKind::Blind)) return;
+    const std::int32_t period = attack_period_ms(u);
+    if (u.windup_end_ms == 0) {
+        if (now_ms < u.attack_ready_ms) return;
+        u.windup_end_ms = now_ms + period * 30 / 100;
+        return;
+    }
+    if (now_ms < u.windup_end_ms) return;
+    u.windup_end_ms = 0;
+    u.attack_ready_ms = now_ms + period * 70 / 100;
+    const SubElement sub = elemental ? champions()[std::size_t(u.champ)].sub : SubElement::Physical;
+    const std::int64_t dmg = std::int64_t(u.stats.attack.total()) / 100 * a.wall_pct / 100 * wall_effect_pct(grid.at(cx, cy).wall(), sub) / 100;
+    damage_wall(cx, cy, std::int32_t(std::max<std::int64_t>(1, dmg)), dir_of(std::int64_t(wx) - u.ux(), std::int64_t(wy) - u.uy()));
+}
+
 // One autoattack leaves now: damage, then melee hit at once or a projectile [U-41][U-55][U-56][U-186].
 void World::fire_auto(Unit& u, Unit& target) {
     Unit* t = &target;

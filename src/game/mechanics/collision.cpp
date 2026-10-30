@@ -100,6 +100,16 @@ int World::body_violations(const Unit& u, std::int32_t xs, std::int32_t ys) cons
     }
     // structures and other units: exact circle tests
     const std::int64_t reach = body_reach(*u.body, size_pct(u));
+    // [U-386] stone skills (Heavy Stone's boulder …) are solid like walls: only what passes walls (flying) goes through
+    if (m & kCollWall)
+        for (const Circle& rc : rock_bodies_) {
+            const std::int64_t rr = reach + rc.r;
+            if (dist2(xs / kSub, ys / kSub, rc.x, rc.y) > rr * rr) continue;
+            Shape rs;
+            rs.add(rc);
+            const std::int64_t gap = em::edge_gap(body, rs);
+            if (gap < 0) bad += 1'000 * std::int32_t(std::min<std::int64_t>(-gap, 999));
+        }
     for (const Unit& o : units) {
         if (&o == &u || !o.alive) continue;
         const bool structure = o.is_structure() || o.kind == UnitKind::Inhibitor;

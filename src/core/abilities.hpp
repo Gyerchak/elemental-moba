@@ -62,7 +62,7 @@ struct PassiveDef {
     std::uint16_t effect_id = 0;  // [X-13] points into data-driven effect table
 };
 
-// [U-106] Multicast / recast (Taliyah-like): one cooldown, several casts in a window.
+// [U-106] Multicast / recast (one cooldown, several casts): one cooldown, several casts in a window.
 struct MulticastDef {
     std::uint8_t max_casts = 1;           // 1 = normal skill
     std::uint16_t recast_window_ms = 0;   // time to use the next cast

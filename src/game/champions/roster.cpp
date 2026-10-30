@@ -1,4 +1,5 @@
 // [X-13][X-59] The champion roster and the special-skill list. One file per champion in this folder.
+#include <algorithm>
 #include <array>
 #include <vector>
 
@@ -13,13 +14,26 @@
 #include "game/champions/mist_dancer.hpp"
 #include "game/champions/chi_blocker.hpp"
 #include "game/champions/avatar_kyren.hpp"
+#include "game/champions/pack_a.hpp"  // [U-390] 60 more champions (water / earth / fire / air packs)
+#include "game/champions/pack_b.hpp"
+#include "game/champions/pack_c.hpp"
+#include "game/champions/pack_d.hpp"
 #include "game/skills/q_options.hpp"
 #include "game/skills/specials.hpp"
 
 namespace em {
 namespace {
 
-constexpr std::array kRoster{data::kEmberMonk, data::kStormDaughter, data::kStoneWarden, data::kIronSentinel, data::kMagmaHerald, data::kTideHealer, data::kFrostHunter, data::kWindNomad, data::kMistDancer, data::kChiBlocker, data::kAvatarKyren};
+constexpr std::array kBase{data::kEmberMonk, data::kStormDaughter, data::kStoneWarden, data::kIronSentinel, data::kMagmaHerald, data::kTideHealer, data::kFrostHunter, data::kWindNomad, data::kMistDancer, data::kChiBlocker, data::kAvatarKyren};
+// [U-390] the first 11 keep their numbers (saved picks / settings); the packs follow
+template <std::size_t... N>
+constexpr auto join(const std::array<ChampionDef, N>&... parts) {
+    std::array<ChampionDef, (N + ...)> out{};
+    std::size_t i = 0;
+    ((std::ranges::copy(parts, out.begin() + std::ptrdiff_t(i)), i += N), ...);
+    return out;
+}
+constexpr auto kRoster = join(kBase, data::kPackA, data::kPackB, data::kPackC, data::kPackD);
 
 constexpr auto kSpecials = [] {
     std::array<SkillDef, std::size(data::kSpecialRows)> a{};

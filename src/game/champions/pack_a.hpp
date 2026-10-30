@@ -1,0 +1,222 @@
+#pragma once
+// Pack A: 12 water-family champions + 3 non-benders. Numbers are placeholders close to the first roster.
+#include <array>
+
+#include "game/champions/common.hpp"
+
+namespace em::data {
+
+// Glacier Warden: ice tank. Walls off lanes with thick ice, then crushes whoever stays near it.
+// Plays as a slow front-line: stack walls, shrug damage, lock down with a freezing quake.
+inline constexpr ChampionDef kGlacierWarden{.name = "Glacier Warden", .element = Element::Water, .sub = S::Ice, .body = &kBroadBody,
+ .resource = ResourceKind::Water, .ep_lvl = 200, .hp = 64'000, .hp_lvl = 10'500, .attack = 5'600, .def = 3'600, .ms = 33'000,
+ .attack_range = 50, .res_max = 30'000, .res_regen = 300,
+ .w = {.name = "Frost Armour", .kind = K::Shield, .sub = S::Ice, .dmg = 110, .dmg_rank = 55, .ep = 45, .cast_ms = 0, .cd_ms = 16'000, .dur_ms = 3'500, .size_bonus = 1'000, .desc = "Ice shield on yourself; you grow a little"},
+ .e = {.name = "Glacier Wall", .kind = K::Wall, .sub = S::Ice, .range = 650, .width = 300, .cast_ms = 300, .cd_ms = 16'000, .cost = 320, .dur_ms = 3'500, .desc = "Thick two-level ice wall; takes a lot to break", .wall_thick = 3, .wall_level = 2, .wall_hp = 220, .wall_hp_rank = 40},
+ .r = {.name = "Ground Frost", .kind = K::Field, .sub = S::Ice, .dmg = 14, .dmg_rank = 7, .ep = 8, .range = 600, .radius = 230, .cast_ms = 250, .cd_ms = 13'000, .dur_ms = 3'000, .cc = C::Slow, .cc_ms = 600, .cc_val = 50, .group = true, .desc = "Frozen ground slows 50 %; allies can feed it"},
+ .t = {.name = "Shatter Slam", .kind = K::Burst, .sub = S::Ice, .dmg = 80, .dmg_rank = 40, .ep = 45, .range = 300, .radius = 220, .cast_ms = 300, .cd_ms = 12'000, .delay_ms = 400, .cc = C::Stun, .cc_ms = 700, .desc = "Slam the ground: stuns; centre hits harder", .melee = true, .ground = true, .sweet_pct = 30},
+ .y = {.name = "Ice Age", .kind = K::Field, .sub = S::Ice, .dmg = 30, .dmg_rank = 15, .ep = 20, .range = 700, .radius = 380, .cast_ms = 500, .cd_ms = 100'000, .cost = 100, .dur_ms = 4'000, .cc = C::Frozen, .cc_ms = 700, .group = true, .desc = "A huge freezing zone that holds enemies in place", .ultimate = true},
+ .p = {.name = "Deep Cold", .kind = K::Passive, .passive = PassiveId::Rooted, .desc = "+tenacity"},
+ .colour = 0x90d0f0, .role = Role::Tank,
+ .q_pool = {"Ice Shards", "Ice Spear", "Water Whip"}};
+
+// Brine Sage: sea support. Heals the weakest ally hardest and leaves salt puddles that slow enemies.
+// Plays as a backline healer who repositions water with MoveWater and swaps heals for pressure.
+inline constexpr ChampionDef kBrineSage{.name = "Brine Sage", .element = Element::Water, .sub = S::Water, .range = Range::Ranged,
+ .resource = ResourceKind::Water, .ep_lvl = 260, .hp = 50'000, .attack = 4'600, .attack_range = 520, .res_max = 30'000, .res_regen = 340,
+ .w = {.name = "Salt Mend", .kind = K::Heal, .sub = S::Water, .dmg = 60, .dmg_rank = 30, .ep = 40, .range = 700, .radius = 200, .cast_ms = 300, .cd_ms = 10'000, .cost = 60, .ally = true, .desc = "Heals allies; +10 % of the missing health", .pct_missing_hp = 1'000},
+ .e = {.name = "Salt Puddle", .kind = K::MoveWater, .sub = S::Water, .range = 800, .radius = 200, .cast_ms = 250, .cd_ms = 12'000, .cost = 40, .dur_ms = 3'500, .cc = C::Slow, .cc_ms = 600, .cc_val = 40, .desc = "Move water to a spot: a puddle that slows 40 %"},
+ .r = {.name = "Undertow", .kind = K::Field, .sub = S::Water, .dmg = 16, .dmg_rank = 8, .ep = 10, .range = 700, .radius = 240, .cast_ms = 300, .cd_ms = 14'000, .dur_ms = 3'000, .cc = C::Root, .cc_ms = 500, .group = true, .desc = "Pulls feet down: short roots; allies can feed it"},
+ .t = {.name = "Cleansing Rain", .kind = K::Heal, .sub = S::Water, .dmg = 45, .dmg_rank = 22, .ep = 30, .range = 600, .radius = 280, .cast_ms = 250, .cd_ms = 13'000, .cost = 50, .ally = true, .casts = 2, .recast_ms = 2'500, .desc = "Heals allies in an area; recast once for a second wave"},
+ .y = {.name = "Tide Surge", .kind = K::Wave, .sub = S::Water, .dmg = 150, .dmg_rank = 75, .ep = 65, .range = 1'300, .width = 480, .speed = 850, .cast_ms = 550, .cd_ms = 105'000, .cost = 100, .cc = C::Slow, .cc_ms = 1'800, .cc_val = 50, .knock = 200, .pierce = true, .desc = "A long wave that shoves and slows", .ultimate = true},
+ .p = {.name = "Sea Blessing", .kind = K::Passive, .passive = PassiveId::Tide, .desc = "Heals stronger near water"},
+ .colour = 0x5090d0, .role = Role::Support,
+ .q_pool = {"Water Whip", "Water Wave", "Ice Shards"}};
+
+// Moon Weaver: blood mage. Only strong at full moon, when she can steer one enemy like a puppet.
+// Plays as a patient assassin: drain with whips, then lock the target and burst it.
+inline constexpr ChampionDef kMoonWeaver{.name = "Moon Weaver", .element = Element::Water, .sub = S::Blood, .body = &kSlimBody, .range = Range::Ranged,
+ .resource = ResourceKind::Water, .ep_lvl = 270, .hp = 49'000, .attack = 4'900, .attack_range = 480, .res_max = 30'000, .res_regen = 300,
+ .w = {.name = "Blood Thread", .kind = K::Bolt, .sub = S::Blood, .dmg = 50, .dmg_rank = 25, .ep = 45, .range = 750, .width = 50, .speed = 1'700, .cast_ms = 200, .cd_ms = 8'000, .cost = 40, .cc = C::Slow, .cc_ms = 1'200, .cc_val = 35, .desc = "A thin thread: slows and deals +3 % of current health", .pct_current_hp = 300, .source_first = 0},
+ .e = {.name = "Crimson Tide", .kind = K::Cone, .sub = S::Blood, .dmg = 60, .dmg_rank = 30, .ep = 50, .range = 380, .width = 300, .cast_ms = 250, .cd_ms = 11'000, .cost = 50, .desc = "A short fan of blood; the tip hits harder", .sweet_pct = 25, .source_first = 0},
+ .r = {.name = "Pulse Lock", .kind = K::Bloodbend, .sub = S::Blood, .range = 650, .cast_ms = 300, .cd_ms = 60'000, .cc = C::Bloodbound, .cc_ms = 2'000, .targeted = true, .full_moon_only = true, .desc = "Full moon only: take control of one enemy"},
+ .t = {.name = "Night Veil", .kind = K::Haste, .sub = S::Water, .cast_ms = 0, .cd_ms = 14'000, .dur_ms = 2'500, .cc_val = 35, .desc = "+35 % move speed"},
+ .y = {.name = "Blood Moon", .kind = K::Burst, .sub = S::Blood, .dmg = 160, .dmg_rank = 80, .ep = 70, .range = 800, .radius = 300, .cast_ms = 600, .cd_ms = 100'000, .cost = 100, .delay_ms = 700, .cc = C::Silence, .cc_ms = 1'500, .desc = "Delayed red blast; silences, +8 % of the missing health", .sweet_pct = 20, .ultimate = true, .pct_missing_hp = 800, .source_first = 0},
+ .p = {.name = "Night Veins", .kind = K::Passive, .passive = PassiveId::LightFeet, .desc = "Faster on foot"},
+ .colour = 0xb02848, .role = Role::Assassin,
+ .q_pool = {"Water Whip", "Ice Shards", "Ice Spear"}};
+
+// Mire Stalker: mud fighter. Drags enemies into sticky ground and fights them there up close.
+// Plays as a brawler: root with mud, dash in, finish with a pit that holds the whole team.
+inline constexpr ChampionDef kMireStalker{.name = "Mire Stalker", .element = Element::Water, .sub = S::Mud, .body = &kBroadBody,
+ .resource = ResourceKind::Water, .ep_lvl = 120, .hp = 60'000, .hp_lvl = 10'000, .attack = 6'200, .attack_lvl = 380, .def = 3'300,
+ .attack_range = 50, .res_max = 30'000, .res_regen = 300,
+ .w = {.name = "Mud Lunge", .kind = K::Dash, .sub = S::Mud, .dmg = 45, .dmg_rank = 25, .ep = 25, .ad = 40, .range = 450, .width = 110, .speed = 1'400, .cast_ms = 0, .cd_ms = 10'000, .cost = 40, .cc = C::Slow, .cc_ms = 1'000, .cc_val = 30, .desc = "Lunge forward, slowing what you hit", .melee = true},
+ .e = {.name = "Bog Trap", .kind = K::Field, .sub = S::Mud, .dmg = 10, .dmg_rank = 5, .ep = 8, .range = 600, .radius = 170, .cast_ms = 200, .cd_ms = 12'000, .dur_ms = 3'500, .cc = C::Root, .cc_ms = 700, .desc = "Sticky mud roots enemies", .ground = true},
+ .r = {.name = "Mud Slap", .kind = K::Cone, .sub = S::Mud, .dmg = 65, .dmg_rank = 32, .ep = 35, .ad = 35, .range = 260, .width = 260, .cast_ms = 150, .cd_ms = 9'000, .cost = 30, .knock = 120, .desc = "Close slap that pushes back; tip is strongest", .melee = true, .sweet_pct = 30, .source_first = 0},
+ .t = {.name = "Sink Down", .kind = K::Shield, .sub = S::Mud, .dmg = 90, .dmg_rank = 45, .ep = 35, .cast_ms = 0, .cd_ms = 17'000, .dur_ms = 3'000, .desc = "Mud coat absorbs damage"},
+ .y = {.name = "Sinkhole", .kind = K::Field, .sub = S::Mud, .dmg = 40, .dmg_rank = 20, .ep = 25, .range = 650, .radius = 330, .cast_ms = 450, .cd_ms = 95'000, .cost = 100, .dur_ms = 3'500, .cc = C::Root, .cc_ms = 1'200, .group = true, .desc = "A huge pit: roots everyone inside", .ultimate = true},
+ .p = {.name = "Thick Hide", .kind = K::Passive, .passive = PassiveId::Rooted, .desc = "+tenacity"},
+ .colour = 0x7a5a38, .role = Role::Fighter, .auto_projectile = false,
+ .q_pool = {"Water Whip", "Ice Shards", "Water Wave"}};
+
+// Boil Caller: steam mage. Wears enemies down with scalding blasts that cut a share of their health.
+// Plays as a poke caster: cast twice for a second blast, burn big targets, hide in your own fog.
+inline constexpr ChampionDef kBoilCaller{.name = "Boil Caller", .element = Element::Water, .sub = S::Steam, .range = Range::Ranged,
+ .resource = ResourceKind::Water, .ep_lvl = 280, .hp = 49'000, .attack = 4'700, .attack_range = 500, .res_max = 30'000, .res_regen = 320,
+ .w = {.name = "Scald", .kind = K::Burst, .sub = S::Steam, .dmg = 55, .dmg_rank = 28, .ep = 50, .range = 750, .radius = 170, .cast_ms = 250, .cd_ms = 9'000, .cost = 50, .delay_ms = 400, .casts = 2, .recast_ms = 2'000, .desc = "Hot blast, +2.5 % of current health; cast again within 2 s", .sweet_pct = 25, .pct_current_hp = 250},
+ .e = {.name = "Vapour Screen", .kind = K::Field, .sub = S::Steam, .range = 650, .radius = 240, .cast_ms = 200, .cd_ms = 15'000, .dur_ms = 3'000, .cc = C::Blind, .cc_ms = 600, .cc_val = 50, .desc = "A steam cloud that blinds", .env_bend = true},
+ .r = {.name = "Whistle Jet", .kind = K::Bolt, .sub = S::Steam, .dmg = 75, .dmg_rank = 38, .ep = 60, .range = 900, .width = 60, .speed = 1'800, .cast_ms = 200, .cd_ms = 10'000, .cost = 40, .pierce = true, .desc = "A piercing jet of steam", .source_first = 0},
+ .t = {.name = "Pressure Dash", .kind = K::Blink, .sub = S::Steam, .range = 380, .cast_ms = 0, .cd_ms = 11'000, .cost = 30, .desc = "Steam-powered blink"},
+ .y = {.name = "Geyser Field", .kind = K::Field, .sub = S::Steam, .dmg = 45, .dmg_rank = 22, .ep = 30, .range = 800, .radius = 300, .cast_ms = 500, .cd_ms = 100'000, .cost = 100, .dur_ms = 4'000, .tick_ms = 400, .cc = C::Airborne, .cc_ms = 300, .desc = "Geysers erupt over time; each hit also cuts 0.2 % max health", .ground = true, .ultimate = true, .pct_max_hp = 20},
+ .p = {.name = "Cold Hands", .kind = K::Passive, .passive = PassiveId::None, .desc = "Steam never burns you"},
+ .colour = 0xe0e0e8, .role = Role::Mage,
+ .q_pool = {"Water Whip", "Ice Shards", "Water Wave"}};
+
+// Thorn Binder: plant-bender. Grows living walls and vines, and chops through walls with root-strikes.
+// Plays as a zone controller: wall fields, root traps, autos that also break enemy walls.
+inline constexpr ChampionDef kThornBinder{.name = "Thorn Binder", .element = Element::Water, .sub = S::Wood, .body = &kSlimBody,
+ .resource = ResourceKind::Water, .ep_lvl = 220, .hp = 55'000, .attack = 5'400, .attack_range = 200, .res_max = 30'000, .res_regen = 300,
+ .w = {.name = "Vine Snare", .kind = K::Bolt, .sub = S::Wood, .dmg = 45, .dmg_rank = 22, .ep = 40, .range = 700, .width = 60, .speed = 1'500, .cast_ms = 250, .cd_ms = 9'000, .cost = 40, .cc = C::Root, .cc_ms = 900, .desc = "A vine that roots the first target", .stop_on = 1, .source_first = 0},
+ .e = {.name = "Bramble Hedge", .kind = K::Wall, .sub = S::Wood, .range = 650, .width = 400, .cast_ms = 300, .cd_ms = 15'000, .cost = 100, .dur_ms = 5'000, .desc = "A thin hedge of four low segments; lasts longer than ice", .source_first = 0, .wall_thick = 1, .wall_level = 1, .wall_hp = 140, .wall_segs = 4},
+ .r = {.name = "Overgrowth", .kind = K::Field, .sub = S::Wood, .dmg = 14, .dmg_rank = 7, .ep = 10, .range = 700, .radius = 250, .cast_ms = 300, .cd_ms = 14'000, .dur_ms = 3'500, .cc = C::Slow, .cc_ms = 600, .cc_val = 40, .group = true, .desc = "Thick growth slows; allies can feed it", .destroys_trees = 0},
+ .t = {.name = "Bark Skin", .kind = K::Shield, .sub = S::Wood, .dmg = 80, .dmg_rank = 40, .ep = 35, .cast_ms = 0, .cd_ms = 16'000, .dur_ms = 3'500, .desc = "Bark absorbs damage"},
+ .y = {.name = "Verdant Cage", .kind = K::Wall, .sub = S::Wood, .dmg = 120, .dmg_rank = 60, .ep = 55, .range = 700, .radius = 170, .cast_ms = 500, .cd_ms = 95'000, .cost = 100, .dur_ms = 3'500, .cc = C::Root, .cc_ms = 1'200, .desc = "A cage of living wood around a point", .ultimate = true, .wall_thick = 2, .wall_level = 2, .wall_hp = 200},
+ .p = {.name = "Deep Roots", .kind = K::Passive, .passive = PassiveId::Rooted, .desc = "+tenacity"},
+ .colour = 0x4a9a50, .role = Role::Mage,
+ .autos = {.hits_walls = true, .wall_pct = 150},
+ .q_pool = {"Water Whip", "Ice Shards", "Water Wave"}};
+
+// Rime Archer: ice marksman. Long, straight shots that pierce along a line and chill the last target.
+// Plays as a kiter: hold distance, shoot where you face, freeze anything that gets close.
+inline constexpr ChampionDef kRimeArcher{.name = "Rime Archer", .element = Element::Water, .sub = S::Ice, .body = &kSlimBody, .range = Range::Ranged,
+ .resource = ResourceKind::Water, .ep_lvl = 150, .hp = 50'000, .attack = 5'600, .attack_lvl = 400, .as = 75, .as_lvl = 250, .ms = 34'000,
+ .attack_range = 620, .res_max = 30'000, .res_regen = 300,
+ .w = {.name = "Hoar Arrow", .kind = K::Bolt, .sub = S::Ice, .dmg = 70, .dmg_rank = 35, .ep = 50, .ad = 30, .range = 1'000, .width = 50, .speed = 2'200, .cast_ms = 200, .cd_ms = 8'000, .cost = 40, .cc = C::Slow, .cc_ms = 900, .cc_val = 35, .desc = "Arrow fired where you face; the last part of its flight hits harder", .aim = Aim::Facing, .sweet_pct = 30, .source_first = 0},
+ .e = {.name = "Snow Step", .kind = K::Dash, .sub = S::Ice, .range = 350, .width = 60, .speed = 1'700, .cast_ms = 0, .cd_ms = 9'000, .cost = 30, .desc = "Slide backwards... or wherever you face", .aim = Aim::Facing},
+ .r = {.name = "Ice Needle", .kind = K::Bolt, .sub = S::Ice, .dmg = 55, .dmg_rank = 28, .ep = 40, .ad = 25, .range = 800, .width = 40, .speed = 2'400, .cast_ms = 150, .cd_ms = 7'000, .cost = 30, .desc = "A needle that flies on after a kill", .stop_on = 1, .pass_on_kill = 1, .source_first = 0},
+ .t = {.name = "Frost Net", .kind = K::Burst, .sub = S::Ice, .dmg = 40, .dmg_rank = 20, .ep = 30, .range = 700, .radius = 200, .cast_ms = 250, .cd_ms = 13'000, .delay_ms = 350, .cc = C::Frozen, .cc_ms = 800, .desc = "Freezes a small area"},
+ .y = {.name = "Blizzard Volley", .kind = K::Wave, .sub = S::Ice, .dmg = 170, .dmg_rank = 85, .ep = 60, .ad = 60, .range = 1'500, .width = 360, .speed = 1'400, .cast_ms = 450, .cd_ms = 100'000, .cost = 100, .cc = C::Slow, .cc_ms = 2'000, .cc_val = 50, .pierce = true, .desc = "A wall of ice arrows fired ahead", .aim = Aim::Facing, .ultimate = true},
+ .p = {.name = "Frost Tips", .kind = K::Passive, .passive = PassiveId::Frostbite, .desc = "Autoattacks slow 15 %"},
+ .colour = 0xc8f0ff, .role = Role::Marksman,
+ .autos = {.shape = AutoShape::Line, .line_length = 220, .line_width = 50},
+ .q_pool = {"Ice Spear", "Ice Shards", "Water Whip"}};
+
+// Rain Caller: storm-water mage. Moves water around the map to make puddles that burst or hold.
+// Plays as a trapper: place puddles, recast them closer, then flood the whole lane.
+inline constexpr ChampionDef kRainCaller{.name = "Rain Caller", .element = Element::Water, .sub = S::Water, .range = Range::Ranged,
+ .resource = ResourceKind::Water, .ep_lvl = 270, .hp = 50'000, .attack = 4'700, .attack_range = 500, .res_max = 30'000, .res_regen = 330,
+ .w = {.name = "Pull Water", .kind = K::MoveWater, .sub = S::Water, .dmg = 25, .dmg_rank = 12, .ep = 25, .range = 900, .radius = 190, .cast_ms = 250, .cd_ms = 9'000, .cost = 40, .dur_ms = 3'500, .cc = C::Slow, .cc_ms = 600, .cc_val = 35, .casts = 2, .recast_ms = 3'000, .desc = "Drag water to a spot for a puddle; cast again to make a second"},
+ .e = {.name = "Drizzle", .kind = K::Field, .sub = S::Water, .dmg = 12, .dmg_rank = 6, .ep = 12, .range = 750, .radius = 260, .cast_ms = 250, .cd_ms = 12'000, .dur_ms = 3'500, .cc = C::Wet, .cc_ms = 1'500, .group = true, .desc = "Rain that soaks everything under it; allies can feed it"},
+ .r = {.name = "Water Lash", .kind = K::Cone, .sub = S::Water, .dmg = 70, .dmg_rank = 35, .ep = 55, .range = 450, .width = 250, .cast_ms = 250, .cd_ms = 9'000, .cost = 50, .knock = 140, .desc = "Lash that pushes enemies back"},
+ .t = {.name = "Mist Step", .kind = K::Haste, .sub = S::Water, .cast_ms = 0, .cd_ms = 15'000, .dur_ms = 2'500, .cc_val = 30, .desc = "+30 % move speed"},
+ .y = {.name = "Flash Flood", .kind = K::Field, .sub = S::Water, .dmg = 35, .dmg_rank = 18, .ep = 28, .range = 900, .radius = 360, .cast_ms = 500, .cd_ms = 100'000, .cost = 100, .dur_ms = 4'500, .tick_ms = 450, .cc = C::Slow, .cc_ms = 600, .cc_val = 60, .knock = 60, .group = true, .desc = "A flood that slows 60 % and drags enemies along", .ultimate = true},
+ .p = {.name = "Wet Season", .kind = K::Passive, .passive = PassiveId::Tide, .desc = "Heals stronger near water"},
+ .colour = 0x3070c0, .role = Role::Mage,
+ .q_pool = {"Water Wave", "Water Whip", "Ice Shards"}};
+
+// Tidal Duelist: water fighter. Chains lunges through the enemy like a wave, switching between two forms.
+// Plays as a bruiser: dive with multicast dashes, switch stance (space), finish low targets.
+inline constexpr ChampionDef kTidalDuelist{.name = "Tidal Duelist", .element = Element::Water, .sub = S::Water,
+ .resource = ResourceKind::Water, .ep_lvl = 150, .hp = 58'000, .attack = 6'300, .attack_lvl = 390, .as = 70, .ms = 34'000,
+ .attack_range = 45, .res_max = 30'000, .res_regen = 300,
+ .w = {.name = "Wave Rush", .kind = K::Dash, .sub = S::Water, .dmg = 40, .dmg_rank = 20, .ep = 25, .ad = 45, .range = 380, .width = 90, .speed = 1'600, .cast_ms = 0, .cd_ms = 11'000, .cost = 30, .casts = 3, .recast_ms = 2'500, .desc = "Dash up to three times in 2.5 s, hitting on the way", .melee = true},
+ .e = {.name = "Riptide Cut", .kind = K::Cone, .sub = S::Water, .dmg = 60, .dmg_rank = 30, .ep = 30, .ad = 55, .range = 280, .width = 240, .cast_ms = 150, .cd_ms = 8'000, .cost = 30, .desc = "A close slash; +5 % of the target's missing health", .melee = true, .sweet_pct = 20, .pct_missing_hp = 500},
+ .r = {.name = "Spray Guard", .kind = K::Shield, .sub = S::Water, .dmg = 80, .dmg_rank = 40, .ep = 30, .bonus_ad = 60, .cast_ms = 0, .cd_ms = 14'000, .dur_ms = 2'500, .desc = "A fast water shield"},
+ .t = {.name = "Undertow Hook", .kind = K::Bolt, .sub = S::Water, .dmg = 50, .dmg_rank = 25, .ep = 30, .ad = 30, .range = 600, .width = 60, .speed = 1'800, .cast_ms = 200, .cd_ms = 12'000, .cost = 40, .cc = C::Slow, .cc_ms = 1'000, .cc_val = 40, .desc = "A hook of water that slows", .stop_on = 1},
+ .y = {.name = "Maelstrom Spin", .kind = K::Burst, .sub = S::Water, .dmg = 150, .dmg_rank = 75, .ep = 50, .ad = 70, .range = 0, .radius = 300, .cast_ms = 300, .cd_ms = 90'000, .cost = 80, .delay_ms = 300, .cc = C::Airborne, .cc_ms = 700, .desc = "Spin around yourself, lifting enemies", .melee = true, .ultimate = true},
+ .p = {.name = "Swift Current", .kind = K::Passive, .passive = PassiveId::LightFeet, .desc = "Faster on foot"},
+ .stance = true,
+ .colour = 0x2090e0, .role = Role::Fighter, .auto_projectile = false,
+ .q_pool = {"Water Whip", "Ice Shards", "Water Wave"}};
+
+// Snowdrift Trickster: ice assassin. Vanishes in a flurry, reappears behind targets and freezes them solid.
+// Plays as a flanker: teleport in, burst one enemy, step back out; weak when caught.
+inline constexpr ChampionDef kSnowdriftTrickster{.name = "Snowdrift Trickster", .element = Element::Water, .sub = S::Ice, .body = &kSlimBody,
+ .resource = ResourceKind::Water, .ep_lvl = 220, .hp = 48'000, .attack = 5'400, .attack_lvl = 360, .as = 72, .ms = 35'000,
+ .attack_range = 40, .res_max = 30'000, .res_regen = 320,
+ .w = {.name = "Flurry Step", .kind = K::Blink, .sub = S::Ice, .range = 450, .cast_ms = 0, .cd_ms = 12'000, .cost = 40, .desc = "Teleport in a snow flurry", .teleport = true},
+ .e = {.name = "Hoarfrost Stab", .kind = K::Cone, .sub = S::Ice, .dmg = 75, .dmg_rank = 38, .ep = 45, .ad = 30, .range = 240, .width = 200, .cast_ms = 100, .cd_ms = 7'000, .cost = 30, .desc = "Stab; the tip hits much harder", .melee = true, .sweet_pct = 35, .source_first = 0},
+ .r = {.name = "Cold Snap", .kind = K::Burst, .sub = S::Ice, .dmg = 50, .dmg_rank = 25, .ep = 40, .range = 550, .radius = 150, .cast_ms = 150, .cd_ms = 11'000, .cost = 40, .delay_ms = 600, .cc = C::Frozen, .cc_ms = 900, .targeted = true, .desc = "Pick one enemy: a moment later it freezes"},
+ .t = {.name = "Ice Mirror", .kind = K::SelfFreeze, .sub = S::Ice, .cast_ms = 0, .cd_ms = 40'000, .dur_ms = 1'500, .desc = "Freeze yourself: untouchable for a moment"},
+ .y = {.name = "White Out", .kind = K::Field, .sub = S::Ice, .dmg = 40, .dmg_rank = 20, .ep = 30, .ad = 40, .range = 600, .radius = 280, .cast_ms = 300, .cd_ms = 90'000, .cost = 80, .dur_ms = 3'500, .cc = C::Blind, .cc_ms = 600, .cc_val = 80, .desc = "A blizzard that nearly blinds enemies and shaves max health", .ultimate = true, .pct_max_hp = 15},
+ .p = {.name = "Snow Light", .kind = K::Passive, .passive = PassiveId::LightFeet, .desc = "Faster on foot"},
+ .colour = 0xe8f8ff, .role = Role::Assassin, .auto_projectile = false,
+ .q_pool = {"Ice Shards", "Ice Spear", "Water Whip"}};
+
+// Marsh Shaman: mud / plant support. Feeds a shared swamp the whole team can power.
+// Plays as a field controller: group-fed swamp, mud shields on allies, a healing bloom at the end.
+inline constexpr ChampionDef kMarshShaman{.name = "Marsh Shaman", .element = Element::Water, .sub = S::Mud, .range = Range::Ranged,
+ .resource = ResourceKind::Water, .ep_lvl = 250, .hp = 54'000, .attack = 4'600, .attack_range = 480, .res_max = 30'000, .res_regen = 330,
+ .w = {.name = "Swamp Gift", .kind = K::Shield, .sub = S::Mud, .dmg = 90, .dmg_rank = 45, .ep = 40, .range = 600, .cast_ms = 250, .cd_ms = 12'000, .dur_ms = 3'500, .ally = true, .desc = "A mud shield on an ally"},
+ .e = {.name = "Marsh Pool", .kind = K::Field, .sub = S::Mud, .dmg = 12, .dmg_rank = 6, .ep = 10, .range = 700, .radius = 280, .cast_ms = 300, .cd_ms = 15'000, .dur_ms = 4'500, .cc = C::Slow, .cc_ms = 600, .cc_val = 45, .group = true, .desc = "A swamp that slows; every ally who feeds it makes it stronger"},
+ .r = {.name = "Reed Whip", .kind = K::Bolt, .sub = S::Wood, .dmg = 55, .dmg_rank = 28, .ep = 50, .range = 800, .width = 60, .speed = 1'700, .cast_ms = 200, .cd_ms = 8'000, .cost = 40, .cc = C::Root, .cc_ms = 600, .desc = "Reed lash that briefly roots", .source_first = 0},
+ .t = {.name = "Moss Bloom", .kind = K::Heal, .sub = S::Wood, .dmg = 55, .dmg_rank = 28, .ep = 35, .range = 600, .radius = 240, .cast_ms = 250, .cd_ms = 13'000, .cost = 50, .ally = true, .casts = 2, .recast_ms = 3'000, .desc = "A healing bloom; recast to heal again"},
+ .y = {.name = "Living Swamp", .kind = K::Tornado, .sub = S::Mud, .dmg = 50, .dmg_rank = 25, .ep = 35, .range = 900, .speed = 220, .radius = 300, .cast_ms = 500, .cd_ms = 100'000, .dur_ms = 6'000, .cc = C::Slow, .cc_ms = 600, .cc_val = 50, .group = true, .desc = "A moving swamp that rolls through the lane", .ultimate = true},
+ .p = {.name = "Marsh Calm", .kind = K::Passive, .passive = PassiveId::Tide, .desc = "Heals stronger near water"},
+ .colour = 0x5a7a3a, .role = Role::Support,
+ .q_pool = {"Water Whip", "Water Wave", "Ice Shards"}};
+
+// Dew Mystic: steam seer. Short, fast spells that shroud allies and punish who steps into the fog.
+// Plays as a skirmisher mage: fog, quick steam cones with a sweet tip, blink and burst.
+inline constexpr ChampionDef kDewMystic{.name = "Dew Mystic", .element = Element::Water, .sub = S::Steam, .body = &kSlimBody, .range = Range::Ranged,
+ .resource = ResourceKind::Water, .ep_lvl = 270, .hp = 48'000, .attack = 4'600, .ms = 34'500, .attack_range = 470, .res_max = 30'000, .res_regen = 330,
+ .w = {.name = "Hot Breath", .kind = K::Cone, .sub = S::Steam, .dmg = 60, .dmg_rank = 30, .ep = 55, .range = 380, .width = 300, .cast_ms = 200, .cd_ms = 7'000, .cost = 40, .desc = "Short steam cone; the tip hits hard", .sweet_pct = 40, .source_first = 0},
+ .e = {.name = "Dew Veil", .kind = K::Shield, .sub = S::Water, .dmg = 70, .dmg_rank = 35, .ep = 35, .range = 600, .cast_ms = 0, .cd_ms = 13'000, .dur_ms = 3'000, .ally = true, .desc = "A thin veil shield on you or an ally"},
+ .r = {.name = "Fog Walk", .kind = K::Blink, .sub = S::Steam, .range = 420, .cast_ms = 0, .cd_ms = 12'000, .cost = 30, .desc = "Fast dash through a puff of steam", .env_bend = true},
+ .t = {.name = "Cloud Lock", .kind = K::Burst, .sub = S::Steam, .dmg = 65, .dmg_rank = 32, .ep = 50, .range = 700, .radius = 190, .cast_ms = 250, .cd_ms = 11'000, .cost = 50, .delay_ms = 450, .cc = C::Silence, .cc_ms = 1'000, .desc = "Steam burst that silences"},
+ .y = {.name = "Scalding Mist", .kind = K::Field, .sub = S::Steam, .dmg = 35, .dmg_rank = 18, .ep = 30, .range = 750, .radius = 320, .cast_ms = 450, .cd_ms = 95'000, .cost = 100, .dur_ms = 4'000, .cc = C::Blind, .cc_ms = 600, .cc_val = 50, .group = true, .desc = "A hot fog that hurts and blinds; allies can feed it", .ultimate = true},
+ .p = {.name = "Dew Step", .kind = K::Passive, .passive = PassiveId::MistForm, .desc = "+10 % skill size"},
+ .colour = 0xb8d8e0, .role = Role::Mage,
+ .q_pool = {"Water Whip", "Ice Shards", "Water Wave"}};
+
+// Blade Wanderer: non-bender duellist. Quick sword fighter whose autos leap between enemies.
+// Plays as a skirmisher: stance switch (space) between sword and long reach, parries into a rush.
+inline constexpr ChampionDef kBladeWanderer{.name = "Blade Wanderer", .element = Element::None, .sub = S::Physical,
+ .resource = ResourceKind::Energy, .mage = false, .hp = 57'000, .attack = 6'700, .attack_lvl = 420, .as = 72, .as_lvl = 280, .ms = 34'500,
+ .attack_range = 45, .res_max = 20'000, .res_regen = 1'000,
+ .w = {.name = "Parry", .kind = K::Shield, .dmg = 90, .dmg_rank = 45, .bonus_ad = 80, .cast_ms = 0, .cd_ms = 13'000, .dur_ms = 1'500, .desc = "A short guard that absorbs damage"},
+ .e = {.name = "Crescent Cut", .kind = K::Cone, .dmg = 55, .dmg_rank = 28, .ad = 70, .range = 270, .width = 250, .cast_ms = 150, .cd_ms = 8'000, .cost = 40, .desc = "Wide slash; the tip hits harder", .melee = true, .sweet_pct = 25},
+ .r = {.name = "Lunge", .kind = K::Dash, .dmg = 60, .dmg_rank = 30, .ad = 70, .range = 420, .width = 100, .speed = 1'700, .cast_ms = 0, .cd_ms = 10'000, .cost = 40, .casts = 2, .recast_ms = 2'000, .desc = "Dash; cast again within 2 s"},
+ .t = {.name = "Battle Cry", .kind = K::Haste, .cast_ms = 0, .cd_ms = 15'000, .cost = 40, .dur_ms = 2'500, .cc_val = 30, .desc = "+30 % move speed"},
+ .y = {.name = "Thousand Cuts", .kind = K::Dash, .dmg = 190, .dmg_rank = 95, .ad = 140, .range = 500, .width = 140, .speed = 1'300, .cast_ms = 0, .cd_ms = 90'000, .cost = 80, .desc = "Dash; hits harder on wounded enemies", .ultimate = true, .pct_missing_hp = 700},
+ .p = {.name = "Steady Breath", .kind = K::Passive, .passive = PassiveId::ChiFlow, .desc = "Hits give energy"},
+ .stance = true,
+ .colour = 0xc0c0c8, .role = Role::Fighter, .auto_projectile = false,
+ .autos = {.shape = AutoShape::Chain, .chain_count = 1, .chain_range = 180, .chain_pct = 60},
+ .q_pool = {"Chi Strike", "Knife Throw", "Bolas Throw"}};
+
+// Siege Breaker: non-bender bruiser. Swings a huge axe that also smashes walls and trees.
+// Plays as a front-liner: tear down bent walls, splash packs of enemies, land a heavy stunning slam.
+inline constexpr ChampionDef kSiegeBreaker{.name = "Siege Breaker", .element = Element::None, .sub = S::Physical, .body = &kBroadBody,
+ .resource = ResourceKind::Energy, .mage = false, .hp = 64'000, .hp_lvl = 10'500, .attack = 7'000, .attack_lvl = 450, .def = 3'500, .as = 60,
+ .ms = 33'000, .attack_range = 55, .res_max = 20'000, .res_regen = 900,
+ .w = {.name = "Wall Smash", .kind = K::Cone, .dmg = 70, .dmg_rank = 35, .ad = 80, .range = 250, .width = 280, .cast_ms = 250, .cd_ms = 9'000, .cost = 40, .knock = 150, .desc = "A heavy swing that pushes enemies and fells trees", .melee = true, .destroys_trees = 1},
+ .e = {.name = "Hurled Axe", .kind = K::Bolt, .dmg = 65, .dmg_rank = 33, .ad = 85, .range = 650, .width = 70, .speed = 1'700, .cast_ms = 200, .cd_ms = 10'000, .cost = 40, .pierce = true, .desc = "Throw the axe through enemies"},
+ .r = {.name = "Bracing Roar", .kind = K::Shield, .dmg = 100, .dmg_rank = 50, .bonus_ad = 100, .cast_ms = 0, .cd_ms = 17'000, .cost = 40, .dur_ms = 3'500, .size_bonus = 800, .desc = "Shield and a bigger frame"},
+ .t = {.name = "Shield Charge", .kind = K::Dash, .dmg = 45, .dmg_rank = 25, .ad = 55, .range = 380, .width = 130, .speed = 1'300, .cast_ms = 0, .cd_ms = 13'000, .cost = 40, .cc = C::Slow, .cc_ms = 1'000, .cc_val = 40, .knock = 80, .desc = "Charge with a shield"},
+ .y = {.name = "Earthshaker Blow", .kind = K::Burst, .dmg = 200, .dmg_rank = 100, .ad = 130, .range = 250, .radius = 280, .cast_ms = 450, .cd_ms = 95'000, .cost = 80, .delay_ms = 500, .cc = C::Stun, .cc_ms = 1'300, .desc = "A huge slam: stuns; the centre hits harder", .melee = true, .ground = true, .sweet_pct = 25, .ultimate = true},
+ .p = {.name = "Hardened Frame", .kind = K::Passive, .passive = PassiveId::MetalSkin, .desc = "+15 defence"},
+ .colour = 0x886040, .role = Role::Tank, .auto_projectile = false,
+ .autos = {.shape = AutoShape::Splash, .splash_radius = 120, .splash_pct = 50, .hits_walls = true, .wall_pct = 200},
+ .q_pool = {"Chi Strike", "Knife Throw", "Bolas Throw"}};
+
+// Dusk Hunter: non-bender marksman. Throws knives down a line and marks one enemy to finish.
+// Plays as a trapper-archer: bolas to pin, snipe with pierce, mark and execute.
+inline constexpr ChampionDef kDuskHunter{.name = "Dusk Hunter", .element = Element::None, .sub = S::Physical, .body = &kSlimBody, .range = Range::Ranged,
+ .resource = ResourceKind::Energy, .mage = false, .hp = 50'000, .attack = 6'300, .attack_lvl = 420, .as = 75, .as_lvl = 280, .ms = 34'500,
+ .attack_range = 580, .res_max = 20'000, .res_regen = 1'000,
+ .w = {.name = "Net Shot", .kind = K::Bolt, .dmg = 35, .dmg_rank = 18, .ad = 50, .range = 750, .width = 70, .speed = 1'700, .cast_ms = 200, .cd_ms = 11'000, .cost = 40, .cc = C::Root, .cc_ms = 1'000, .desc = "A net that roots the first enemy hit", .stop_on = 1},
+ .e = {.name = "Smoke Roll", .kind = K::Dash, .range = 330, .width = 60, .speed = 1'700, .cast_ms = 0, .cd_ms = 9'000, .cost = 30, .desc = "Roll in the direction you face", .aim = Aim::Facing},
+ .r = {.name = "Piercing Shot", .kind = K::Bolt, .dmg = 70, .dmg_rank = 35, .ad = 95, .range = 1'050, .width = 50, .speed = 2'400, .cast_ms = 250, .cd_ms = 9'000, .cost = 40, .pierce = true, .desc = "A long shot through enemies; the end hits harder", .sweet_pct = 30},
+ .t = {.name = "Hunter's Mark", .kind = K::Burst, .dmg = 40, .dmg_rank = 20, .ad = 50, .range = 650, .radius = 140, .cast_ms = 150, .cd_ms = 14'000, .cost = 40, .delay_ms = 300, .cc = C::Slow, .cc_ms = 1'500, .cc_val = 35, .targeted = true, .desc = "Mark one enemy: slows it and cuts 4 % of current health", .pct_current_hp = 400},
+ .y = {.name = "Last Light Barrage", .kind = K::Wave, .dmg = 150, .dmg_rank = 75, .ad = 120, .range = 1'300, .width = 300, .speed = 1'600, .cast_ms = 400, .cd_ms = 90'000, .cost = 80, .pierce = true, .desc = "A fan of arrows fired ahead; wounded enemies take more", .aim = Aim::Facing, .ultimate = true, .pct_missing_hp = 600},
+ .p = {.name = "Night Eyes", .kind = K::Passive, .passive = PassiveId::LightFeet, .desc = "Faster on foot"},
+ .colour = 0x404860, .role = Role::Marksman,
+ .autos = {.move_while_attacking = true},
+ .q_pool = {"Knife Throw", "Bolas Throw", "Chi Strike"}};
+
+inline constexpr std::array kPackA{kGlacierWarden, kBrineSage, kMoonWeaver, kMireStalker, kBoilCaller, kThornBinder, kRimeArcher, kRainCaller,
+                                   kTidalDuelist, kSnowdriftTrickster, kMarshShaman, kDewMystic, kBladeWanderer, kSiegeBreaker, kDuskHunter};
+
+}  // namespace em::data

@@ -1,0 +1,306 @@
+#pragma once
+// Pack B: 12 earth-family champions + 3 non-benders. Numbers are near the first roster; edit freely.
+#include <array>
+
+#include "game/champions/common.hpp"
+
+namespace em::data {
+
+// Cairn Mason (earth, tank): builds low ramps and thick short barricades; fights from behind his own stone.
+// Thin ramps for allies, a high-HP wall that grows per rank, and wall-breaking fists.
+inline constexpr ChampionDef kCairnMason{.name = "Cairn Mason", .element = Element::Earth, .sub = S::Earth, .body = &kBroadBody, .hp = 64'000,
+ .hp_lvl = 10'800, .attack = 6'200, .def = 3'700, .def_lvl = 470, .ms = 33'000, .attack_range = 45,
+ .w = {.name = "Stone Ramp", .kind = K::Wall, .sub = S::Earth, .range = 650, .width = 300, .cast_ms = 350, .cd_ms = 12'000,
+       .dur_ms = 5'000, .desc = "A long, low wall one level high: a ramp for friends", .wall_thick = 3, .wall_level = 1, .wall_segs = 3},
+ .e = {.name = "Bulwark", .kind = K::Wall, .sub = S::Earth, .range = 600, .width = 100, .cast_ms = 500, .cd_ms = 18'000,
+       .dur_ms = 6'000, .desc = "One thick, tall block with lots of HP; more per rank", .wall_thick = 3, .wall_level = 2,
+       .wall_hp = 700, .wall_hp_rank = 150, .wall_segs = 1},
+ .r = {.name = "Footing", .kind = K::Shield, .sub = S::EarthArmor, .dmg = 90, .dmg_rank = 45, .ep = 35, .cast_ms = 0, .cd_ms = 15'000,
+       .dur_ms = 3'500, .desc = "A short shield from the ground under you"},
+ .t = {.name = "Mason's Slam", .kind = K::Cone, .sub = S::Earth, .dmg = 50, .dmg_rank = 30, .ad = 60, .range = 260, .width = 260,
+       .cast_ms = 200, .cd_ms = 9'000, .cc = C::Slow, .cc_ms = 1'200, .cc_val = 35, .desc = "Close slam, slows", .melee = true, .sweet_pct = 20},
+ .y = {.name = "Fortress Ring", .kind = K::Wall, .sub = S::Earth, .dmg = 80, .dmg_rank = 40, .ep = 40, .range = 650, .radius = 200,
+       .cast_ms = 600, .cd_ms = 100'000, .dur_ms = 5'000, .cc = C::Root, .cc_ms = 800,
+       .desc = "A ring of high stone walls around a point", .ultimate = true, .wall_thick = 3, .wall_level = 2, .wall_hp = 500, .wall_hp_rank = 100},
+ .p = {.name = "Rooted", .kind = K::Passive, .passive = PassiveId::Rooted, .desc = "+20 % tenacity"},
+ .colour = 0x8c7a5a, .role = Role::Tank,
+ .autos = {.hits_walls = true, .wall_pct = 150},
+ .q_pool = {"Heavy Stone", "Rock Throw", "Iron Cleave"}};
+
+// Dune Reaver (earth, sand assassin): blinds with sand and rushes through the blind.
+// Fast, fragile, hits hard in a narrow cone tip.
+inline constexpr ChampionDef kDuneReaver{.name = "Dune Reaver", .element = Element::Earth, .sub = S::Earth, .body = &kSlimBody, .hp = 52'000,
+ .hp_lvl = 9'000, .attack = 6'400, .as = 72, .ms = 35'500, .attack_range = 45,
+ .w = {.name = "Sand Veil", .kind = K::Field, .sub = S::Earth, .range = 600, .radius = 240, .cast_ms = 250, .cd_ms = 14'000,
+       .dur_ms = 3'500, .cc = C::Blind, .cc_ms = 700, .cc_val = 75, .desc = "A cloud of sand that blinds", .env_bend = true},
+ .e = {.name = "Dune Slide", .kind = K::Dash, .sub = S::Earth, .dmg = 45, .dmg_rank = 25, .ep = 30, .ad = 40, .range = 480, .width = 120,
+       .speed = 1'500, .cast_ms = 0, .cd_ms = 9'000, .desc = "Slide on sand, hits on the way", .ground = true},
+ .r = {.name = "Sand Lash", .kind = K::Cone, .sub = S::Earth, .dmg = 65, .dmg_rank = 35, .ep = 45, .range = 460, .width = 200,
+       .cast_ms = 250, .cd_ms = 8'000, .cc = C::Slow, .cc_ms = 1'000, .cc_val = 25, .desc = "A lash of grit; big bonus at the tip", .sweet_pct = 40},
+ .t = {.name = "Grit Step", .kind = K::Haste, .sub = S::Earth, .cast_ms = 0, .cd_ms = 12'000, .dur_ms = 2'500, .cc_val = 40,
+       .desc = "+40 % move speed"},
+ .y = {.name = "Sandstorm", .kind = K::Field, .sub = S::Earth, .dmg = 25, .dmg_rank = 12, .ep = 15, .range = 800, .radius = 380,
+       .cast_ms = 500, .cd_ms = 95'000, .dur_ms = 6'000, .cc = C::Blind, .cc_ms = 800, .cc_val = 90, .desc = "A huge storm of sand; almost no sight inside",
+       .env_bend = true, .ultimate = true},
+ .p = {.name = "Light Feet", .kind = K::Passive, .passive = PassiveId::LightFeet, .desc = "+15 move speed"},
+ .colour = 0xd8b868, .role = Role::Assassin,
+ .q_pool = {"Rock Throw", "Magma Spit", "Iron Cleave"}};
+
+// Tremor Sage (earth, seismic support): feels everything through the ground and protects a team.
+// Pillars lift allies out of danger, shields cover friends, a small quake slows chasers.
+inline constexpr ChampionDef kTremorSage{.name = "Tremor Sage", .element = Element::Earth, .sub = S::Earth, .range = Range::Ranged, .ep_lvl = 280,
+ .hp = 54'000, .attack = 5'000, .attack_range = 400,
+ .w = {.name = "Stone Cradle", .kind = K::Shield, .sub = S::EarthArmor, .dmg = 80, .dmg_rank = 40, .ep = 45, .range = 600, .cast_ms = 250,
+       .cd_ms = 13'000, .dur_ms = 3'500, .ally = true, .desc = "A stone shield on an ally"},
+ .e = {.name = "Lifting Stone", .kind = K::Pillar, .sub = S::Earth, .dmg = 20, .dmg_rank = 10, .ep = 15, .range = 700, .radius = 130,
+       .cast_ms = 350, .cd_ms = 12'000, .dur_ms = 2'500, .cc = C::Airborne, .cc_ms = 500, .desc = "A pillar that lifts units: use on friends to dodge", .ground = true},
+ .r = {.name = "Soft Quake", .kind = K::Field, .sub = S::Earth, .dmg = 15, .dmg_rank = 8, .ep = 10, .range = 600, .radius = 280,
+       .cast_ms = 450, .cd_ms = 15'000, .dur_ms = 3'500, .cc = C::Slow, .cc_ms = 600, .cc_val = 45, .group = true,
+       .desc = "A trembling zone that slows; earthbenders can feed it"},
+ .t = {.name = "Ground Pulse", .kind = K::Burst, .sub = S::Earth, .dmg = 70, .dmg_rank = 35, .ep = 50, .range = 750, .radius = 170,
+       .cast_ms = 300, .cd_ms = 9'000, .delay_ms = 600, .desc = "A pulse from below after 0.6 s", .ground = true, .sweet_pct = 30},
+ .y = {.name = "Healing Mountain", .kind = K::Heal, .sub = S::Earth, .dmg = 150, .dmg_rank = 70, .ep = 60, .range = 600, .radius = 320,
+       .cast_ms = 600, .cd_ms = 100'000, .ally = true, .desc = "The earth mends allies in a wide area", .ultimate = true},
+ .p = {.name = "Seismic Sense", .kind = K::Passive, .passive = PassiveId::SeismicSense, .desc = "Feels steps through the ground"},
+ .colour = 0x9a8a60, .role = Role::Support,
+ .q_pool = {"Rock Throw", "Heavy Stone", "Lava Glob"}};
+
+// Ashen Smith (lava, bruiser): melts the ground and burns what stays on it.
+// Lava ground with % current HP burn, a lava lunge, and a molten wall that cools.
+inline constexpr ChampionDef kAshenSmith{.name = "Ashen Smith", .element = Element::Earth, .sub = S::Lava, .body = &kBroadBody, .mage = false,
+ .hp = 62'000, .hp_lvl = 10'200, .attack = 6'600, .attack_lvl = 400, .def = 3'400, .ms = 33'500, .attack_range = 50,
+ .w = {.name = "Slag Pour", .kind = K::Field, .sub = S::Lava, .dmg = 15, .dmg_rank = 8, .ad = 20, .range = 500, .radius = 190,
+       .cast_ms = 300, .cd_ms = 13'000, .dur_ms = 5'000, .cc = C::Burn, .cc_ms = 1'000, .cc_val = 900,
+       .desc = "Lava ground: ticks also take 2 % of current health", .pct_current_hp = 200},
+ .e = {.name = "Molten Lunge", .kind = K::Dash, .sub = S::Lava, .dmg = 55, .dmg_rank = 30, .ad = 70, .range = 420, .width = 130,
+       .speed = 1'400, .cast_ms = 0, .cd_ms = 10'000, .cc = C::Burn, .cc_ms = 1'500, .cc_val = 1'000, .desc = "Lunge, leaves burning enemies", .melee = true},
+ .r = {.name = "Forge Wall", .kind = K::Wall, .sub = S::Lava, .range = 600, .width = 200, .cast_ms = 400, .cd_ms = 17'000, .dur_ms = 4'000,
+       .desc = "Two short, thick walls of hot stone", .wall_thick = 3, .wall_level = 2, .wall_hp = 400, .wall_segs = 2},
+ .t = {.name = "Cinder Hammer", .kind = K::Cone, .sub = S::Lava, .dmg = 65, .dmg_rank = 35, .ad = 80, .range = 280, .width = 240,
+       .cast_ms = 250, .cd_ms = 8'000, .desc = "A heavy swing; the tip hits harder", .melee = true, .sweet_pct = 35},
+ .y = {.name = "Crucible", .kind = K::Burst, .sub = S::Lava, .dmg = 220, .dmg_rank = 110, .ad = 100, .range = 700, .radius = 300,
+       .cast_ms = 550, .cd_ms = 105'000, .delay_ms = 1'000, .cc = C::Burn, .cc_ms = 3'000, .cc_val = 1'500,
+       .desc = "A pit of lava opens and burns hard", .ultimate = true, .pct_max_hp = 500},
+ .p = {.name = "Molten", .kind = K::Passive, .passive = PassiveId::Molten, .desc = "Lava lasts longer"},
+ .colour = 0xc85a20, .role = Role::Fighter,
+ .autos = {.shape = AutoShape::Splash, .splash_radius = 80, .splash_pct = 40},
+ .q_pool = {"Iron Cleave", "Rock Throw", "Heavy Stone"}};
+
+// Cinder Oracle (lava, long-range mage): seeds the map with slow lava bursts and reads where you will stand.
+// Facing-aimed river of lava, delayed bursts, bigger damage the more health you are missing.
+inline constexpr ChampionDef kCinderOracle{.name = "Cinder Oracle", .element = Element::Earth, .sub = S::Lava, .body = &kSlimBody,
+ .range = Range::Ranged, .ep_lvl = 330, .hp = 51'000, .hp_lvl = 8'800, .attack = 4'800, .def = 2'700, .attack_range = 520,
+ .w = {.name = "Ember Seed", .kind = K::Burst, .sub = S::Lava, .dmg = 60, .dmg_rank = 32, .ep = 55, .range = 900, .radius = 130,
+       .cast_ms = 300, .cd_ms = 6'000, .delay_ms = 900, .desc = "A slow lava burst that punishes the wounded", .sweet_pct = 30, .pct_missing_hp = 400},
+ .e = {.name = "Lava Stream", .kind = K::Wave, .sub = S::Lava, .dmg = 80, .dmg_rank = 40, .ep = 60, .range = 1'000, .width = 120,
+       .speed = 1'000, .cast_ms = 400, .cd_ms = 12'000, .pierce = true, .desc = "A thin river of lava straight ahead", .aim = Aim::Facing, .ground = true},
+ .r = {.name = "Smoulder Mark", .kind = K::Bolt, .sub = S::Lava, .dmg = 30, .dmg_rank = 15, .ep = 40, .range = 700, .width = 50, .speed = 1'600,
+       .cast_ms = 150, .cd_ms = 10'000, .cc = C::Burn, .cc_ms = 3'000, .cc_val = 1'400, .targeted = true,
+       .desc = "Click an enemy: it burns for 3 s"},
+ .t = {.name = "Pumice Hop", .kind = K::Blink, .sub = S::Lava, .range = 300, .cast_ms = 0, .cd_ms = 11'000, .desc = "Short hop over cooling stone"},
+ .y = {.name = "Caldera", .kind = K::Field, .sub = S::Lava, .dmg = 45, .dmg_rank = 22, .ep = 35, .range = 900, .radius = 360,
+       .cast_ms = 700, .cd_ms = 110'000, .dur_ms = 6'000, .cc = C::Burn, .cc_ms = 1'000, .cc_val = 1'600,
+       .desc = "A huge lava lake for 6 s", .ultimate = true, .pct_max_hp = 100},
+ .p = {.name = "Molten", .kind = K::Passive, .passive = PassiveId::Molten, .desc = "Lava lasts longer"},
+ .colour = 0xff7a30, .role = Role::Mage,
+ .q_pool = {"Lava Glob", "Magma Spit", "Rock Throw"}};
+
+// Rill Quarrier (earth, boulder marksman): rolls many small boulders, one after another.
+// Multicast boulders and stone throws chip down walls and enemies from a distance.
+inline constexpr ChampionDef kRillQuarrier{.name = "Rill Quarrier", .element = Element::Earth, .sub = S::Earth, .range = Range::Ranged, .mage = false,
+ .hp = 54'000, .attack = 6'600, .attack_lvl = 400, .as = 70, .attack_range = 480,
+ .w = {.name = "Gravel Volley", .kind = K::Boulder, .sub = S::Earth, .dmg = 45, .dmg_rank = 22, .ad = 60, .range = 700, .width = 90,
+       .speed = 1'300, .cast_ms = 200, .cd_ms = 9'000, .casts = 3, .recast_ms = 2'500, .desc = "Raise a stone, then fire up to 3 more shots"},
+ .e = {.name = "Quarry Crack", .kind = K::Bolt, .sub = S::Earth, .dmg = 70, .dmg_rank = 35, .ad = 90, .range = 900, .width = 70,
+       .speed = 1'800, .cast_ms = 250, .cd_ms = 8'000, .desc = "A fast rock; best at the end of its flight", .sweet_pct = 35},
+ .r = {.name = "Scree Slope", .kind = K::Field, .sub = S::Earth, .dmg = 12, .dmg_rank = 6, .ad = 15, .range = 650, .radius = 220,
+       .cast_ms = 300, .cd_ms = 14'000, .dur_ms = 3'500, .cc = C::Slow, .cc_ms = 600, .cc_val = 40, .desc = "Loose rock that slows"},
+ .t = {.name = "Crumble Step", .kind = K::Blink, .sub = S::Earth, .range = 280, .cast_ms = 0, .cd_ms = 12'000, .desc = "Short step back on crumbling stone"},
+ .y = {.name = "Landslide", .kind = K::Wave, .sub = S::Earth, .dmg = 150, .dmg_rank = 75, .ad = 90, .range = 1'100, .width = 380,
+       .speed = 800, .cast_ms = 600, .cd_ms = 100'000, .cc = C::Airborne, .cc_ms = 700, .knock = 120, .pierce = true,
+       .desc = "A wide slide of rock down the lane", .ground = true, .ultimate = true},
+ .p = {.name = "Chi Flow", .kind = K::Passive, .passive = PassiveId::ChiFlow, .desc = "Hits refill energy"},
+ .colour = 0xa89070, .role = Role::Marksman,
+ .autos = {.move_while_attacking = true, .hits_walls = true, .wall_pct = 100},
+ .q_pool = {"Rock Throw", "Heavy Stone", "Metal Cable"}};
+
+// Gantry Warden (metal, rare - fighter): drags and pins with steel cables, then slams a steel gate.
+// Few, tough pieces of metal; hits hard on a pinned target.
+inline constexpr ChampionDef kGantryWarden{.name = "Gantry Warden", .element = Element::Earth, .sub = S::Metal, .body = &kBroadBody, .mage = false,
+ .hp = 60'000, .hp_lvl = 10'000, .attack = 6'700, .attack_lvl = 410, .def = 3'500, .ms = 33'800, .attack_range = 55,
+ .w = {.name = "Cable Snare", .kind = K::Bolt, .sub = S::Metal, .dmg = 40, .dmg_rank = 22, .ad = 60, .range = 650, .width = 50, .speed = 2'000,
+       .cast_ms = 150, .cd_ms = 11'000, .cc = C::Root, .cc_ms = 1'200, .desc = "A cable that roots and pulls the first enemy"},
+ .e = {.name = "Steel Gate", .kind = K::Wall, .sub = S::Metal, .range = 550, .width = 100, .cast_ms = 350, .cd_ms = 16'000, .dur_ms = 4'000,
+       .desc = "One tall steel segment: the toughest block", .wall_thick = 1, .wall_level = 2, .wall_hp_rank = 100, .wall_segs = 1},
+ .r = {.name = "Rivet Burst", .kind = K::Cone, .sub = S::Metal, .dmg = 55, .dmg_rank = 30, .ad = 75, .range = 340, .width = 180,
+       .cast_ms = 200, .cd_ms = 9'000, .desc = "A cone of rivets; more damage to the missing health", .sweet_pct = 25, .pct_missing_hp = 500},
+ .t = {.name = "Tempered Plates", .kind = K::Shield, .sub = S::MetalArmor, .dmg = 100, .dmg_rank = 50, .bonus_ad = 100, .cast_ms = 0,
+       .cd_ms = 17'000, .dur_ms = 3'500, .size_bonus = 1'000, .desc = "Steel plates: shield and a bigger body"},
+ .y = {.name = "Gantry Drop", .kind = K::Burst, .sub = S::Metal, .dmg = 200, .dmg_rank = 100, .ad = 110, .range = 750, .radius = 200,
+       .cast_ms = 500, .cd_ms = 100'000, .delay_ms = 900, .cc = C::Stun, .cc_ms = 1'300, .desc = "A steel beam drops on a point: stun", .ultimate = true},
+ .p = {.name = "Metal Skin", .kind = K::Passive, .passive = PassiveId::MetalSkin, .desc = "+15 defence"},
+ .colour = 0x9aa4b0, .role = Role::Fighter,
+ .autos = {.hits_walls = true, .wall_pct = 200},
+ .q_pool = {"Metal Cable", "Iron Cleave", "Heavy Stone"}};
+
+// Shard Dancer (metal, rare - assassin): throws razor shards and slips through between them.
+// Light skirmisher with blink, a piercing shard line and a chain auto.
+inline constexpr ChampionDef kShardDancer{.name = "Shard Dancer", .element = Element::Earth, .sub = S::Metal, .body = &kSlimBody, .mage = false,
+ .hp = 51'000, .hp_lvl = 8'900, .attack = 6'300, .attack_lvl = 380, .def = 2'800, .as = 74, .ms = 35'000, .attack_range = 45,
+ .w = {.name = "Razor Fan", .kind = K::Cone, .sub = S::Metal, .dmg = 50, .dmg_rank = 28, .ad = 70, .range = 380, .width = 260,
+       .cast_ms = 150, .cd_ms = 7'000, .desc = "A fan of shards", .sweet_pct = 30},
+ .e = {.name = "Glint Step", .kind = K::Blink, .sub = S::Metal, .range = 380, .cast_ms = 0, .cd_ms = 9'000,
+       .desc = "A true teleport along a shiny edge", .teleport = true},
+ .r = {.name = "Needle Line", .kind = K::Bolt, .sub = S::Metal, .dmg = 60, .dmg_rank = 32, .ad = 80, .range = 900, .width = 40, .speed = 2'200,
+       .cast_ms = 200, .cd_ms = 8'000, .pierce = true, .desc = "A needle that pierces everything"},
+ .t = {.name = "Shard Whirl", .kind = K::Field, .sub = S::Metal, .dmg = 18, .dmg_rank = 9, .ad = 25, .range = 0, .radius = 180,
+       .cast_ms = 100, .cd_ms = 12'000, .dur_ms = 2'500, .tick_ms = 400, .move = CastMove::Free, .desc = "Shards spin around you and cut"},
+ .y = {.name = "Thousand Edges", .kind = K::Dash, .sub = S::Metal, .dmg = 190, .dmg_rank = 95, .ad = 130, .range = 500, .width = 140,
+       .speed = 1'700, .cast_ms = 0, .cd_ms = 90'000, .cc = C::Slow, .cc_ms = 1'500, .cc_val = 40, .desc = "A deadly rush; slows what it cuts", .ultimate = true},
+ .p = {.name = "Light Feet", .kind = K::Passive, .passive = PassiveId::LightFeet, .desc = "+15 move speed"},
+ .colour = 0xd0d6dc, .role = Role::Assassin,
+ .autos = {.shape = AutoShape::Chain, .chain_count = 1, .chain_range = 220, .chain_pct = 60},
+ .q_pool = {"Metal Cable", "Iron Cleave", "Rock Throw"}};
+
+// Mire Weaver (mud, control mage): turns the ground to bog, sinks and holds its prey.
+// Mud puddles, roots and slows; pure zone control with little burst.
+inline constexpr ChampionDef kMireWeaver{.name = "Mire Weaver", .element = Element::Earth, .sub = S::Mud, .range = Range::Ranged, .ep_lvl = 300,
+ .hp = 54'000, .attack = 4'900, .attack_range = 430,
+ .w = {.name = "Bog Patch", .kind = K::Field, .sub = S::Mud, .dmg = 10, .dmg_rank = 5, .ep = 10, .range = 700, .radius = 230,
+       .cast_ms = 350, .cd_ms = 13'000, .dur_ms = 4'500, .cc = C::Slow, .cc_ms = 700, .cc_val = 55, .desc = "Sticky mud: heavy slow"},
+ .e = {.name = "Sinking Grasp", .kind = K::Burst, .sub = S::Mud, .dmg = 40, .dmg_rank = 20, .ep = 35, .range = 750, .radius = 120,
+       .cast_ms = 300, .cd_ms = 12'000, .delay_ms = 600, .cc = C::Root, .cc_ms = 1'400, .desc = "Mud grabs the ground after 0.6 s: root", .ground = true},
+ .r = {.name = "Mud Lob", .kind = K::Bolt, .sub = S::Mud, .dmg = 55, .dmg_rank = 28, .ep = 50, .range = 850, .width = 80, .speed = 1'200,
+       .cast_ms = 250, .cd_ms = 7'000, .cc = C::Blind, .cc_ms = 900, .cc_val = 40, .desc = "A mud ball that blinds"},
+ .t = {.name = "Wet Wall", .kind = K::Wall, .sub = S::Mud, .range = 600, .width = 200, .cast_ms = 400, .cd_ms = 15'000, .dur_ms = 4'000,
+       .desc = "A soft wall: low and weak, quick to build", .wall_thick = 2, .wall_level = 1, .wall_hp = 200, .wall_segs = 2},
+ .y = {.name = "Swallowing Bog", .kind = K::Field, .sub = S::Mud, .dmg = 30, .dmg_rank = 15, .ep = 25, .range = 800, .radius = 340,
+       .cast_ms = 600, .cd_ms = 100'000, .dur_ms = 5'000, .cc = C::Root, .cc_ms = 600, .desc = "A giant bog: units inside are rooted again and again",
+       .ultimate = true, .pct_missing_hp = 300},
+ .p = {.name = "Rooted", .kind = K::Passive, .passive = PassiveId::Rooted, .desc = "+20 % tenacity"},
+ .colour = 0x6a4a30, .role = Role::Mage,
+ .q_pool = {"Rock Throw", "Heavy Stone", "Magma Spit"}};
+
+// Moss Titan (earth armor, juggernaut): wears a plate of living rock, slow and very hard to kill.
+// Armour shields, close earth fists, and a pillar charge. Wall-breaking autos.
+inline constexpr ChampionDef kMossTitan{.name = "Moss Titan", .element = Element::Earth, .sub = S::EarthArmor, .body = &kBroadBody, .mage = false,
+ .hp = 70'000, .hp_lvl = 11'500, .attack = 6'200, .attack_lvl = 360, .def = 4'000, .def_lvl = 500, .edef = 3'600, .ms = 32'000, .attack_range = 50,
+ .w = {.name = "Living Armour", .kind = K::Shield, .sub = S::EarthArmor, .dmg = 150, .dmg_rank = 75, .bonus_ad = 100, .cast_ms = 0, .cd_ms = 18'000,
+       .dur_ms = 5'000, .size_bonus = 2'000, .desc = "A big stone armour: shield and +20 % size"},
+ .e = {.name = "Titan Stomp", .kind = K::Pillar, .sub = S::EarthArmor, .dmg = 50, .dmg_rank = 25, .ad = 60, .range = 300, .radius = 190,
+       .cast_ms = 300, .cd_ms = 13'000, .dur_ms = 2'000, .cc = C::Airborne, .cc_ms = 700, .desc = "Stomp close to you: raises and tosses", .melee = true},
+ .r = {.name = "Boulder Shoulder", .kind = K::Dash, .sub = S::EarthArmor, .dmg = 60, .dmg_rank = 30, .ad = 70, .range = 380, .width = 150,
+       .speed = 1'100, .cast_ms = 0, .cd_ms = 11'000, .cc = C::Slow, .cc_ms = 1'200, .cc_val = 30, .knock = 100, .desc = "A heavy shove; hits grow with the target's health",
+       .melee = true, .pct_max_hp = 300},
+ .t = {.name = "Overgrowth", .kind = K::Haste, .sub = S::EarthArmor, .cast_ms = 0, .cd_ms = 14'000, .dur_ms = 2'500, .cc_val = 30,
+       .desc = "+30 % move speed"},
+ .y = {.name = "Mountain Heart", .kind = K::Shield, .sub = S::EarthArmor, .dmg = 400, .dmg_rank = 200, .bonus_ad = 150, .cast_ms = 300,
+       .cd_ms = 110'000, .dur_ms = 6'000, .size_bonus = 3'500, .desc = "Become a hill: huge shield and body for 6 s", .ultimate = true},
+ .p = {.name = "Rooted", .kind = K::Passive, .passive = PassiveId::Rooted, .desc = "+20 % tenacity"},
+ .colour = 0x5f7a40, .role = Role::Tank,
+ .autos = {.shape = AutoShape::Splash, .splash_radius = 70, .splash_pct = 50, .hits_walls = true, .wall_pct = 120},
+ .q_pool = {"Heavy Stone", "Rock Throw", "Iron Cleave"}};
+
+// Plate Vanguard (metal armor, duelist): iron-clad lancer who wins the first clash.
+// Armour on a stance toggle: guard (tanky) and lance (damage). Steel line charge.
+inline constexpr ChampionDef kPlateVanguard{.name = "Plate Vanguard", .element = Element::Earth, .sub = S::MetalArmor, .body = &kBroadBody, .mage = false,
+ .hp = 61'000, .hp_lvl = 10'300, .attack = 6'900, .attack_lvl = 420, .def = 3'700, .ms = 33'800, .attack_range = 60,
+ .w = {.name = "Hardened Guard", .kind = K::Shield, .sub = S::MetalArmor, .dmg = 110, .dmg_rank = 55, .bonus_ad = 110, .cast_ms = 0, .cd_ms = 15'000,
+       .dur_ms = 3'000, .desc = "A fast armour shield"},
+ .e = {.name = "Lance Rush", .kind = K::Dash, .sub = S::MetalArmor, .dmg = 60, .dmg_rank = 32, .ad = 80, .range = 520, .width = 100, .speed = 1'600,
+       .cast_ms = 0, .cd_ms = 12'000, .cc = C::Stun, .cc_ms = 500, .desc = "A long rush; the tip stuns", .melee = true, .sweet_pct = 25},
+ .r = {.name = "Clanging Strike", .kind = K::Cone, .sub = S::MetalArmor, .dmg = 45, .dmg_rank = 28, .ad = 65, .range = 220, .width = 160,
+       .cast_ms = 100, .cd_ms = 6'000, .cc = C::Silence, .cc_ms = 700, .desc = "A ringing blow that silences", .melee = true},
+ .t = {.name = "Brace", .kind = K::Haste, .sub = S::MetalArmor, .cast_ms = 0, .cd_ms = 14'000, .dur_ms = 2'000, .cc_val = 35,
+       .desc = "+35 % move speed, no turning back"},
+ .y = {.name = "Last Charge", .kind = K::Dash, .sub = S::MetalArmor, .dmg = 210, .dmg_rank = 105, .ad = 120, .range = 700, .width = 160,
+       .speed = 1'700, .cast_ms = 0, .cd_ms = 95'000, .cc = C::Airborne, .cc_ms = 900, .knock = 120, .desc = "A giant charge across the map",
+       .melee = true, .ultimate = true, .pct_missing_hp = 400},
+ .p = {.name = "Metal Skin", .kind = K::Passive, .passive = PassiveId::MetalSkin, .desc = "+15 defence"},
+ .stance = true,
+ .colour = 0x7b8794, .role = Role::Fighter,
+ .autos = {.hits_walls = true, .wall_pct = 130},
+ .q_pool = {"Iron Cleave", "Metal Cable", "Heavy Stone"}};
+
+// Basalt Hermit (earth, wall control mage): a hermit who carves the arena into narrow lanes.
+// Long thin walls, level-2 traps that close in, and a cursor-free column that locks the path.
+inline constexpr ChampionDef kBasaltHermit{.name = "Basalt Hermit", .element = Element::Earth, .sub = S::Earth, .range = Range::Ranged, .ep_lvl = 290,
+ .hp = 55'000, .hp_lvl = 9'200, .attack = 4'800, .def = 3'000, .attack_range = 400,
+ .w = {.name = "Lane Line", .kind = K::Wall, .sub = S::Earth, .range = 700, .width = 500, .cast_ms = 500, .cd_ms = 17'000, .dur_ms = 6'000,
+       .desc = "A very long, thin wall: five segments, two levels", .wall_thick = 1, .wall_level = 2, .wall_hp = 250, .wall_segs = 5},
+ .e = {.name = "Trap Pit", .kind = K::Wall, .sub = S::Earth, .dmg = 40, .dmg_rank = 20, .ep = 30, .range = 650, .radius = 150, .cast_ms = 450,
+       .cd_ms = 16'000, .dur_ms = 3'000, .cc = C::Root, .cc_ms = 900, .desc = "A ring of stone closes round a point", .wall_thick = 2, .wall_level = 2},
+ .r = {.name = "Splitting Column", .kind = K::Pillar, .sub = S::Earth, .dmg = 55, .dmg_rank = 28, .ep = 40, .range = 800, .radius = 100,
+       .cast_ms = 300, .cd_ms = 10'000, .dur_ms = 2'500, .cc = C::Airborne, .cc_ms = 600, .desc = "A narrow column; aimed where you face",
+       .aim = Aim::Facing, .ground = true},
+ .t = {.name = "Pebble Spray", .kind = K::Cone, .sub = S::Earth, .dmg = 45, .dmg_rank = 25, .ep = 40, .range = 400, .width = 240,
+       .cast_ms = 200, .cd_ms = 7'000, .desc = "A short spray of stone"},
+ .y = {.name = "Stone Maze", .kind = K::Wall, .sub = S::Earth, .dmg = 70, .dmg_rank = 35, .ep = 40, .range = 700, .radius = 260,
+       .cast_ms = 700, .cd_ms = 110'000, .dur_ms = 7'000, .desc = "Two rings of high walls: a maze around a point",
+       .ultimate = true, .wall_thick = 2, .wall_level = 2, .wall_hp = 450, .wall_hp_rank = 120},
+ .p = {.name = "Seismic Sense", .kind = K::Passive, .passive = PassiveId::SeismicSense, .desc = "Feels steps through the ground"},
+ .colour = 0x4a4a52, .role = Role::Mage,
+ .q_pool = {"Rock Throw", "Heavy Stone", "Magma Spit"}};
+
+// Oathless Duelist (non-bender, fighter): a plain swordsman with disciplined chi and no tricks.
+// Parry window as a haste burst, lunge, and an execute that hits for % missing health.
+inline constexpr ChampionDef kOathlessDuelist{.name = "Oathless Duelist", .element = Element::None, .sub = S::Physical, .resource = ResourceKind::Energy,
+ .mage = false, .hp = 58'000, .hp_lvl = 9'800, .attack = 6'800, .attack_lvl = 430, .as = 70, .as_lvl = 280, .ms = 34'500, .attack_range = 55,
+ .res_max = 20'000, .res_regen = 1'000,
+ .w = {.name = "Riposte Stance", .kind = K::Shield, .dmg = 90, .dmg_rank = 45, .bonus_ad = 90, .cast_ms = 0, .cd_ms = 12'000, .cost = 40, .dur_ms = 1'500,
+       .desc = "A brief parry: a shield"},
+ .e = {.name = "Fencer's Lunge", .kind = K::Dash, .dmg = 55, .dmg_rank = 30, .ad = 75, .range = 400, .width = 90, .speed = 1'500, .cast_ms = 0,
+       .cd_ms = 8'000, .cost = 40, .desc = "A quick thrust forward", .melee = true},
+ .r = {.name = "Sweeping Cut", .kind = K::Cone, .dmg = 60, .dmg_rank = 32, .ad = 80, .range = 250, .width = 300, .cast_ms = 150, .cd_ms = 9'000,
+       .cost = 50, .cc = C::Slow, .cc_ms = 1'000, .cc_val = 30, .desc = "A wide cut, slows", .melee = true, .sweet_pct = 20},
+ .t = {.name = "Focused Breath", .kind = K::Haste, .cast_ms = 0, .cd_ms = 14'000, .cost = 30, .dur_ms = 2'000, .cc_val = 30, .desc = "+30 % move speed"},
+ .y = {.name = "Final Verdict", .kind = K::Bolt, .dmg = 100, .dmg_rank = 60, .ad = 120, .range = 450, .width = 60, .speed = 2'400, .cast_ms = 200,
+       .cd_ms = 80'000, .cost = 80, .targeted = true, .desc = "Click an enemy: more damage the less health it has",
+       .ultimate = true, .pct_missing_hp = 1'500},
+ .p = {.name = "Chi Flow", .kind = K::Passive, .passive = PassiveId::ChiFlow, .desc = "Hits give energy"},
+ .colour = 0xc8c0b0, .role = Role::Fighter,
+ .q_pool = {"Chi Strike", "Knife Throw", "Bolas Throw"}};
+
+// Thornwick Trapper (non-bender, marksman): a hunter who pins prey with bolas and a stakes line.
+// Long range, root traps and a piercing bolt; autos pierce in a line.
+inline constexpr ChampionDef kThornwickTrapper{.name = "Thornwick Trapper", .element = Element::None, .sub = S::Physical, .body = &kSlimBody,
+ .range = Range::Ranged, .resource = ResourceKind::Ammo, .mage = false, .hp = 52'000, .attack = 6'700, .attack_lvl = 420, .as = 72, .as_lvl = 290,
+ .ms = 34'500, .attack_range = 560, .res_max = 20'000, .res_regen = 1'000,
+ .w = {.name = "Snare Trap", .kind = K::Burst, .dmg = 30, .dmg_rank = 15, .ad = 40, .range = 700, .radius = 110, .cast_ms = 200, .cd_ms = 12'000, .cost = 40,
+       .delay_ms = 400, .cc = C::Root, .cc_ms = 1'300, .desc = "A snare at a point: root"},
+ .e = {.name = "Stake Line", .kind = K::Bolt, .dmg = 65, .dmg_rank = 35, .ad = 90, .range = 950, .width = 50, .speed = 2'000, .cast_ms = 250,
+       .cd_ms = 9'000, .cost = 40, .pierce = true, .desc = "A heavy stake that pierces", .sweet_pct = 30},
+ .r = {.name = "Tumble", .kind = K::Dash, .range = 300, .width = 60, .speed = 1'400, .cast_ms = 0, .cd_ms = 9'000, .cost = 30, .desc = "A roll away"},
+ .t = {.name = "Thorn Net", .kind = K::Field, .dmg = 10, .dmg_rank = 5, .ad = 15, .range = 650, .radius = 200, .cast_ms = 200, .cd_ms = 14'000,
+       .cost = 40, .dur_ms = 3'000, .cc = C::Slow, .cc_ms = 600, .cc_val = 45, .desc = "A net of thorns that slows"},
+ .y = {.name = "Hunter's Mark", .kind = K::Bolt, .dmg = 150, .dmg_rank = 80, .ad = 130, .range = 1'000, .width = 50, .speed = 2'600, .cast_ms = 250,
+       .cd_ms = 85'000, .cost = 70, .cc = C::Silence, .cc_ms = 1'000, .targeted = true, .desc = "Click an enemy: a long, sure shot",
+       .ultimate = true, .pct_current_hp = 500},
+ .p = {.name = "Chi Flow", .kind = K::Passive, .passive = PassiveId::ChiFlow, .desc = "Hits refill ammo"},
+ .colour = 0x4a6a3a, .role = Role::Marksman,
+ .autos = {.shape = AutoShape::Line, .line_length = 160, .line_width = 50},
+ .q_pool = {"Knife Throw", "Bolas Throw", "Chi Strike"}};
+
+// Hush Alchemist (non-bender, support): a quiet healer-bomber with flasks and smoke.
+// Heals, blinds with smoke and breaks lines with a flash; low damage.
+inline constexpr ChampionDef kHushAlchemist{.name = "Hush Alchemist", .element = Element::None, .sub = S::Physical, .body = &kSlimBody,
+ .range = Range::Ranged, .resource = ResourceKind::Ammo, .mage = false, .hp = 53'000, .attack = 5'600, .as = 68, .ms = 34'000, .attack_range = 450,
+ .res_max = 20'000, .res_regen = 1'200,
+ .w = {.name = "Restorative Flask", .kind = K::Heal, .dmg = 90, .dmg_rank = 45, .ad = 40, .range = 600, .radius = 200, .cast_ms = 250, .cd_ms = 12'000,
+       .cost = 40, .ally = true, .desc = "A healing flask for allies in a blob"},
+ .e = {.name = "Fume Flask", .kind = K::Field, .dmg = 10, .dmg_rank = 5, .ad = 15, .range = 650, .radius = 230, .cast_ms = 200, .cd_ms = 15'000, .cost = 50,
+       .dur_ms = 3'500, .cc = C::Blind, .cc_ms = 700, .cc_val = 60, .desc = "Smoke that blinds"},
+ .r = {.name = "Acid Splash", .kind = K::Burst, .dmg = 60, .dmg_rank = 30, .ad = 80, .range = 700, .radius = 140, .cast_ms = 200, .cd_ms = 8'000,
+       .cost = 40, .delay_ms = 450, .desc = "A flask that bursts after 0.45 s", .pct_max_hp = 200},
+ .t = {.name = "Flash Powder", .kind = K::Blink, .range = 320, .cast_ms = 0, .cd_ms = 12'000, .cost = 30, .desc = "Flash and step away"},
+ .y = {.name = "Grand Elixir", .kind = K::Heal, .dmg = 250, .dmg_rank = 120, .ad = 70, .range = 650, .radius = 360, .cast_ms = 500, .cd_ms = 100'000,
+       .cost = 80, .ally = true, .desc = "A great heal for the whole team nearby", .ultimate = true, .pct_missing_hp = 1'000},
+ .p = {.name = "Chi Flow", .kind = K::Passive, .passive = PassiveId::ChiFlow, .desc = "Hits refill ammo"},
+ .colour = 0x5aa08a, .role = Role::Support,
+ .q_pool = {"Bolas Throw", "Knife Throw", "Chi Strike"}};
+
+inline constexpr std::array kPackB{kCairnMason, kDuneReaver, kTremorSage, kAshenSmith, kCinderOracle, kRillQuarrier, kGantryWarden,
+                                   kShardDancer, kMireWeaver, kMossTitan, kPlateVanguard, kBasaltHermit, kOathlessDuelist,
+                                   kThornwickTrapper, kHushAlchemist};
+
+}  // namespace em::data

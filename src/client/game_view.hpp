@@ -160,6 +160,7 @@ private:
         bool was_alive = true, was_casting = false;
     };
     std::unordered_map<std::uint32_t, AnimMem> anim_mem_;
+    std::unordered_map<std::uint32_t, double> fx_born_;  // [U-399] when an effect was first seen (rise animations)
     // [U-259] my events → sounds
     int snd_level_ = 0, snd_items_ = -1, snd_gold_ = 0, snd_notice_ = -1;
     bool snd_recall_ = false, snd_welcome_ = false, snd_end_ = false;

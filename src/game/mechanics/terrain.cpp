@@ -347,7 +347,7 @@ void World::step_terrain() {
             continue;
         }
         if (t.kind == CellTimerKind::LavaToStone &&  // [U-356] most lava cools into plain ground
-            std::uint32_t(t.x * 73'856'093 ^ t.y * 19'349'663 ^ std::int32_t(now_ms / 1000)) % 100 >= std::uint32_t(elements::kLavaRockPct)) {
+            (std::uint32_t(t.x) * 73'856'093u ^ std::uint32_t(t.y) * 19'349'663u ^ std::uint32_t(now_ms / 1000)) % 100 >= std::uint32_t(elements::kLavaRockPct)) {
             t.kind = CellTimerKind::Restore;
             continue;  // restored by the next pass of this loop
         }
@@ -578,6 +578,21 @@ bool World::water_sourced(const Unit& u, const SkillDef& d, std::int32_t sx, std
         if (dist2(sx, sy, u.ux(), u.uy()) <= reach * reach) return true;
     }
     return big_water_near(u) != 0;  // standing next to water: bent from there
+}
+
+void World::drain_water(std::int32_t x, std::int32_t y, std::int32_t radius, std::int32_t ms) {
+    const int r = std::max(1, radius / kCellUnits), ccx = x / kCellUnits, ccy = y / kCellUnits;
+    for (int cy = ccy - r; cy <= ccy + r; ++cy)
+        for (int cx = ccx - r; cx <= ccx + r; ++cx) {
+            if (!Grid::in_bounds(cx, cy) || (cx - ccx) * (cx - ccx) + (cy - ccy) * (cy - ccy) > r * r || protected_cell(cx, cy)) continue;
+            Cell c = grid.at(cx, cy);
+            if (c.temp_walkable()) continue;  // frozen / bent already
+            if (c.surface() == Surface::Water) c.set_surface(Surface::Land);
+            else if (c.surface() == Surface::DeepWater) c.set_surface(Surface::Water), c.set_walk(Walk::Walk);
+            else continue;
+            remember(cell_timers, cx, cy, grid.at(cx, cy).raw(), now_ms + ms, CellTimerKind::Restore);
+            set_cell(cx, cy, c);
+        }
 }
 
 void World::take_from_source(const Unit& u, std::int32_t sx, std::int32_t sy) {

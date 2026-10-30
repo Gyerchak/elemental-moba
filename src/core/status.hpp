@@ -25,7 +25,7 @@ enum class StatusKind : std::uint8_t {
     Bloodbound,// [U-78] moved by the bloodbender, ignores tenacity
     Channel,   // channelling (portal X-54, group bending)
     Swimming,  // [U-188] in deep water: half speed, no spells (except water mobility skills)
-    WaterRide, // [U-189] riding a water column (Korra): raised above melee / ground skills, casts freely
+    WaterRide, // [U-189] riding a water column: raised above melee / ground skills, casts freely
     Redirect,  // [U-185] lightning redirection window is open
     Wet,       // [U-241] soaked: lightning +25 %; fire or waterbending dries it
     Count

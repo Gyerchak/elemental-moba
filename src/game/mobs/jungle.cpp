@@ -72,6 +72,8 @@ void World::spawn_jungle() {
             const CellPt c = side == 0 ? kBuffCamps[i] : mirror(kBuffCamps[i]);
             spawn_unit(make_monster(i == 0 ? "Platypus Bear" : "Knowledge Seeker", cell_mid(c.first), cell_mid(c.second)));
         }
+    for (CellPt c : kDarkSpiritCells)  // [U-401] dark spirits at both portals
+        for (CellPt p : {c, mirror(c)}) spawn_unit(make_monster("Dark Spirit", cell_mid(p.first), cell_mid(p.second)));
     // [X-55] Face Stealer on the spirit island [X-86]
     spawn_unit(make_monster("Face Stealer", cell_mid(kSpiritIsland.first + 14), cell_mid(kSpiritIsland.second + 14)));
     // [U-364] epic monsters: they appear later (first_spawn_ms)

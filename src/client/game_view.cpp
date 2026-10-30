@@ -680,6 +680,11 @@ void GameView::frame(NetClient& net, double now_s, Ui& ui) {
             attack_move_ = 0;
         } else if (const DrawUnit* t = unit_at(wx, wy, false, champs_only()); t && t->u.team != net.my_team && t->u.alive) {
             net.send_cmd({.kind = CmdKind::Attack, .target = t->u.id});
+        } else if (const auto mine = net.roster.find(net.my_unit);  // [U-393] a wall under the cursor + autos that hit walls
+                   mine != net.roster.end() && mine->second.champ >= 0 && champions()[std::size_t(mine->second.champ)].autos.hits_walls &&
+                   wx >= 0 && wy >= 0 && Grid::in_bounds(int(wx) / kCellUnits, int(wy) / kCellUnits) &&
+                   net.seen.at(int(wx) / kCellUnits, int(wy) / kCellUnits).wall() != Wall::None) {
+            net.send_cmd({.kind = CmdKind::AttackWall, .x = std::int32_t(wx), .y = std::int32_t(wy)});
         } else {
             net.send_cmd({.kind = CmdKind::Move, .x = std::int32_t(wx), .y = std::int32_t(wy)});
             click_x_ = wx, click_y_ = wy, click_t_ = now_s;

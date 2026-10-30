@@ -216,7 +216,7 @@ struct NetUnit {
     std::uint8_t cc_kind, emote;         // strongest crowd control now [U-193] (255 = none); emote [U-246]
     std::uint16_t cc_left_cs;            // … time left in 1/100 s
 };
-inline constexpr const char* kMobNames[] = {"", "Spirit Wolf", "Wandering Spirit", "Cursed Spirit", "Angry Beast", "Bandit", "Face Stealer", "Bandit Archer", "Platypus Bear", "Knowledge Seeker", "Lion Turtle", "Sun Dragons"};
+inline constexpr const char* kMobNames[] = {"", "Spirit Wolf", "Wandering Spirit", "Cursed Spirit", "Angry Beast", "Bandit", "Face Stealer", "Bandit Archer", "Platypus Bear", "Knowledge Seeker", "Lion Turtle", "Sun Dragons", "Dark Spirit"};
 
 struct NetFx {
     std::uint32_t id, seed;

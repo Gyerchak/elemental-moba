@@ -46,9 +46,11 @@ inline constexpr std::array<CellPt, 5> kCamps{{{110, 300}, {150, 410}, {230, 430
 // [X-97] aggressive camps: cursed spirit, angry beast, bandits — attack whoever comes close
 inline constexpr std::array<CellPt, 3> kAggroCamps{{{130, 250}, {270, 400}, {60, 250}}};
 // [U-366] buff camps (Fire side; mirrored): Platypus Bear (Ember buff), Knowledge Seeker (Wan Shi Tong's Wisdom)
-inline constexpr std::array<CellPt, 2> kBuffCamps{{{205, 310}, {110, 440}}};
+inline constexpr std::array<CellPt, 2> kBuffCamps{{{150, 300}, {174, 442}}};  // [U-387] deep in the jungle (≈ 40 cells from roads)
 // [U-364] epic monsters on islands in the sea (one each, not mirrored), reached by a shallow ford
 inline constexpr CellPt kLionTurtleCell{170, 170};
 inline constexpr CellPt kDragonsCell{341, 341};
+// [U-401] dark spirits around each spirit portal (NW; SE = mirror)
+inline constexpr std::array<CellPt, 2> kDarkSpiritCells{{{26, 14}, {14, 26}}};
 
 }  // namespace em

@@ -375,6 +375,61 @@ void GameView::draw_units(NetClient& net, double now_s) {
                     fill_ellipse(r_, bx, top, rr, view_.ry(float(body.c[i].r)), fill, 16);
                 }
             }
+            if (u.alive) {  // [U-396] status animations (every status that changes the body gets a visible cue)
+                const float sx0 = view_.sx(du.x), gy0 = view_.sy(du.y);
+                const float rb = float(body_reach(body_by_index(u.body), u.size_pct));
+                const float ph = float(std::fmod(now_s, 1.0));
+                if (has_status(u, StatusKind::WaterRide)) {  // a column of water carries the rider: rising rings + spray
+                    const float top = view_.sy_h(du.y, lift);
+                    fill_rect(r_, sx0 - 16 * z, top, 32 * z, gy0 - top, {70, 150, 240, 150});
+                    for (int k = 0; k < 4; ++k) {
+                        const float f = float(std::fmod(now_s * 1.5 + k * 0.25, 1.0));
+                        fill_ellipse(r_, sx0, gy0 - (gy0 - top) * f, 18 * z * (1.2f - f * 0.4f), 5 * z, {190, 230, 255, std::uint8_t(200 * (1 - f))}, 14);
+                    }
+                    ground_ring(r_, view_, du.x, du.y, rb + 18 + 10 * ph, {150, 210, 255, std::uint8_t(200 * (1 - ph))}, 24);
+                }
+                if (has_status(u, StatusKind::Shield)) {  // a shimmering bubble
+                    const std::uint8_t a = std::uint8_t(70 + 40 * std::sin(now_s * 4));
+                    fill_ellipse(r_, sx0, view_.sy_h(du.y, lift + H * 0.5f), (rb + 14) * z, (H * 0.5f + 16) * z * view_.hz + 6 * z, {200, 230, 255, a}, 24);
+                }
+                if (has_status(u, StatusKind::Haste))  // wind streaks behind the body
+                    for (int k = 0; k < 3; ++k) {
+                        const float bx = sx0 - float(u.fx) / kOne * (20 + 12 * float(k)) * z, by = view_.sy_h(du.y - float(u.fy) / kOne * (20 + 12 * float(k)), lift + 10 + 12 * float(k));
+                        line(r_, bx, by, bx - float(u.fx) / kOne * 22 * z, by - float(u.fy) / kOne * 6 * z, {230, 240, 255, std::uint8_t(180 - 50 * k)});
+                    }
+                if (has_status(u, StatusKind::Root))  // stone / vines grip the feet
+                    for (int k = 0; k < 6; ++k) {
+                        const float a = float(k) * 1.047f;
+                        const float px = du.x + std::cos(a) * rb, py = du.y + std::sin(a) * rb;
+                        line(r_, view_.sx(px), view_.sy(py), view_.sx(px), view_.sy_h(py, 18), {110, 140, 70, 230});
+                    }
+                if (has_status(u, StatusKind::Redirect))  // crackling sparks around the hands
+                    for (int k = 0; k < 4; ++k) {
+                        const float a = float(now_s * 9) + float(k) * 1.57f;
+                        line(r_, sx0, view_.sy_h(du.y, lift + H * 0.6f), sx0 + std::cos(a) * 22 * z, view_.sy_h(du.y, lift + H * 0.6f) + std::sin(a) * 10 * z,
+                             {170, 210, 255, 230});
+                    }
+                if (has_status(u, StatusKind::Wet))  // drops falling off
+                    for (int k = 0; k < 3; ++k) {
+                        const float f = float(std::fmod(now_s * 1.2 + k * 0.33, 1.0));
+                        fill_circle(r_, sx0 + float(k * 9 - 9) * z, view_.sy_h(du.y, lift + H * (1 - f)), 2 * z + 1, {120, 180, 255, std::uint8_t(220 * (1 - f))}, 6);
+                    }
+                if (has_status(u, StatusKind::Airborne))  // dust where it was thrown up
+                    ground_fill(r_, view_, du.x, du.y, rb + 10, {150, 130, 100, 70}, 18);
+                // [U-399] an earthbender lifts the rock out of the ground first: it rises in front during the cast
+                if (u.casting && kind == UnitKind::Champion && u.champ >= 0 &&
+                    champions()[std::size_t(u.champ)].element == Element::Earth) {
+                    const SubElement csub = champions()[std::size_t(u.champ)].sub;
+                    const float t = float(now_s - am.cast_from), up = std::min(1.f, t / 0.35f);
+                    const float rx = du.x + float(u.fx) / kOne * (rb + 22), ry = du.y + float(u.fy) / kOne * (rb + 22);
+                    const Rgba rc = csub == SubElement::Lava ? Rgba{230, 110, 40, 255} : csub == SubElement::Metal ? Rgba{165, 170, 182, 255} : Rgba{125, 105, 85, 255};
+                    if (t < 0.45f) ground_fill(r_, view_, rx, ry, 14 + 26 * up, {120, 100, 80, std::uint8_t(140 * (1 - up))}, 14);  // the ground breaks
+                    const float rr = 10 * z * (0.6f + 0.4f * up);
+                    const float ry_s = view_.sy_h(ry, -10 + (H * 0.55f + 20) * up);
+                    fill_circle(r_, view_.sx(rx), ry_s, rr, rc, 10);
+                    fill_circle(r_, view_.sx(rx) - rr * 0.3f, ry_s - rr * 0.3f, rr * 0.45f, mixc(rc, {255, 255, 255, 255}, 25), 8);
+                }
+            }
             if (kind == UnitKind::Champion || kind == UnitKind::Minion || kind == UnitKind::Monster || kind == UnitKind::Boss) {
                 const float hr = (kind == UnitKind::Minion ? 9.f : 12.f) * float(u.size_pct) / 100.f;
                 const float fwd = (kind == UnitKind::Boss || u.body == 4 ? 40.f : 12.f) * float(u.size_pct) / 100.f;
@@ -687,9 +742,17 @@ void GameView::draw_world(NetClient& net, double now_s) {
         outline_shape(r_, view_, s, mixc(col, {255, 255, 255, 255}, 40), 1.5f);
         if (f.feeds) text(r_, view_.sx(float(f.x)) - 12, view_.sy(float(f.y)) - 4, std::format("x{}", f.feeds + 1), {255, 255, 255}, 2);
         if (k == FxKind::Lantern) fill_circle(r_, view_.sx(float(f.x)), view_.sy_h(float(f.y), 140), 10 * z + 3, {255, 220, 120, 255});
-        if (view_.hz > 0 && (k == FxKind::Bolt || k == FxKind::Auto || k == FxKind::TowerShot || k == FxKind::Boulder))
-            fill_circle(r_, view_.sx(float(f.x)), view_.sy_h(float(f.y), k == FxKind::TowerShot ? 110 : 40),
-                        std::max(3.f, float(f.radius) * z * 0.7f), with_alpha(mixc(col, {255, 255, 255, 255}, 25), 230), 14);
+        if (view_.hz > 0 && (k == FxKind::Bolt || k == FxKind::Auto || k == FxKind::TowerShot || k == FxKind::Boulder)) {
+            float h = k == FxKind::TowerShot ? 110.f : 40.f;
+            if (k == FxKind::Boulder) {  // [U-399] the boulder is pulled out of the ground (0.4 s), with broken earth around
+                auto [it, fresh] = fx_born_.try_emplace(f.id, now_s);
+                const float up = std::min(1.f, float(now_s - it->second) / 0.4f);
+                h = -20.f + 60.f * up;
+                if (up < 1.f) ground_fill(r_, view_, float(f.x), float(f.y), float(f.radius) * (1.3f - 0.3f * up), {110, 90, 70, std::uint8_t(160 * (1 - up))}, 18);
+            }
+            fill_circle(r_, view_.sx(float(f.x)), view_.sy_h(float(f.y), h), std::max(3.f, float(f.radius) * z * 0.7f),
+                        with_alpha(mixc(col, {255, 255, 255, 255}, 25), 230), 14);
+        }
     }
     draw_ghosts(net);
     draw_units(net, now_s);

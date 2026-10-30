@@ -23,7 +23,7 @@ namespace em {
 
 inline constexpr std::int32_t kSub = 256;  // [X-04] positions: 1 game unit = 256 sub-units (Q24.8)
 inline constexpr int kTeams = 2;
-inline constexpr std::int32_t kShopRange = 1'100;  // [X-100] game units around the fountain
+inline constexpr std::int32_t kShopRange = 1'700;  // [X-100][U-400] game units around the fountain (was 1 100)
 
 enum class UnitKind : std::uint8_t { Champion, Minion, Turret, Inhibitor, Nexus, Monster, Boss };
 enum class MinionType : std::uint8_t { Melee, Ranged, Siege, Super };
@@ -37,6 +37,7 @@ enum class CmdKind : std::uint8_t {
     Ping,           // slot = PingKind, x / y = where [U-246]
     CancelCast,     // [U-265] Z: cancel the cast / channel (S does not)
     SourceForm,     // [U-293] waterbenders: slot 0 = take water from sources as water, 1 = as ice
+    AttackWall,     // [U-393] x / y = a wall cell to hit with autoattacks (champions whose autos have hits_walls)
 };
 
 // [U-246] emotes (Ctrl+1…6) and pings (like LoL + the bait ping)
@@ -58,7 +59,7 @@ struct Cmd {
     std::int32_t sx = -1, sy = -1;  // [U-340] the chosen source (water / rock) for skills that start from one; −1 = none
 };
 
-enum class OrderKind : std::uint8_t { None, Move, Attack, AttackMove, Cast, Portal, Recall };
+enum class OrderKind : std::uint8_t { None, Move, Attack, AttackMove, Cast, Portal, Recall, AttackWall };
 struct Order {
     OrderKind kind = OrderKind::None;
     std::uint32_t target = 0;
@@ -107,7 +108,7 @@ inline constexpr std::uint16_t kAllCategories = 0x1ff;
 inline constexpr std::uint16_t kMinionCategories = cat_bit(UnitCategory::Minion) | cat_bit(UnitCategory::SiegeMinion) | cat_bit(UnitCategory::SuperMinion);
 
 // [U-302] named monsters (the order = the network name id; net::kMobNames is the same list)
-inline constexpr const char* kMobNameList[] = {"", "Spirit Wolf", "Wandering Spirit", "Cursed Spirit", "Angry Beast", "Bandit", "Face Stealer", "Bandit Archer", "Platypus Bear", "Knowledge Seeker", "Lion Turtle", "Sun Dragons"};
+inline constexpr const char* kMobNameList[] = {"", "Spirit Wolf", "Wandering Spirit", "Cursed Spirit", "Angry Beast", "Bandit", "Face Stealer", "Bandit Archer", "Platypus Bear", "Knowledge Seeker", "Lion Turtle", "Sun Dragons", "Dark Spirit"};
 struct TakenHit {
     std::int64_t ms = 0;
     std::uint32_t src = 0;
@@ -469,7 +470,9 @@ public:
     // a water skill has its water: a chosen source in reach, or one near the caster (then it costs no carried water)
     [[nodiscard]] bool water_sourced(const Unit& u, const SkillDef& d, std::int32_t sx, std::int32_t sy) const;
     void take_from_source(const Unit& u, std::int32_t sx, std::int32_t sy);
-    // [U-378] a rock to bend (Taliyah-W-like): any stone wall cell — a map rock, a bent wall, a thrown rock
+    // [U-398] water moved away from a lasting source: shallow water → wet ground, deep → shallow, for ms
+    void drain_water(std::int32_t x, std::int32_t y, std::int32_t radius, std::int32_t ms);
+    // [U-378] a rock to bend (lift a rock, then throw it): any stone wall cell — a map rock, a bent wall, a thrown rock
     [[nodiscard]] bool rock_source_at(std::int32_t x, std::int32_t y) const;  // a puddle is used up, an ice wall melts a bit
     [[nodiscard]] static bool water_skill(const SkillDef& d) { return base_element(d.sub) == Element::Water; }
     [[nodiscard]] bool elevated(const Unit& u) const;       // flying or riding water → melee / ground can't hit
@@ -541,6 +544,7 @@ public:
     // [X-94] collision helpers
     std::vector<std::uint8_t> struct_block;  // cells under alive structures (never bendable) [X-95]
     std::vector<std::uint8_t> clearance;     // cells to the nearest blocker (Chebyshev, max 7) for A*
+    std::vector<Circle> rock_bodies_;        // [U-386] stone skills (boulders) this tick: they block like walls (kCollWall)
     bool clearance_dirty = true;
     void rebuild_collision_maps();
     [[nodiscard]] int body_violations(const Unit& u, std::int32_t x_sub, std::int32_t y_sub) const;
@@ -591,6 +595,7 @@ public:
     static constexpr std::uint8_t kCcDisplaced = 254;   // [U-368] TakenHit::cc marker for a displacement
     void interrupt(Unit& u, std::uint32_t event);  // [U-337] break the cast / channel if its rules say so
     void update_attack(Unit& u);
+    void update_attack_wall(Unit& u);  // [U-393]
     void fire_auto(Unit& u, Unit& target);
     void auto_extras(Unit& u, Unit& primary, std::int32_t dmg, SubElement sub, bool physical);
     void attack_on_the_move(Unit& u);

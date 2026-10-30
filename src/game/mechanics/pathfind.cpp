@@ -36,6 +36,25 @@ int octile(int x0, int y0, int x1, int y1) {
     return kStraight * std::max(dx, dy) + (kDiag - kStraight) * std::min(dx, dy);
 }
 
+// [U-394] does a circle of radius r (units) centred at px / py touch any blocked cell (clearance 0)?
+bool circle_clear(const std::uint8_t* clr, int px, int py, int r) {
+    for (int y = (py - r) / kCellUnits; y <= (py + r) / kCellUnits; ++y)
+        for (int x = (px - r) / kCellUnits; x <= (px + r) / kCellUnits; ++x) {
+            if (!Grid::in_bounds(x, y)) return false;
+            if (clr[std::size_t(y) * N + std::size_t(x)] != 0) continue;
+            const int qx = std::clamp(px, x * kCellUnits, x * kCellUnits + kCellUnits - 1);
+            const int qy = std::clamp(py, y * kCellUnits, y * kCellUnits + kCellUnits - 1);
+            if ((qx - px) * (qx - px) + (qy - py) * (qy - py) < r * r) return false;
+        }
+    return true;
+}
+bool body_fits_near(const std::uint8_t* clr, int cx, int cy, int r) {
+    const int mx = cx * kCellUnits + kCellUnits / 2, my = cy * kCellUnits + kCellUnits / 2, h = kCellUnits / 2;
+    for (const auto [ox, oy] : {std::pair{0, 0}, {h, 0}, {-h, 0}, {0, h}, {0, -h}})
+        if (circle_clear(clr, mx + ox, my + oy, r)) return true;
+    return false;
+}
+
 }  // namespace
 
 bool line_walkable(const Grid& g, int x0, int y0, int x1, int y1, const std::uint8_t* clr, int k) {
@@ -59,7 +78,7 @@ bool line_walkable(const Grid& g, int x0, int y0, int x1, int y1, const std::uin
 }
 
 bool find_path(const Grid& grid, int sx, int sy, int tx, int ty, PathCells& out, int max_nodes, const std::uint8_t* clr,
-               int k, int* expanded_out) {
+               int k, int* expanded_out, int body_r) {
     thread_local Scratch s;
     out.clear();
     if (!Grid::in_bounds(sx, sy) || !Grid::in_bounds(tx, ty)) return false;
@@ -104,12 +123,16 @@ bool find_path(const Grid& grid, int sx, int sy, int tx, int ty, PathCells& out,
             const int cost_pct = step_cost_pct(grid, cx, cy, nx, ny);
             if (cost_pct == 0) continue;
             // body does not fit [X-94] — except the goal and the first 3 cells around the start (way out of a tight spot)
+            int narrow_pct = 100;
             if (clr && clr[idx(nx, ny)] <= k && !(nx == tx && ny == ty) &&
-                (clr[idx(nx, ny)] == 0 || std::max(std::abs(nx - sx), std::abs(ny - sy)) > 3))
-                continue;
+                (clr[idx(nx, ny)] == 0 || std::max(std::abs(nx - sx), std::abs(ny - sy)) > 3)) {
+                // [U-394] one short of the clearance: a thin pass the body still fits through (exact circle test)
+                if (body_r > 0 && clr[idx(nx, ny)] == k && body_fits_near(clr, nx, ny, body_r)) narrow_pct = 150;
+                else continue;
+            }
             if (d >= 4 && (!step_cost_pct(grid, cx, cy, nx, cy) || !step_cost_pct(grid, cx, cy, cx, ny))) continue;
             const std::size_t ni = idx(nx, ny);
-            const std::int32_t ng = s.g[std::size_t(ci)] + (d >= 4 ? kDiag : kStraight) * cost_pct / 100;
+            const std::int32_t ng = s.g[std::size_t(ci)] + (d >= 4 ? kDiag : kStraight) * cost_pct / 100 * narrow_pct / 100;
             if (s.stamp[ni] == s.cur && s.g[ni] <= ng) continue;
             s.stamp[ni] = s.cur;
             s.g[ni] = ng;

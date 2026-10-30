@@ -560,5 +560,47 @@ Additions outside the plan live in `ENGINE-EXTRAS.md`, never here.
 - [U-381] **Ally lightning redirect**: an ally may hit an ally with lightning; the ally can redirect it (ally → ally → enemy).
 - [U-382] Keep the established standards; everything configurable.
 
+## 32. Round 10 (2026-10-29)
+
+- [U-383] A **huge bug-hunting session** (simulation, graphics, network, own content).
+- [U-384] **Expand the champion setup** (the pre-game setup editor, U-178): what was planned and not made yet — classic runes, masteries 30 / 30 / 30, build creator + auto-buy, auto-levelling [U-318][U-319][U-323][U-324].
+- [U-385] Make sure there are **no graphical glitches** at all.
+- [U-386] **Stone skills have hitboxes** (e.g. Heavy Stone on Q): units cannot walk through them unless they can pass terrain — done with what the engine already has.
+- [U-387] **Jungle monsters must not stand on lanes** — move them into the jungle.
+- [U-388] **Metal walls**: VERY SMALL by default (metal is rare), **600 HP** per segment, otherwise like other walls; they **attract lightning** — a lightning strike bends towards them, still hits on the way and anything within **33 units** of the wall's hitbox.
+
+## 33. Round 11 (2026-10-29)
+
+- [U-389] **Graphical glitches are confirmed** — finish everything, then fix them; at the end check the graphics engine once more for glitches and issues.
+- [U-390] **About 60 more champions**, really unique and creative, using the existing systems and mechanics.
+- [U-391] Systems: Hubert is satisfied with them for now (no big new systems needed).
+- [U-392] **Better sounds using FL Studio** (through Wine).
+- [U-393] **Autoattacks that hit walls**: some characters can attack walls — a configurable switch of the autoattack.
+- [U-394] **Pathing** often avoids thin passes that are clearly crossable — fix.
+- [U-395] **No names of the characters Hubert used for comparison** in the game texts (e.g. the water-column ride).
+- [U-396] **Animations** for the water-column ride and every other skill without one (use the available gfx / sfx / animation / model tools).
+- [U-397] A way to **check every interaction** that exists in the systems.
+- [U-398] More abilities that **move water sources on the ground**: from own resource, or from deep / shallow water or another ground source (literally moving it).
+- [U-399] **Rocks are lifted first**: every earth skill that throws rock / stone first lifts the rock out of the ground (visible, e.g. during the cast / a channel) — it never appears from nowhere.
+- [U-400] **Bigger shopping area**.
+- [U-401] **Dark spirits near the portals**.
+
+## 34. Round 12 (2026-10-30)
+
+- [U-402] **"Drawing" skills**: some skills draw a wall or steer their projectiles with the mouse while the cast key is held (move + cast, or cast + control; or two separate skills).
+- [U-403] **Cast locks**: most skills lock the caster in place while casting / channelling; some allow moving (or only in specific situations).
+- [U-404] **Move the Face Stealer** off the mid lane.
+- [U-405] Own champions: a 1:1 copy of a well-known MOBA champion (sword fighter) and one rock-surfing earth mage, with their exact stats / mechanics, to test the engine (own-champions category only; media local only).
+- [U-406] **Earthbenders' 3 basic Q skills**: (1) lift a stone and throw it (self, weaker); (2) lift a stone (support: for another skill or another earthbender); (3) push a lifted stone — own or anyone's (team play, stronger). A lifted stone = the smallest wall, own graphic, above the ground, with a hitbox.
+- [U-407] **Companion instead of recall**: pick a travel animal (sky bison, polar bear-dog, monkey-cat, the sandal-sniffing tracker, badgermoles, dragon). Recall calls it from the base at 1 000 units/s (time depends on distance), it cannot be interrupted or cancelled; when it arrives it carries the champion back to base at the same speed; the champion can be hit / killed on the way. Keep the old recall in the code as an option.
+- [U-408] **Skills by mouse click** on the HUD icons (like other MOBAs).
+- [U-409] **Turret kills**: a champion who hit the victim recently gets the kill credit even when a turret / minion / monster last-hits.
+- [U-410] **Champion kills give XP**; **gold and XP shared with assists**; assists shown in the kill feed.
+- [U-411] **Jungle timers only on the minimap** (all camps while Tab is held) and epic-monster timers at the top of the Tab screen.
+- [U-412] **Never use the e-mail address in commits**; remove it from the GitHub contributors.
+- [U-413] **Shutdown bounties**, shown nicely in the Tab scoreboard.
+- [U-414] **Pings and emotes** must work as the system asked for (wheels, own emotes / sounds).
+- [U-415] **Own champions get full graphics and models** (a complete champion add).
+
 ---
 *Hubert continues editing the plan later — new ideas get the next free `[U-xx]` number.*

@@ -39,9 +39,11 @@ enum class SkillKind : std::uint8_t {
     Redirect,    // [U-185] lightning redirection: a well-timed window sends incoming lightning to your cursor
     AvatarState, // [U-279] fly + power + size for dur_ms
     MagicStance, // [U-264] non-benders: physical skills + autos become this skill's element (magic) for dur_ms
+    MoveWater,   // [U-398] move water on the ground: from a chosen source (river / sea / puddle — it is taken from there)
+                 // or from carried water, a puddle of `radius` appears at the target for dur_ms (cc / dmg hit there)
 };
 
-// [U-184] Where a skill aims: at the mouse cursor (normal) or where the champion faces (Cassiopeia-like).
+// [U-184] Where a skill aims: at the mouse cursor (normal) or where the champion faces.
 enum class Aim : std::uint8_t { Cursor, Facing };
 
 // [U-180] Champion classes for sorting in champion select.
@@ -145,6 +147,7 @@ struct SkillDef {
     //   wall_hp per segment (0 = 300; ice 100), + wall_hp_rank per rank above 1
     std::uint8_t wall_thick = 0, wall_level = 0;
     std::int16_t wall_hp = 0, wall_hp_rank = 0;
+    std::uint8_t wall_segs = 0;  // [U-388] segments in a line wall (0 = from the width; metal: 1 — metal is rare)
 };
 
 // [U-340] does this skill ask for a source first?
@@ -152,6 +155,7 @@ struct SkillDef {
     if (d.source_first >= 0) return d.source_first == 1;
     const bool water = d.sub == SubElement::Water || d.sub == SubElement::Ice;
     if (d.sub == SubElement::Earth && (d.kind == SkillKind::Bolt || d.kind == SkillKind::Wave)) return true;  // [U-378] rock bending
+    if (d.kind == SkillKind::MoveWater) return true;  // [U-398] pick the water, then where it goes
     return water && (d.kind == SkillKind::Bolt || d.kind == SkillKind::Wave || d.kind == SkillKind::Cone || d.kind == SkillKind::Wall);
 }
 
@@ -172,7 +176,7 @@ static_assert(skill_max_rank(SkillDef{}, 1) == 2 && skill_max_rank(SkillDef{}, 5
 inline constexpr std::uint8_t kAirSelf = 1, kAirAlly = 2, kAirEnemy = 4;
 
 // [U-217] What a right click does. Defaults = a plain single-target hit. Mechanic ready; nothing uses
-// the special shapes yet (Aphelios / Twitch-ult-like autos can be built from these).
+// the special shapes yet (special autoattacks can be built from these).
 enum class AutoShape : std::uint8_t { Single, Splash, Line, Chain };
 struct AutoAttackDef {
     bool move_while_attacking = false;   // fire at the closest enemy in range while walking
@@ -181,6 +185,8 @@ struct AutoAttackDef {
     std::int16_t line_length = 0, line_width = 60;    // Line: everything on a line behind the target
     std::int8_t chain_count = 0;                      // Chain: jumps to this many more enemies …
     std::int16_t chain_range = 0, chain_pct = 60;     // … within this range, each jump this % of the last
+    bool hits_walls = false;   // [U-393] right click on a wall cell attacks the wall (bent walls, map rocks)
+    std::int16_t wall_pct = 100;  // … with this % of the autoattack damage
 };
 
 // Bridge to the core numbers → resolve() does ranks, levels, items, sky [U-110..U-114][U-123].

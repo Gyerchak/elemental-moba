@@ -498,6 +498,13 @@ void World::command(std::uint32_t id, const Cmd& c) {
             else refuse(u, "can't attack that (not visible / ally)");
             break;
         }
+        case CmdKind::AttackWall: {  // [U-393]
+            const int cx = c.x / kCellUnits, cy = c.y / kCellUnits;
+            if (u.kind != UnitKind::Champion || !champions()[std::size_t(u.champ)].autos.hits_walls) refuse(u, "your autoattacks can't hit walls");
+            else if (!Grid::in_bounds(cx, cy) || grid.at(cx, cy).wall() == Wall::None) refuse(u, "no wall there");
+            else u.order = {OrderKind::AttackWall, 0, c.x, c.y};
+            break;
+        }
         case CmdKind::AttackMove:  // slot 1 = closest champion only [X-98]
             u.order = {OrderKind::AttackMove, 0, c.x, c.y, std::uint8_t(c.slot & 3)};  // [U-303] bit 2 = to the cursor
             path_to(u, c.x, c.y);
