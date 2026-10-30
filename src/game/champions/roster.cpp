@@ -135,6 +135,8 @@ int default_q(int champ) {
 
 bool special_allowed(int special, Element e) {
     if (special < 0 || special >= int(std::size(data::kSpecialRows))) return false;
+    // [U-448] no magic stance as a pick: non-benders get the stances (the whole set) only at the 60:00 alignment
+    if (data::kSpecialRows[std::size_t(special)].def.kind == SkillKind::MagicStance) return false;
     return data::kSpecialRows[std::size_t(special)].element == e;
 }
 bool special_allowed(int special, const ChampionDef& c) {

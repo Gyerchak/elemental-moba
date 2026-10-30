@@ -256,6 +256,8 @@ struct Unit {
     std::int32_t water = 0, water_max = 0;  // [U-339] carried water of champions whose resource is NOT water (the Avatar)
     std::int64_t magic_until = 0;      // [U-264] non-bender magic stance
     std::uint8_t awakened = 255;       // [U-296] a non-bender's awakened Element (255 = not awakened)
+    std::uint8_t stance_el = 255;      // [U-448] the magic stance in use: an Element, or 4 = the own physical set
+    std::array<const SkillDef*, 5> base_set{};  // [U-448] P Q W E R as before the awakening (the physical stance)
     std::uint8_t jbuff = 0;            // [U-366] JungleBuff the champion carries …
     std::int64_t jbuff_until = 0;      // … until then
     std::int8_t mob = -1;              // [U-308] index in kMonsters (game/mobs/monsters.hpp), −1 = not a monster

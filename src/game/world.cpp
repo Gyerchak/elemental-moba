@@ -621,7 +621,15 @@ void World::command(std::uint32_t id, const Cmd& c) {
             }
             break;
         case CmdKind::Stance:
-            if (champions()[std::size_t(u.champ)].stance) {
+            if (u.awakened != 255) {  // [U-448] an awakened non-bender: the WHOLE set switches water → earth → fire → air → own
+                const ChampionDef& cd = champions()[std::size_t(u.champ)];
+                u.stance_el = std::uint8_t((u.stance_el + 1) % 5);
+                for (int s = 1; s <= 4; ++s) {
+                    const SkillDef* d = u.stance_el < 4 ? awakened_skill(cd, Element(u.stance_el), s) : u.base_set[std::size_t(s)];
+                    if (d) u.skill[std::size_t(s)] = d;  // ranks carry over
+                }
+                refuse(u, u.stance_el < 4 ? std::format("stance: {}bending", element_name(Element(u.stance_el))) : std::string("stance: your own weapons"));
+            } else if (champions()[std::size_t(u.champ)].stance) {
                 u.stance_b = !u.stance_b;
                 recompute_stats(u);
             } else {

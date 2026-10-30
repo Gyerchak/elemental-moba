@@ -21,9 +21,11 @@ void World::step_match() {
             if (c.element != Element::None) continue;
             const Element el = awaken_element_for(c, u.stat_dmg_from_champs);
             u.awakened = std::uint8_t(el);
+            u.stance_el = std::uint8_t(el);
+            for (int s = 0; s <= 4; ++s) u.base_set[std::size_t(s)] = u.skill[std::size_t(s)];  // [U-448] the physical stance
             for (int s = 1; s <= 4; ++s)
                 if (const SkillDef* d = awakened_skill(c, el, s)) u.skill[std::size_t(s)] = d;  // ranks carry over
-            add_feed(std::format("{} awakens as a {}bender!", u.name, element_name(el)));
+            add_feed(std::format("{} awakens as a {}bender! (Stance key: switch the whole set between the elements)", u.name, element_name(el)));
             announce(AnnounceKind::Awakened, u.id, std::uint32_t(el), u.team);
         }
     if (now_ms >= next_wave_ms) {

@@ -380,6 +380,11 @@ void GameView::hint(std::string h) {
 void GameView::cast_key(NetClient& net, int slot, bool from_click) {
     const SkillDef* d = skill_of(net, slot);
     if (!d) return;
+    if (pending_ == slot && src_x_ >= 0 && (set_.quick(slot) || force_quick_)) {  // [U-450] quick cast: 2nd press = throw at the cursor
+        cast_at_cursor(net, slot);
+        pending_ = -1;
+        return;
+    }
     src_x_ = src_y_ = -1;
     if (d->kind == SkillKind::Passive) return hint(std::format("{} is a passive (always on)", d->name));
     const auto& me = net.cur.me;
@@ -834,6 +839,10 @@ void GameView::draw_indicator(NetClient& net) {
                 const ChampionDef& c = champions()[std::size_t(std::max<int>(0, it->second.champ))];
                 return c.element == Element::Water || c.avatar;
             }();
+            for (const auto& f : fx_draw_) {  // [U-453] every visible skill's hitbox: mine / allies' blue, enemies' red
+                const Shape fs = fx_shape(FxKind(f.kind), f.x, f.y, f.radius, f.width, f.length, Dir{f.dx, f.dy}, Flow(f.flow), f.seed, local_tick_);
+                if (!fs.empty()) outline_shape(r_, view_, fs, f.team == net.my_team ? Rgba{110, 190, 255, 200} : Rgba{255, 90, 80, 220}, 1.5f);
+            }
             for (const DrawUnit& du : draw_) {
                 if (!du.u.alive) continue;
                 const float reach = float(body_reach(body_by_index(du.u.body), du.u.size_pct));
@@ -872,16 +881,28 @@ void GameView::draw_indicator(NetClient& net) {
         if (du.u.id == net.my_unit) mine = &du;
     if (!d || !mine) return;
     const auto& me = net.cur.me;
-    const float range = float(me.s_range[pending_]), width = float(me.s_width[pending_]), radius = float(me.s_radius[pending_]);
+    float range = float(me.s_range[pending_]);
+    const float width = float(me.s_width[pending_]), radius = float(me.s_radius[pending_]);
     const float mx = view_.wx(ui_->mx), my = view_.wy(ui_->my);
-    const std::int32_t ux = std::int32_t(mine->x), uy = std::int32_t(mine->y);
+    std::int32_t ux = std::int32_t(mine->x), uy = std::int32_t(mine->y);
+    // [U-450] a picked source: the skill starts THERE with +25 % range (as the server casts it)
+    if (src_x_ >= 0 && (d->kind == SkillKind::Bolt || d->kind == SkillKind::Wave || d->kind == SkillKind::Cone)) {
+        ux = src_x_, uy = src_y_;
+        range *= 1.25f;
+        line(r_, view_.sx(mine->x), view_.sy(mine->y), view_.sx(float(ux)), view_.sy(float(uy)), {120, 210, 255, 160});
+    }
+    auto label = [&](float wx, float wy, std::string_view t, Rgba c) {  // [U-451] what each part of the skill is
+        const float lx = view_.sx(wx) - text_w(t) / 2, ly = view_.sy(wy) - 18;
+        text(r_, lx + 1, ly + 1, t, {0, 0, 0});  // (a shadow: readable on any ground)
+        text(r_, lx, ly, t, c);
+    };
     const Dir dir = dir_of(std::int64_t(mx) - ux, std::int64_t(my) - uy);
     const float dist = std::hypot(mx - mine->x, my - mine->y);
     const float clamped = range > 0 ? std::min(dist, range) : 0;
     const std::int32_t px = ux + std::int32_t(float(dir.x) / kOne * clamped), py = uy + std::int32_t(float(dir.y) / kOne * clamped);
     const Flow flow = flow_of(d->sub);
     const Rgba edge{255, 255, 255, 230};
-    if (range > 0) ground_ring(r_, view_, mine->x, mine->y, range, {255, 255, 255, 90}, 72);
+    if (range > 0) ground_ring(r_, view_, float(ux), float(uy), range, {255, 255, 255, 90}, 72);
     Shape s;
     switch (d->kind) {
         case SkillKind::Bolt: case SkillKind::Dash: case SkillKind::Tornado: case SkillKind::Lantern: {
@@ -902,17 +923,79 @@ void GameView::draw_indicator(NetClient& net) {
             outline_shape(r_, view_, start, {255, 255, 255, 120});
             break;
         }
-        case SkillKind::Cone: s = fx_shape(FxKind::Cone, ux, uy, 0, std::int32_t(width), std::int32_t(range), dir, flow, 1, local_tick_); break;
-        case SkillKind::Burst: case SkillKind::Field: case SkillKind::Heal: case SkillKind::Pillar:
-            s = fx_shape(FxKind::Field, range > 0 ? px : ux, range > 0 ? py : uy, std::int32_t(radius), 0, 0, dir, flow, 1, local_tick_);
+        case SkillKind::Cone: {
+            s = fx_shape(FxKind::Cone, ux, uy, 0, std::int32_t(width), std::int32_t(range), dir, flow, 1, local_tick_);
+            // [U-451] fire cones leave burning ground (and burn trees): show that second part too
+            const bool burns = d->burns_ground >= 0 ? d->burns_ground > 0 : base_element(d->sub) == Element::Fire || d->sub == SubElement::Lava;
+            if (burns) {
+                fill_shape(r_, view_, s, {255, 120, 40, 50});
+                label(float(ux) + float(dir.x) / kOne * range * 0.7f, float(uy) + float(dir.y) / kOne * range * 0.7f,
+                      d->cc == StatusKind::Burn ? tr("burning ground + burn") : tr("burning ground"), {255, 170, 90, 255});
+            }
             break;
-        case SkillKind::Boulder: s = fx_shape(FxKind::Boulder, px, py, std::int32_t(width / 2), 0, 0, dir, flow, 1, local_tick_); break;
+        }
+        case SkillKind::Burst: case SkillKind::Field: case SkillKind::Heal: case SkillKind::Pillar: case SkillKind::MoveWater:
+            s = fx_shape(FxKind::Field, range > 0 ? px : ux, range > 0 ? py : uy, std::int32_t(std::max(radius, 48.f)), 0, 0, dir, flow, 1, local_tick_);
+            if (d->kind == SkillKind::Pillar) label(float(px), float(py), tr("pillar: enemies thrown up (allies never)"), {230, 210, 160, 255});
+            if (d->kind == SkillKind::MoveWater) label(float(px), float(py), tr("the water lands here (a source)"), {140, 210, 255, 255});
+            if (d->kind == SkillKind::Field && d->sub == SubElement::Lava) label(float(px), float(py), tr("lava pool"), {255, 150, 80, 255});
+            break;
+        case SkillKind::Boulder: {
+            // [U-450][U-451] where the stone is lifted (beside me / at the cursor) and how far it can be thrown from there
+            std::int32_t bx = px, by = py;
+            if (d->lift_beside) {
+                const float off = 40.f + width / 2;
+                bx = ux + std::int32_t(float(dir.x) / kOne * off), by = uy + std::int32_t(float(dir.y) / kOne * off);
+            }
+            s = fx_shape(FxKind::Boulder, bx, by, std::int32_t(width / 2), 0, 0, dir, flow, 1, local_tick_);
+            if (d->casts > 1) {
+                ground_ring(r_, view_, float(bx), float(by), range, {255, 210, 150, 110}, 64);
+                label(float(bx), float(by), tr("lift — then throw within the ring"), {255, 220, 160, 255});
+            } else {
+                label(float(bx), float(by), tr("a lifted stone (pushable)"), {255, 220, 160, 255});
+            }
+            break;
+        }
+        case SkillKind::StonePush: {  // [U-450] from the stone that will fly (the picked / nearest lifted one) to the cursor
+            float sx0 = src_x_ >= 0 ? float(src_x_) : -1, sy0 = float(src_y_);
+            if (sx0 < 0) {
+                float best = 1e18f;
+                for (const auto& f : fx_draw_)
+                    if (f.kind == std::uint8_t(FxKind::Boulder)) {
+                        const float dd = (float(f.x) - mine->x) * (float(f.x) - mine->x) + (float(f.y) - mine->y) * (float(f.y) - mine->y);
+                        if (dd < best && dd <= range * range) best = dd, sx0 = float(f.x), sy0 = float(f.y);
+                    }
+            }
+            if (sx0 >= 0) {
+                line(r_, view_.sx(sx0), view_.sy(sy0), view_.sx(mx), view_.sy(my), edge);
+                ground_ring(r_, view_, sx0, sy0, width / 2 + 6, edge, 24);
+                label(sx0, sy0, tr("this stone flies"), {255, 220, 160, 255});
+            } else {
+                label(mx, my, tr("no lifted stone in reach"), {255, 140, 120, 255});
+            }
+            break;
+        }
         case SkillKind::Wall: {
             const Dir along{-dir.y, dir.x};
             const float L = radius > 0 ? radius : width;
-            if (radius > 0) ground_ring(r_, view_, float(px), float(py), L, edge, 48);
-            else line(r_, view_.sx(float(px) - float(along.x) / kOne * L / 2), view_.sy(float(py) - float(along.y) / kOne * L / 2),
-                      view_.sx(float(px) + float(along.x) / kOne * L / 2), view_.sy(float(py) + float(along.y) / kOne * L / 2), edge);
+            if (radius > 0) {
+                ground_ring(r_, view_, float(px), float(py), L, edge, 48);
+            } else {  // [U-450] the real pieces: 100 long, their thickness (metal: one thin piece; drawn walls: thin)
+                const bool metal = d->sub == SubElement::Metal || d->sub == SubElement::MetalArmor;
+                const int n = d->wall_segs ? d->wall_segs : metal ? 1 : std::max(1, int((L + 50) / 100));
+                const float thick = float(d->wall_thick ? d->wall_thick : (metal || d->control == 2) ? 1 : 2) * 33.f;
+                for (int i = 0; i < n; ++i) {
+                    const float off = float(2 * i - (n - 1)) * 50.f;
+                    const float cx = float(px) + float(along.x) / kOne * off, cy = float(py) + float(along.y) / kOne * off;
+                    Shape seg;
+                    for (int k = -2; k <= 2; ++k)
+                        seg.add(Circle{std::int32_t(cx + float(along.x) / kOne * float(k) * 22), std::int32_t(cy + float(along.y) / kOne * float(k) * 22),
+                                       std::int32_t(thick / 2)});
+                    fill_shape(r_, view_, seg, {255, 255, 255, 40});
+                    outline_shape(r_, view_, seg, edge, 1.5f);
+                }
+                label(float(px), float(py), std::format("{} × 100 · {} {}", n, int(thick), tr("thick")), {230, 230, 230, 255});
+            }
             break;
         }
         case SkillKind::Blink: ground_ring(r_, view_, float(px), float(py), 30, edge); break;
