@@ -689,6 +689,7 @@ Additions outside the plan live in `ENGINE-EXTRAS.md`, never here.
 - [U-483] Anything from the setup system (keystones, trees, shards, classic runes, quintessences, masteries) can be added / modified / removed by a changed game version; test changes in the test version.
 - [U-484] LoL: self-healing % (heals only done by yourself) and heal & shield power % (mainly support items); LoL polymorph with the exact LoL combination. LoL-modified: buffing increase — EVERY buffing effect (heals, skill damage buffs, jungle buffs and their effects, shields / damage / on-hit / item buffs given to allies …).
 - [U-485] Add the Runeforge Aatrox mod (free to use) as an Aatrox skin.
+- [U-486] All of Aatrox's animations from the mod, and every animation kind configurable in the base game engine.
 
 ---
 *Hubert continues editing the plan later — new ideas get the next free `[U-xx]` number.*

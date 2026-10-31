@@ -1,5 +1,6 @@
 // [U-258] See sprites.hpp.
 #include "client/sprites.hpp"
+#include "client/anim.hpp"
 
 #include <cmath>
 #include <fstream>
@@ -25,6 +26,12 @@ const SpriteSheet* Sprites::get_dir(const std::string& dir) {
             else if (k == "dirs") ls >> s->dirs;
             else if (k == "ortho_m") ls >> s->ortho_m;
             else if (k == "anchor") ls >> s->ax >> s->ay;
+            else if (k == "wrap") ls >> s->wrap;  // [U-486]
+            else if (k == "use") {
+                std::string key, to;
+                ls >> key >> to;
+                s->use[key] = to;
+            }
             else if (k == "anim") {
                 std::string name;
                 SpriteSheet::Anim a;
@@ -40,17 +47,29 @@ const SpriteSheet* Sprites::get_dir(const std::string& dir) {
     return p;
 }
 
+const SpriteSheet::Anim* SpriteSheet::find(std::string key) const {
+    for (int guard = 0; guard < 12 && !key.empty(); ++guard) {
+        if (auto u = use.find(key); u != use.end())
+            if (auto a = anims.find(u->second); a != anims.end()) return &a->second;
+        if (auto a = anims.find(key); a != anims.end()) return &a->second;
+        key = anim_fallback(key);
+    }
+    if (auto a = anims.find("idle"); a != anims.end()) return &a->second;
+    return anims.empty() ? nullptr : &anims.begin()->second;
+}
+
 void Sprites::draw(SDL_Renderer* r, const SpriteSheet& s, const std::string& anim, double t, int dir, float sx, float sy, float scale,
                    gfx::Rgba tint, bool hold) {
-    auto it = s.anims.find(anim);
-    if (it == s.anims.end()) it = s.anims.find("idle");
-    if (it == s.anims.end()) it = s.anims.begin();
-    const SpriteSheet::Anim& a = it->second;
+    const SpriteSheet::Anim* ap = s.find(anim);
+    if (!ap) return;
+    const SpriteSheet::Anim& a = *ap;
     int f = int(std::max(0.0, t) * a.fps);
     f = hold ? std::min(f, a.n - 1) : f % std::max(1, a.n);
     const int row = s.dirs > 1 ? ((dir % s.dirs) + s.dirs) % s.dirs : 0;
     // half a pixel inside the frame: the smooth filter must never read the NEIGHBOUR frame (thin lines / specks) [U-338]
-    const SDL_FRect src{float((a.col + f) * s.px) + 0.5f, float(row * s.px) + 0.5f, float(s.px) - 1.f, float(s.px) - 1.f};
+    // [U-486] wrapped sheets: frame i sits in block i / wrap (each block = `dirs` rows), column i % wrap
+    const int i = a.col + f, cx = s.wrap > 0 ? i % s.wrap : i, block = s.wrap > 0 ? i / s.wrap : 0;
+    const SDL_FRect src{float(cx * s.px) + 0.5f, float((block * s.dirs + row) * s.px) + 0.5f, float(s.px) - 1.f, float(s.px) - 1.f};
     const float size = s.ortho_m * kUnitsPerMetre * scale;  // the frame width on screen
     // [U-389] whole pixels: fractional positions made thin lines shimmer while moving / zoomed out
     const SDL_FRect dst{std::round(sx - size * s.ax), std::round(sy - size * s.ay), std::round(size), std::round(size)};

@@ -1,0 +1,106 @@
+{
+ "_about": "[U-485][U-486] Old Aatrox mod (Runeforge, by lavei3 / Scrafty, CC-BY-NC-4.0) -> Aatrox skins. Only FILE NAMES here; the mod itself stays local. Keys: client/anim.hpp. Game keys: W = LoL Q (Darkin Blade, 3 stages), E = LoL W, R = LoL E (dash), T = LoL R (World Ender = form_*).",
+ "champion": "aatrox",
+ "dir": "ASSETS/Characters/Aatrox/Skins",
+ "credit": "Old Aatrox mod by lavei3 / Scrafty (runeforge.dev, CC-BY-NC-4.0, non-commercial). League of Legends assets (c) Riot Games. Local use only.",
+ "height": 3.3,
+ "ortho": 3.9,
+ "px": 112,
+ "anchor": 0.86,
+ "max_frames": 5,
+ "wrap": 16,
+ "skins": {
+  "old_aatrox": {
+   "mesh": "Base/Aatrox",
+   "texture": "Base/Aatrox_Base_TX_CM.dds",
+   "splash": "Base/AatroxLoadscreen.dds",
+   "name": "Old Aatrox"
+  },
+  "old_justicar": {
+   "mesh": "Skin01/Aatrox_Skin01",
+   "texture": "Skin01/Aatrox_Skin01_TX_CM.dds",
+   "splash": "Skin01/AatroxLoadscreen_1.dds",
+   "name": "Old Justicar Aatrox",
+   "anims": {
+    "recall": "Aatrox_Skin01_recall"
+   }
+  },
+  "old_mecha": {
+   "mesh": "Skin02/Aatrox_Skin02",
+   "texture": "Skin02/Aatrox_Skin02_TX_CM.dds",
+   "splash": "Skin02/AatroxLoadscreen_2.dds",
+   "name": "Old Mecha Aatrox",
+   "anims": {
+    "recall": "Aatrox_Skin02_Recall"
+   }
+  },
+  "old_sea_hunter": {
+   "mesh": "Skin03/Aatrox_Skin03",
+   "texture": "Skin03/Aatrox_skin03_TX_CM.dds",
+   "splash": "Skin03/AatroxLoadscreen_3.dds",
+   "name": "Old Sea Hunter Aatrox"
+  },
+  "old_mecha_chroma4": {
+   "mesh": "Skin02/Aatrox_Skin02",
+   "texture": "Skin04/Aatrox_Skin04_TX_CM_update.dds",
+   "splash": "Skin02/AatroxLoadscreen_2.dds",
+   "name": "Old Mecha Aatrox (chroma 4)",
+   "anims": {
+    "recall": "Aatrox_Skin02_Recall"
+   }
+  },
+  "old_mecha_chroma5": {
+   "mesh": "Skin02/Aatrox_Skin02",
+   "texture": "Skin05/Aatrox_Skin05_TX_CM_update.dds",
+   "splash": "Skin02/AatroxLoadscreen_2.dds",
+   "name": "Old Mecha Aatrox (chroma 5)",
+   "anims": {
+    "recall": "Aatrox_Skin02_Recall"
+   }
+  },
+  "old_mecha_chroma6": {
+   "mesh": "Skin02/Aatrox_Skin02",
+   "texture": "Skin06/Aatrox_Skin06_TX_CM_update.dds",
+   "splash": "Skin02/AatroxLoadscreen_2.dds",
+   "name": "Old Mecha Aatrox (chroma 6)",
+   "anims": {
+    "recall": "Aatrox_Skin02_Recall"
+   }
+  }
+ },
+ "anims": {
+  "idle": "Aatrox_Idle1",
+  "idle2": "Aatrox_idle2",
+  "walk": "Aatrox_sheath_run01",
+  "run": "Aatrox_sheath_run_haste",
+  "dash": "Aatrox_Spell_Dash_Running",
+  "attack": "Aatrox_Attack1",
+  "attack2": "Aatrox_Attack3",
+  "crit": "Aatrox_Crit",
+  "cast": "Aatrox_Spell3",
+  "cast_w1": "Aatrox_ground_Q1",
+  "cast_w2": "Aatrox_ground_Q2",
+  "cast_w3": "Aatrox_ground_Q3",
+  "cast_e": "Aatrox_Passive_Attack",
+  "cast_r": "Aatrox_Spell3_Dash",
+  "cast_t": "Aatrox_ULT_into",
+  "death": "Aatrox_Death",
+  "recall": "Aatrox_Recall",
+  "channel": "Aatrox_Channel",
+  "emote_laugh": "Aatrox_Laugh",
+  "emote_taunt": "Aatrox_Taunt",
+  "emote_dance": "Aatrox_Dance_Loop",
+  "emote_joke": "Aatrox_Joke",
+  "form_idle": "Aatrox_ULT_Idle",
+  "form_walk": "Aatrox_ULT_Run",
+  "form_attack": "Aatrox_ULT_Attack1",
+  "form_attack2": "Aatrox_ULT_Attack2",
+  "form_cast_w1": "Aatrox_ULT_Q1",
+  "form_cast_w2": "Aatrox_ULT_Q2",
+  "form_cast_w3": "Aatrox_ULT_Q3",
+  "form_cast_e": "Aatrox_Spell3_ULT",
+  "form_cast_r": "Aatrox_ULT_Spell_Dash",
+  "form_dash": "Aatrox_ULT_Spell_Dash",
+  "form_emote_taunt": "Aatrox_ULT_Taunt"
+ }
+}

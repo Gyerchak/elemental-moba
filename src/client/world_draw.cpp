@@ -387,6 +387,7 @@ void GameView::draw_units(NetClient& net, double now_s) {
     for (const LocalHit& h : net.hits)  // [U-258] who just autoattacked → attack animation
         if (h.h.is_auto) {
             AnimMem& am = anim_mem_[h.h.src];
+            if (h.born > am.attacked) ++am.attack_n, am.crit = (h.h.pad & 8) != 0;  // [U-486] a new swing
             am.attacked = std::max(am.attacked, h.born);
         }
     std::vector<std::function<void()>> deferred;  // [U-389]
@@ -448,18 +449,38 @@ void GameView::draw_units(NetClient& net, double now_s) {
             if (u.id == net.my_unit) outline_shape(r_, view_, body, {255, 230, 80, std::uint8_t(std::max<int>(ha, 60))}, 1.f);
             if (anim == AnimSlot::Swim) ground_ring(r_, view_, du.x, du.y, 50 + 10 * float(std::sin(now_s * 4)), {200, 230, 255, 160}, 24);
             if (sheet) {  // [U-258] the Blender model, as a sprite
+                // [U-486] the animation KEY for what the unit does (client/anim.hpp); the sheet falls back / remaps it
                 std::string an = "idle";
                 double t = now_s;
                 bool hold = false;
+                const bool form = (u.anim_flags & 1) != 0, dashing = (u.anim_flags & 2) != 0, hasted = (u.anim_flags & 4) != 0;
                 if (!u.alive) an = "death", t = now_s - am.died, hold = true;
-                else if (anim == AnimSlot::Frozen || anim == AnimSlot::Stunned || anim == AnimSlot::Bloodbent) t = 0;  // frozen still
-                else if (u.casting) an = "cast", t = now_s - am.cast_from, hold = true;
-                else if (now_s - am.attacked < 0.32) an = "attack", t = now_s - am.attacked, hold = true;
+                else if (u.emote != 255 && u.emote < std::size(kEmoteNames)) an = "emote_" + std::string(kEmoteNames[u.emote]);
+                else if (anim == AnimSlot::Frozen || anim == AnimSlot::Stunned || anim == AnimSlot::Bloodbent) {
+                    an = anim == AnimSlot::Frozen ? "frozen" : anim == AnimSlot::Stunned ? "stunned" : "bloodbent";
+                    t = 0;  // frozen still
+                } else if (anim == AnimSlot::FlyEnemy) an = "airborne";
+                else if (anim == AnimSlot::Recall) an = "recall", t = now_s - am.cast_from;
+                else if (u.casting) {
+                    constexpr const char* kSlotKey[] = {"p", "q", "w", "e", "r", "t", "y", "f", "g"};
+                    const int sl = std::min<int>(u.casting - 1, int(std::size(kSlotKey)) - 1);
+                    an = std::string("cast_") + kSlotKey[std::max(0, sl)];
+                    const ChampionDef* cdp = u.champ >= 0 && u.champ < int(champions().size()) ? &champions()[std::size_t(u.champ)] : nullptr;
+                    const SkillDef* sd = cdp && sl >= 0 ? (sl == 0 ? &cdp->p : sl == 2 ? &cdp->w : sl == 3 ? &cdp->e : sl == 4 ? &cdp->r : sl == 5 ? &cdp->t : sl == 6 ? &cdp->y : nullptr) : nullptr;
+                    if (sd && sd->casts > 1) an += std::to_string(u.cast_stage + 1);  // cast_w1 / cast_w2 / cast_w3
+                    t = now_s - am.cast_from, hold = true;
+                } else if (now_s - am.attacked < 0.32) {
+                    an = am.crit ? "crit" : am.attack_n % 2 ? "attack2" : "attack";  // alternating swings, crits their own
+                    t = now_s - am.attacked, hold = true;
+                } else if (dashing) an = "dash";
                 else if (now_s - am.moved < 0.15) {
-                    an = "walk";
-                    if (auto w = sheet->anims.find("walk"); w != sheet->anims.end())  // frames follow the real steps
-                        t = double(u.walk % 1024) / 1024.0 * w->second.n / std::max(1, w->second.fps);
-                }
+                    an = hasted ? "run" : "walk";
+                    if (const SpriteSheet::Anim* w = sheet->find(form ? "form_" + an : an))  // frames follow the real steps
+                        t = double(u.walk % 1024) / 1024.0 * w->n / std::max(1, w->fps);
+                } else if (anim == AnimSlot::Silenced) an = "silenced";
+                else if (anim == AnimSlot::Burning) an = "burning";
+                else if (anim == AnimSlot::Swim) an = "swim";
+                if (form && u.alive) an = "form_" + an;  // transformed: form_walk, form_attack … (falls back to the normal one)
                 // [U-260] the look of what happens to it: frozen = iced skin, burning = glowing red, wet / slowed = bluish
                 Rgba tint{255, 255, 255, 255};
                 if (kind == UnitKind::Minion) tint = mixc(tint, tc, 55);

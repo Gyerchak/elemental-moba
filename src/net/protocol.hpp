@@ -16,7 +16,7 @@
 
 namespace em::net {
 
-inline constexpr std::uint16_t kProtocol = 18;  // 18: heal / shield / buff power, polymorph, setup per version [U-483][U-484]  // 17: healing received [U-481]  // 16: switchable Dota features, version mods [U-478]  // 15: LoL AP / magic pen, Dota attributes + statuses [U-474..U-476]  // 14: crits, skill powers, sweet spots + shapes [U-461..U-471]  // 13: cast stages, chains, skill visuals, proc + recast timers [U-456..U-459]  // 12: maps, lobby owner / queue, charges [U-420..U-433]  // 11: rule sets, own emotes [U-414][U-416]  // 7: ten item slots [U-322]; 8: cast sources [U-340]; 9: camps, jungle buffs [U-364..U-366]; 10: bounties, companions [U-407][U-413]
+inline constexpr std::uint16_t kProtocol = 19;  // 19: animation info (stage, form, dash) [U-486]  // 18: heal / shield / buff power, polymorph, setup per version [U-483][U-484]  // 17: healing received [U-481]  // 16: switchable Dota features, version mods [U-478]  // 15: LoL AP / magic pen, Dota attributes + statuses [U-474..U-476]  // 14: crits, skill powers, sweet spots + shapes [U-461..U-471]  // 13: cast stages, chains, skill visuals, proc + recast timers [U-456..U-459]  // 12: maps, lobby owner / queue, charges [U-420..U-433]  // 11: rule sets, own emotes [U-414][U-416]  // 7: ten item slots [U-322]; 8: cast sources [U-340]; 9: camps, jungle buffs [U-364..U-366]; 10: bounties, companions [U-407][U-413]
 inline constexpr std::string_view kVersion = "official-0.1";  // [U-95][X-14]
 inline constexpr std::uint16_t kDefaultPort = 7777;
 inline constexpr int kMaxPlayers = 32;  // [U-09]
@@ -250,6 +250,7 @@ struct NetUnit {
     std::int16_t atk, def, edef, range;  // for the info panel [U-161]
     std::uint8_t cc_kind, emote;         // strongest crowd control now [U-193] (255 = none); emote [U-246]
     std::uint16_t cc_left_cs;            // … time left in 1/100 s
+    std::uint8_t cast_stage, anim_flags, pad9[2];  // [U-486] multicast cast now (0 = first); bit 1 transformed, 2 dashing, 4 hasted
 };
 inline constexpr const char* kMobNames[] = {"", "Spirit Wolf", "Wandering Spirit", "Cursed Spirit", "Angry Beast", "Bandit", "Face Stealer", "Bandit Archer", "Platypus Bear", "Knowledge Seeker", "Lion Turtle", "Sun Dragons", "Dark Spirit", "Swamp Monster"};
 

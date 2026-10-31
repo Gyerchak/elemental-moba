@@ -166,6 +166,9 @@ void Server::send_snapshot(Player& p) {
     w.put<std::int32_t>(W.team_kills[1]);
     // units the team can see [X-10][U-140]
     std::vector<NetUnit> us;
+    std::vector<std::uint32_t> dashers;  // [U-486] units dragged by their own dash right now
+    for (const Effect& e : W.fx)
+        if (!e.dead && e.def && e.def->kind == SkillKind::Dash) dashers.push_back(e.owner);
     for (const Unit& u : W.units) {
         if (!u.alive && u.kind != UnitKind::Champion && !u.is_structure() && u.kind != UnitKind::Inhibitor) continue;
         if (!u.alive && u.team != team && u.kind == UnitKind::Champion) continue;
@@ -212,6 +215,9 @@ void Server::send_snapshot(Player& p) {
             }
         n.cc_left_cs = std::uint16_t(std::min<std::int64_t>(65'000, cc_left / 10));
         n.emote = u.emote;
+        n.cast_stage = u.cast_stage;  // [U-486] which animation fits: stage, form, dash
+        n.anim_flags = std::uint8_t((u.transform_until > W.now_ms ? 1 : 0) | (std::ranges::find(dashers, u.id) != dashers.end() ? 2 : 0) |
+                                    (u.st.has(StatusKind::Haste) ? 4 : 0));
         us.push_back(n);
     }
     w.put<std::uint16_t>(std::uint16_t(us.size()));

@@ -175,6 +175,8 @@ private:
         std::uint16_t walk = 0;
         double moved = -10, attacked = -10, died = -10, cast_from = -10;
         bool was_alive = true, was_casting = false;
+        bool crit = false;          // [U-486] the last autoattack was a crit
+        std::uint32_t attack_n = 0; // [U-486] swings so far (alternating attack / attack2)
     };
     std::unordered_map<std::uint32_t, AnimMem> anim_mem_;
     std::unordered_map<std::uint32_t, double> fx_born_;

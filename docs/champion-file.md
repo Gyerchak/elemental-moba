@@ -179,3 +179,31 @@ pack used only while the version is active); `resource_pack = <name>` links a pa
 
 Switch packs on and order them (^ / v). Like Minecraft: for the same file, the pack HIGHER in the list wins. After
 your packs come the game version's pack, the map's pack and `default`.
+
+## 10. Models, skins and animations (`sheet.txt`)
+
+A model is `…/model/sheet.png` + `sheet.txt` (made by `tools/art/make_models.py`, or from a League mod by
+`tools/art/lol_skin_make.py`). A skin's model: `resourcepacks/<pack>/champions/<champion>/skins/<skin>/model/`
+(+ `splash.png`, `icon.png`).
+
+    frame_px 112          one frame
+    dirs 8                8 directions (rows)
+    ortho_m 3.9           frame width in metres
+    anchor 0.5 0.86       the ground point in the frame
+    wrap 16               (optional) 16 frames per block row; blocks stacked — for big sheets
+    anim <key> <first frame> <frames> <fps>
+    use <key> <other key> (optional) play <other key> for <key>
+
+Animation keys the game asks for (a model needs only `idle`; a missing key falls back step by step):
+
+| Key | When | Falls back to |
+|---|---|---|
+| `idle`, `idle2` | standing | — / `idle` |
+| `walk`, `run` | moving / moving with a speed buff | `idle` / `walk` |
+| `dash` | dragged by its own dash | `run` |
+| `attack`, `attack2`, `attack3`, `crit` | autoattacks (alternating), a critical hit | `attack` → `idle` |
+| `cast`, `cast_<p q w e r t y>`, `cast_w1` … `cast_w3` | casting; per skill; per multicast stage | `cast_w` → `cast` → `idle` |
+| `death`, `recall`, `channel` | dead / recalling / channelling | `idle` / `channel` → `idle` |
+| `emote_laugh` `emote_taunt` `emote_dance` `emote_joke` `emote_wave` `emote_cheer` | emotes | `emote` → `idle` |
+| `stunned` `frozen` `airborne` `flying` `swim` `silenced` `blinded` `bloodbent` `burning` `slowed` | effects on it | `idle` |
+| `form_<any key>` | the same while transformed (e.g. World Ender) | the key without `form_` |

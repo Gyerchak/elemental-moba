@@ -25,6 +25,10 @@ struct SpriteSheet {
         int col = 0, n = 1, fps = 6;
     };
     std::map<std::string, Anim> anims;
+    std::map<std::string, std::string> use;  // [U-486] `use <key> <anim>`: this model plays <anim> for <key>
+    int wrap = 0;                            // [U-486] `wrap N`: N frames per block row, blocks stacked (big sheets)
+    // the animation for a key: remap → exact → fallback chain (client/anim.hpp); nullptr only for an empty sheet
+    [[nodiscard]] const Anim* find(std::string key) const;
 };
 
 class Sprites {
