@@ -96,6 +96,8 @@ private:
     void interactions();  // [U-397]
     int queue_map_ = 0, queue_rules_ = 0;  // [U-423] my queue choice
     float info_scroll_ = 0;
+    std::string setup_champ_search_;  // [U-432]
+    SavedSetup match_setup_;           // [U-432] champion select: the loadout being tweaked for this match only
     int shots_taken_ = 0;  // [U-446]                 // [U-424] the champion list in Menu → Champions
     float interactions_scroll_ = 0;
     // ---- shared

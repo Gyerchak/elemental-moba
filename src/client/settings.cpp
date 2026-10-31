@@ -186,6 +186,12 @@ bool Settings::load(const std::string& path) {
                 for (std::size_t n = 0; n < l.masteries.size(); ++n) l.masteries[n] = std::uint8_t(std::clamp(to_int(p[1 + n], 0), 0, 9));
                 l = validated(l);
             }
+        } else if (k == "setup_champs") {  // [U-432] idx | champion | champion …
+            const auto p = split(v, '|');
+            const int i = p.empty() ? -1 : to_int(p[0]);
+            if (i >= 0 && i < int(setups.size()))
+                for (std::size_t n = 1; n < p.size() && setups[std::size_t(i)].champs.size() < 40; ++n)
+                    if (!p[n].empty()) setups[std::size_t(i)].champs.push_back(p[n]);
         } else if (k == "setup_build") {  // [U-323] idx | item | text
             const auto p = split(v, '|');
             const int i = p.empty() ? -1 : to_int(p[0]);
@@ -308,6 +314,11 @@ void Settings::save(const std::string& path) const {
             for (char& c : t)
                 if (c == '|' || c == '\n' || c == '\r') c = '/';
             out << "setup_build=" << i << '|' << st.item << '|' << t << '\n';
+        }
+        if (!s.champs.empty()) {  // [U-432]
+            out << "setup_champs=" << i;
+            for (const auto& c : s.champs) out << '|' << c;
+            out << '\n';
         }
         out << "setup_level=" << i << '|' << s.level_mode;
         for (auto n : s.level_prio) out << '|' << int(n);

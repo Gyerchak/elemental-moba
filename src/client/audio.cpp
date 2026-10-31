@@ -40,7 +40,7 @@ void Audio::play(const Sound* s, SoundCat cat, float gain, float pan) {
 void Audio::play_music(const Sound* s) {
     std::scoped_lock lk(mu_);
     std::erase_if(voices_, [](const Voice& v) { return v.cat == SoundCat::Music; });
-    if (s && !s->samples.empty()) voices_.push_back({s, 0, 0.8f, 0.8f, SoundCat::Music, true});
+    if (s && !s->samples.empty()) voices_.push_back({s, 0, 0.55f, 0.55f, SoundCat::Music, true});  // [U-445] under the effects
 }
 
 void Audio::play_at(const Sound* s, float dx, float dy, float hear_range, SoundCat cat) {
@@ -59,23 +59,40 @@ void SDLCALL Audio::callback(void* self, SDL_AudioStream* stream, int additional
     SDL_PutAudioStreamData(stream, a->scratch_.data(), frames * int(sizeof(float) * 2));
 }
 
+// [U-445] the mix: effects first, the music ducks under busy moments (up to −6 dB), a 1 s crossfade where a looping
+// track starts again (no click), and a soft limiter instead of hard clipping (no distortion when many sounds play)
 void Audio::mix(float* out, int frames) {
     std::scoped_lock lk(mu_);
+    int busy = 0;
+    for (const Voice& v : voices_) busy += v.cat != SoundCat::Music && v.cat != SoundCat::Ambient;
+    const float target_duck = 1.f - 0.5f * std::min(1.f, float(busy) / 8.f);
+    duck_ += (target_duck - duck_) * 0.2f;  // smooth (per audio block)
+    constexpr std::size_t kXfade = 44'100;  // 1 s
     for (Voice& v : voices_) {
-        const float g = master_ * vol_[std::size_t(v.cat)];
+        const float g = master_ * vol_[std::size_t(v.cat)] * (v.cat == SoundCat::Music ? duck_ : 1.f);
         const auto& smp = v.s->samples;
+        const std::size_t n = smp.size();
+        const bool xf = v.loop && n > 4 * kXfade;
         for (int i = 0; i < frames; ++i) {
-            if (v.pos >= smp.size()) {
+            if (v.pos >= n) {
                 if (!v.loop) break;
-                v.pos = 0;
+                v.pos = xf ? kXfade : 0;  // the start was already heard inside the crossfade
             }
-            const float x = smp[v.pos++] * g;
-            out[2 * i] += x * v.gl;
-            out[2 * i + 1] += x * v.gr;
+            float x = smp[v.pos];
+            if (xf && v.pos >= n - kXfade) {  // the end fades out while the beginning fades in
+                const float t = float(v.pos - (n - kXfade)) / float(kXfade);
+                x = x * (1.f - t) + smp[v.pos - (n - kXfade)] * t;
+            }
+            ++v.pos;
+            out[2 * i] += x * g * v.gl;
+            out[2 * i + 1] += x * g * v.gr;
         }
     }
     std::erase_if(voices_, [](const Voice& v) { return !v.loop && v.pos >= v.s->samples.size(); });
-    for (int i = 0; i < frames * 2; ++i) out[i] = std::clamp(out[i], -1.f, 1.f);
+    for (int i = 0; i < frames * 2; ++i) {  // soft limiter: linear up to 0.6, then a smooth knee towards ±1
+        const float a = std::abs(out[i]);
+        if (a > 0.6f) out[i] = std::copysign(0.6f + 0.4f * std::tanh((a - 0.6f) / 0.4f), out[i]);
+    }
 }
 
 }  // namespace em

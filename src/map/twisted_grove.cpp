@@ -1,4 +1,4 @@
-// [U-421] Twisted Grove: a 3 v 3 map with two lanes (top / bottom) around a dark jungle and a centre pit
+// [U-421][U-455] the Foggy Swamp (generator name twisted_grove): a 3 v 3 map with two lanes (top / bottom) around a dark jungle and a centre pit
 // (Claude idea in the spirit of LoL's old two-lane map). Same grid, same cell format as the original map; outside
 // the playable band a chasm (not walkable, no vision block). Point-symmetric: Earth = the mirror of Fire.
 #include <algorithm>
@@ -72,7 +72,11 @@ Cell make_cell(int cx, int cy) {
         // paths: the centre cross + a ring around the pit + the jungle edge along the lanes stay open
         const bool path = std::abs(p.y - 256) < 3 || std::abs(p.x - 256) < 3 || std::abs(pit_d - 40) < 3 || lane_d < kLaneHalf + 4;
         const double n = noise(p.x, p.y);
-        if (pit_d < 22 || path) c.set_surface(pit_d < 14 ? Surface::Stone : Surface::ForestPath);
+        // [U-455] the great banyan: its roots ring the pit (trees at 24 … 30 cells) with four openings on the paths
+        const bool roots = pit_d >= 24 && pit_d <= 30 && std::abs(p.y - 256) > 5 && std::abs(p.x - 256) > 5;
+        if (roots) c.set_tree(Tree::Alive);
+        else if (pit_d < 22 || path) c.set_surface(pit_d < 14 ? Surface::Stone : Surface::ForestPath);
+        else if (n < 0.30) c.set_surface(Surface::Water);                               // swamp water (shallow: wade through)
         else if (n > 0.52) c.set_tree(Tree::Alive);                                   // groves
         else if (n > 0.46 && hash(cx / 2, cy / 2, 3) % 100 < 45) c.set_bush(Bush::Alive);  // brush around them
     }

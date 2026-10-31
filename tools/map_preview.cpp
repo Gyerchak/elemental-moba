@@ -45,7 +45,7 @@ Rgb mix(Rgb a, Rgb b, int b_pct) {
 int main(int argc, char** argv) {
     const char* out = argc > 1 ? argv[1] : "map.ppm";
     // [U-420] a second argument = the map id (default: the original map)
-    const em::Grid g = argc > 2 && std::string_view(argv[2]) == "twisted_grove" ? em::make_twisted_grove() : em::make_default_map();
+    const em::Grid g = argc > 2 && std::string_view(argv[2]) == "foggy_swamp" ? em::make_twisted_grove() : em::make_default_map();
 
     std::vector<std::uint8_t> px;
     px.reserve(std::size_t(em::kGridSize) * em::kGridSize * 3);

@@ -81,8 +81,9 @@ inline constexpr std::array kMonsters = {
     MonsterDef{.name = "Dark Spirit", .body = &kSlimBody, .aggressive = true, .spirit = true, .hp = 160'000, .attack = 5'500,
                .defence = 2'000, .elemental_defence = 4'000, .move_speed = 33'000, .attack_speed = 70, .attack_range = 300,
                .range = Range::Ranged, .model_size = 1'000, .sight = 750, .gold = 90, .xp = 180, .patience = 900, .respawn_ms = 180'000},
-    // [U-421] the epic monster of Twisted Grove (centre pit): team gold + the Wisdom buff for the killer
-    MonsterDef{.name = "Canyon Crawler Queen", .body = &kBeastBody, .boss = true, .aggressive = false, .hp = 800'000, .attack = 11'000,
+    // [U-421][U-455] the epic monster of the Foggy Swamp (the vine-suit creature of the swamp's waterbenders, in the pit
+    // under the great banyan tree): team gold + the Wisdom buff for the killer
+    MonsterDef{.name = "Swamp Monster", .body = &kBeastBody, .boss = true, .aggressive = false, .hp = 800'000, .attack = 11'000,
                .defence = 6'000, .elemental_defence = 6'000, .move_speed = 30'000, .attack_speed = 60, .attack_range = 120,
                .model_size = 7'000, .sight = 800, .gold = 200, .xp = 500, .patience = 700, .give_up_ms = 3'000, .reset_heal_pct = 8,
                .respawn_ms = 360'000, .first_spawn_ms = 360'000, .hp_growth_pct = 15, .attack_growth_pct = 10, .buff = JungleBuff::Wisdom,

@@ -69,7 +69,7 @@ def manifest():
         {"id": "dark_spirit", "kind": "humanoid", "body": "slim", "height": 1.8, "colour": "1a1020", "accent": "8030c0",
          "px": 112, "ortho": 2.6, "anims": MOB},
         # [U-421] Twisted Grove's epic monster
-        {"id": "canyon_crawler_queen", "kind": "quad", "size": 2.3, "colour": "5a4a3a", "accent": "c04030", "px": 176, "ortho": 5.4, "anchor": 0.7, "anims": MOB},
+        {"id": "swamp_monster", "kind": "humanoid", "body": "broad", "height": 3.0, "colour": "3f5a2a", "accent": "8fbf5a", "px": 176, "ortho": 5.4, "anchor": 0.7, "anims": MOB},
         # [U-407] travel companions (sky bison, polar bear-dog, monkey-cat, shirshu, badgermole, dragon)
         {"id": "companion_sky_bison", "kind": "quad", "size": 2.2, "colour": "f0ece0", "accent": "8a5a30", "px": 176, "ortho": 5.0, "anchor": 0.7, "anims": ["idle", "walk"]},
         {"id": "companion_polar_bear_dog", "kind": "quad", "size": 1.6, "colour": "f6f6f8", "accent": "202020", "px": 144, "ortho": 3.6, "anims": ["idle", "walk"]},

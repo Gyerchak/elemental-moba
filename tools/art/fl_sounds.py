@@ -57,8 +57,8 @@ def game_sound_names():
 
 
 def fl_running():
-    out = subprocess.run(["pgrep", "-f", "FL64.exe"], capture_output=True, text=True).stdout.strip()
-    return bool(out)
+    # exact process name (-f would match any command line that merely CONTAINS "FL64.exe", e.g. this script's shell)
+    return subprocess.run(["pgrep", "-x", "FL64.exe"], capture_output=True).returncode == 0
 
 
 def close_fl():

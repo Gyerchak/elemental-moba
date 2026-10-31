@@ -82,6 +82,37 @@ void App::setups_screen() {
     float y = 60;
     for (int i = 0; i < int(set_.setups.size()); ++i, y += 30)
         if (button(ren_, ui_, 20, y, 300, 26, set_.setups[std::size_t(i)].name, setup_selected_ == i)) setup_selected_ = i;
+    // [U-432] which champions this setup is for (it is then picked first for them in champion select)
+    if (setup_selected_ >= 0 && setup_selected_ < int(set_.setups.size())) {
+        SavedSetup& s = set_.setups[std::size_t(setup_selected_)];
+        float cy = y + 40;
+        text(ren_, 20, cy, tr("For these champions (click = tie / untie):"), {255, 220, 140});
+        cy += 18;
+        text_field(ren_, ui_, 82, 20, cy + 10, 300, setup_champ_search_, tr("Search a champion"));
+        cy += 34;
+        for (const auto& nm : s.champs) {  // tied ones first
+            if (cy > H - 70) break;
+            if (button(ren_, ui_, 20, cy, 300, 22, std::format("✓ {}", nm), true)) {
+                std::erase(s.champs, nm);
+                set_.save();
+                break;
+            }
+            cy += 24;
+        }
+        if (!setup_champ_search_.empty()) {
+            std::string q = setup_champ_search_;
+            std::ranges::transform(q, q.begin(), [](unsigned char c) { return char(std::tolower(c)); });
+            int shown = 0;
+            for (const ChampionDef& c : champions()) {
+                std::string n(c.name);
+                std::ranges::transform(n, n.begin(), [](unsigned char ch) { return char(std::tolower(ch)); });
+                if (n.find(q) == std::string::npos || std::ranges::find(s.champs, std::string(c.name)) != s.champs.end()) continue;
+                if (cy > H - 70 || ++shown > 6) break;
+                if (button(ren_, ui_, 20, cy, 300, 22, std::string(c.name))) s.champs.push_back(std::string(c.name)), set_.save();
+                cy += 24;
+            }
+        }
+    }
     if (button(ren_, ui_, 20, y, 300, 26, tr("New setup"))) {
         set_.setups.push_back({std::format("{} {}", tr("Setup"), set_.setups.size() + 1), {}});
         setup_selected_ = int(set_.setups.size()) - 1;

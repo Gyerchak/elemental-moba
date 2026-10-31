@@ -33,6 +33,13 @@ void App::apply_champion_defaults(int champ) {
     const ChampionDef& c = champions()[std::size_t(champ)];
     ChampPrefs& p = set_.prefs(c.name);
     pick_setup_ = p.setup >= 0 && p.setup < int(set_.setups.size()) ? p.setup : -1;
+    // [U-432] a setup made for this champion is picked first (when there is no last-used one)
+    if (pick_setup_ < 0)
+        for (int s = 0; s < int(set_.setups.size()); ++s)
+            if (std::ranges::find(set_.setups[std::size_t(s)].champs, std::string(champions()[std::size_t(champ)].name)) != set_.setups[std::size_t(s)].champs.end()) {
+                pick_setup_ = s;
+                break;
+            }
     pick_loadout_ = pick_setup_ >= 0 ? set_.setups[std::size_t(pick_setup_)].loadout : Loadout{};
     pick_q_ = q_allowed(champ, p.q) ? p.q : default_q(champ);
     auto first_special = [&](int other) {
@@ -394,7 +401,7 @@ void App::champ_select() {
         if (button(ren_, ui_, px0, py, 150, 22, show_loadout_ ? tr("Loadout ▾") : tr("Loadout ▸"), show_loadout_)) show_loadout_ = !show_loadout_;
         text(ren_, px0 + 160, py + 6, fit_text(summary, pw - 160), {200, 200, 215});
         py += 30;
-        if (show_loadout_) py += draw_loadout_editor(px0, py, pick_loadout_, true, pw);
+        (void)pw;  // (the editor is an overlay now [U-432])
         // how far it can scroll
         const float content = py + pick_scroll_ - ptop;
         pick_scroll_ = std::clamp(pick_scroll_, 0.f, std::max(0.f, content - (pbot - ptop)));
@@ -473,6 +480,18 @@ void App::champ_select() {
         net_.disconnect();
         stop_server();
         go(Screen::Menu);
+    }
+    // [U-432] the full setup editor (runes · masteries · keystone · build · levelling) on a COPY for this match:
+    // tweaks here never change the saved setups
+    if (show_loadout_) {
+        const float ox = 270, oy = 70, ow = W - 540, oh = H - 150;
+        fill_rect(ren_, ox - 6, oy - 30, ow + 12, oh + 36, {8, 8, 14, 245});
+        rect(ren_, ox - 6, oy - 30, ow + 12, oh + 36, {150, 130, 90});
+        text(ren_, ox, oy - 24, tr("Loadout for this match (your saved setups stay as they are)"), {255, 220, 140});
+        if (button(ren_, ui_, ox + ow - 24, oy - 28, 24, 22, "X")) show_loadout_ = false;
+        match_setup_.loadout = pick_loadout_;
+        setup_editor(ox, oy, ow, oh, match_setup_);
+        if (!(match_setup_.loadout == pick_loadout_)) pick_loadout_ = match_setup_.loadout, send_pick();
     }
     // autotest: pick and start at once
     if (opt_.autotest_s > 0 && net_.state == NetClient::State::Lobby) {

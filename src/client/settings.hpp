@@ -49,6 +49,7 @@ struct SavedSetup {     // [U-178] everything prepared before a game: runes, mas
     int level_mode = 0;
     std::array<std::int8_t, 6> level_prio{1, 2, 3, 4, 5, 6};  // Slot values Q W E R T Y, most wanted first
     std::array<std::int8_t, 18> level_exact{-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};  // Slot per level-up
+    std::vector<std::string> champs;  // [U-432] the champions this setup is for: picked FIRST for them in champion select
 };
 struct ChampPrefs {     // [U-178][U-180] per champion (by name, so the roster order can change)
     std::string champ;

@@ -32,12 +32,13 @@ std::vector<MapDef> make_maps() {
         .epic_islands = true,
         .minions = {.melee = 3, .ranged = 3, .siege_every = 3, .first_ms = 65'000, .period_ms = 30'000},
     });
-    // ---- [U-421] Twisted Grove: 3 v 3, two lanes (top / bottom), a jungle between them, the Canyon Crawler Queen
-    // in the middle pit (a Claude idea in the spirit of LoL's old two-lane map). Bases west (Fire) and east (Earth).
+    // ---- [U-421][U-455] the Foggy Swamp: 3 v 3, two lanes (top / bottom) around the swamp — shallow water, vines,
+    // groves and the great banyan tree whose roots ring the centre pit, where the Swamp Monster waits. A place of
+    // its own in the Avatar world (only the two-lane layout is kept from LoL's old map). West Fire, east Earth.
     m.push_back(MapDef{
-        .id = "twisted_grove", .name = "Twisted Grove",
-        .desc = "3 v 3, two lanes around a dark jungle, the Canyon Crawler Queen in the centre pit",
-        .make = make_twisted_grove, .team_size = 3, .pack = "map_twisted_grove",
+        .id = "foggy_swamp", .name = "Foggy Swamp",
+        .desc = "3 v 3, two lanes around the swamp; the great banyan's roots ring the pit of the Swamp Monster",
+        .make = make_twisted_grove, .team_size = 3, .pack = "map_foggy_swamp",
         .base = {52, 256}, .fountain = {28, 256}, .nexus = {64, 256},
         .lanes = {{{72, 236}, {100, 168}, {170, 150}, {256, 146}, {342, 150}, {412, 168}, {440, 236}},
                   {{72, 275}, {99, 343}, {169, 361}, {255, 365}, {341, 361}, {411, 343}, {439, 275}}},
@@ -47,7 +48,7 @@ std::vector<MapDef> make_maps() {
         .camps = {{150, 215}, {150, 296}, {210, 256}},
         .aggro_camps = {{205, 200}, {205, 312}},
         .buff_camps = {{120, 256}},
-        .epics = {{{256, 256}, "Canyon Crawler Queen"}},
+        .epics = {{{256, 256}, "Swamp Monster"}},
         .minions = {.melee = 3, .ranged = 3, .siege_every = 3, .first_ms = 45'000, .period_ms = 30'000},
     });
     return m;

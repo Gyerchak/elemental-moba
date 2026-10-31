@@ -117,7 +117,7 @@ inline constexpr std::uint16_t kAllCategories = 0x1ff;
 inline constexpr std::uint16_t kMinionCategories = cat_bit(UnitCategory::Minion) | cat_bit(UnitCategory::SiegeMinion) | cat_bit(UnitCategory::SuperMinion);
 
 // [U-302] named monsters (the order = the network name id; net::kMobNames is the same list)
-inline constexpr const char* kMobNameList[] = {"", "Spirit Wolf", "Wandering Spirit", "Cursed Spirit", "Angry Beast", "Bandit", "Face Stealer", "Bandit Archer", "Platypus Bear", "Knowledge Seeker", "Lion Turtle", "Sun Dragons", "Dark Spirit", "Canyon Crawler Queen"};
+inline constexpr const char* kMobNameList[] = {"", "Spirit Wolf", "Wandering Spirit", "Cursed Spirit", "Angry Beast", "Bandit", "Face Stealer", "Bandit Archer", "Platypus Bear", "Knowledge Seeker", "Lion Turtle", "Sun Dragons", "Dark Spirit", "Swamp Monster"};
 struct TakenHit {
     std::int64_t ms = 0;
     std::uint32_t src = 0;

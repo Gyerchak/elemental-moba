@@ -41,6 +41,7 @@ private:
     std::vector<Voice> voices_;
     std::array<float, std::size_t(SoundCat::Count)> vol_{1, 1, 1, 1, 1};
     float master_ = 1;
+    float duck_ = 1.f;  // [U-445] the music under busy moments
     std::vector<float> scratch_;
 };
 
