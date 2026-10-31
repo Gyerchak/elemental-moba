@@ -490,6 +490,18 @@ std::string parse_text(const std::string& text, ChampionDef& out) {
     out.hp = std::clamp(out.hp, 10'000, 1'000'000), out.attack = std::clamp(out.attack, 0, 100'000);
     out.ms = std::clamp(out.ms, 10'000, 100'000), out.as = std::clamp(out.as, 1, 500), out.attack_range = std::clamp(out.attack_range, 0, 2'000);
     out.def = std::clamp(out.def, 0, 100'000), out.edef = std::clamp(out.edef, 0, 100'000);
+    // [U-480] the same kit rules as register_champion(), with the reason (a refused kit used to vanish silently)
+    {
+        int targeted = 0;
+        for (auto [slot, sk] : {std::pair{"p", &out.p}, {"w", &out.w}, {"e", &out.e}, {"r", &out.r}, {"t", &out.t}, {"y", &out.y}}) {
+            targeted += sk->targeted;
+            const bool deals = sk->dmg || sk->dmg_rank || sk->ep || sk->ad || sk->bonus_ad || sk->ap;
+            if (!out.mage && deals && !sk->ad && !sk->bonus_ad)
+                return std::format("{} = {}: a non-mage's damaging skill must scale with attack (add {}.ad = … or {}.bonus_ad = …, or mage = 1)",
+                                   slot, sk->name, slot, slot);
+        }
+        if (targeted > kMaxTargetedPerKit) return std::format("at most {} click-targeted skills per kit", kMaxTargetedPerKit);
+    }
     // only BUILT-IN names count here: an own champion that is already loaded must still read as valid
     // (two own files with the same name: register_champion() refuses the second) [U-353]
     for (int i = 0; i < builtin_champion_count(); ++i)
