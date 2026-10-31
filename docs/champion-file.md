@@ -90,6 +90,7 @@ block_chance true_strike mana_break heal_amp` — 100 = 1 % for percentages. Ite
 | Fear | cannot act, runs straight away from the one who scared it |
 | Silence | no abilities at all (bending or not); autoattacks still work |
 | Ability power | skills deal + `ap` % of it |
+| Healing received | EVERY heal (skills, passives, vamp, items, HP regen, fountain) × (1 + `heal_amp`); a Transform's `buff_heal_pct` adds to it; then grievous wounds |
 | Magic penetration | flat / % — lower the target's elemental defence against non-physical damage (with the elemental pens) |
 
 ## 6. This game's own mechanics (engine: `src/game/mechanics/bending_cc.cpp`)

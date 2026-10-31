@@ -684,6 +684,7 @@ Additions outside the plan live in `ENGINE-EXTRAS.md`, never here.
 - [U-478] Buyback, courier, neutral items, Aghanim (scepter) upgrades, talents, invisibility + true sight, glyph: map / game-mode features, turned OFF by default. The 3 LoL items exist only in a modified game version, with their assets tied to the version file and its resource pack.
 - [U-479] Resource packs can be mixed like in Minecraft: an ordered list; for the same file the first pack in the order wins.
 - [U-480] Bug: Aatrox missing from the own champions (the random Y skill broke the non-mage kit rule; the file was refused silently). The parser now names the reason.
+- [U-481] Aatrox's World Ender increases ALL healing (also the omnivamp of Umbral Dash): in the LoL section, "healing received" raises healing from any source.
 
 ---
 *Hubert continues editing the plan later — new ideas get the next free `[U-xx]` number.*

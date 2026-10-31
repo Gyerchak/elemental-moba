@@ -253,7 +253,7 @@ void GameView::draw_skill_tooltip(NetClient& net, int i, float x, float y, bool 
         }
         if (d->tether_ms) L.push_back(std::format("Chain {} s: still within {} then = pulled {} + hit again", sec1(d->tether_ms), d->tether_radius, d->pull));
         if (d->kind == SkillKind::Transform)
-            L.push_back(std::format("Form: +{}% attack, +{}% healing, +{}% speed", d->buff_attack_pct, d->buff_heal_pct, cc_val));
+            L.push_back(std::format("Form: +{}% attack, +{}% ALL healing received, +{}% speed", d->buff_attack_pct, d->buff_heal_pct, cc_val));
         for (const SkillDef::Learned& l : d->learned)  // [U-468]
             if (l.key != StatKey::Count)
                 L.push_back(std::format("While learned: {} {:.1f}%", kStatKeyNames[int(l.key)], (l.base + l.per_rank * rk) / 100.0));
@@ -364,6 +364,7 @@ void GameView::draw_bottom_panel(NetClient& net, double now_s, Ui& ui) {
                 if (me.uses & 4) stats.push_back(std::format("MAR  +{}%", me.martial_power / 100));
                 if (me.skill_power) stats.push_back(std::format("SKP  +{}%", me.skill_power / 100));
                 if (me.vamp) stats.push_back(std::format("VAMP {}%", me.vamp / 100));
+                if (me.heal_amp) stats.push_back(std::format("HEAL {:+}%", me.heal_amp / 100));  // [U-481] healing received
                 // [U-475] LoL: ability power / magic pen — only when this champion has AP skills or the stats
                 if ((me.uses & 8) || me.ap) stats.push_back(std::format("AP   {}", me.ap / 100));
                 if (me.mpen || me.mpen_pct) stats.push_back(std::format("MPEN {}|{}%", me.mpen / 100, me.mpen_pct / 100));

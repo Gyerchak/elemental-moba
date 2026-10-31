@@ -1,6 +1,6 @@
 // [U-473] LEAGUE OF LEGENDS MECHANICS — one place for the LoL-style rules of the unified engine:
 //   lifesteal (autoattacks), spellvamp (skills), omnivamp (everything), champion vamp (only damage to champions),
-//   grievous wounds on hit, critical strikes, on-hit damage, fear, silence. Ability power (SkillDef::ap → Scaling::ap_pct)
+//   grievous wounds on hit, critical strikes, on-hit damage, fear, silence, healing received (every source). Ability power (SkillDef::ap → Scaling::ap_pct)
 //   and magic penetration (flat / %, added to the elemental pens in core elemental_damage) are LoL stats too [U-475].
 // Champions / items / skills only hold the NUMBERS (Stats fields, StatKey names, ChampionDef::crits, StatusKind::Fear);
 // the rules live here. Dota-style rules stay in their own places (denies, …).
@@ -54,6 +54,18 @@ bool World::lol_fear_step(Unit& u) {
 }  // namespace em
 
 namespace em {
+
+// [U-481] Healing received — EVERY source (skills, passives, lifesteal / spellvamp / omnivamp, items, HP regeneration,
+// the fountain): × (1 + healing received %) (Stats::heal_amp: items, a Transform form like World Ender, Dota heal
+// amplification), then grievous wounds cut it.
+std::int64_t World::lol_healing(const Unit& u, std::int64_t hundredths) const {
+    if (hundredths <= 0) return hundredths;
+    if (u.stats.heal_amp) hundredths = hundredths * std::max(0, 10'000 + u.stats.heal_amp) / 10'000;
+    if (classic_rules(cfg.ruleset))
+        for (int i = 0; i < u.st.size(); ++i)
+            if (u.st[i].kind == StatusKind::Grievous) hundredths = hundredths * (100 - std::clamp<int>(u.st[i].value, 0, 100)) / 100;
+    return hundredths;
+}
 
 // Silence: no abilities at all (bending or not); autoattacks still work.
 bool World::lol_silenced(const Unit& u) const { return u.st.has(StatusKind::Silence); }

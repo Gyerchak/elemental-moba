@@ -719,6 +719,7 @@ public:
     void lol_on_hit(Unit& u, Unit& target, bool physical);
     bool lol_fear_step(Unit& u);
     [[nodiscard]] bool lol_silenced(const Unit& u) const;
+    [[nodiscard]] std::int64_t lol_healing(const Unit& u, std::int64_t hundredths) const;  // [U-481] any healing → what lands
     // ---- [U-474] own mechanics (game/mechanics/bending_cc.cpp): chi block, disarm, subdue
     [[nodiscard]] bool chi_blocked(const Unit& u, Element el) const;
     [[nodiscard]] SubElement auto_sub(const Unit& u) const;           // what the unit's autoattack is made of

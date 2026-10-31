@@ -11,12 +11,7 @@ namespace em {
 
 void World::heal(Unit& u, std::int32_t hundredths) {
     if (!u.alive) return;
-    if (hundredths > 0 && u.stats.heal_amp) hundredths = std::int32_t(std::int64_t(hundredths) * (10'000 + u.stats.heal_amp) / 10'000);  // [U-476]
-    if (u.transform_until > now_ms && hundredths > 0) hundredths = hundredths * (100 + u.transform_heal_pct) / 100;  // [U-456]
-    if (classic_rules(cfg.ruleset) && hundredths > 0)  // [U-416] grievous wounds: healing −value %
-        for (int i = 0; i < u.st.size(); ++i)
-            if (u.st[i].kind == StatusKind::Grievous) hundredths = hundredths * (100 - std::clamp<int>(u.st[i].value, 0, 100)) / 100;
-    u.hp = std::min(u.stats.health.total(), u.hp + hundredths);
+    u.hp = std::min<std::int64_t>(u.stats.health.total(), u.hp + lol_healing(u, hundredths));  // [U-481] healing received (lol.cpp)
 }
 
 void World::apply_cc(const Stats& src_stats, std::uint32_t src_id, Unit& dst, StatusKind k, std::int32_t ms,

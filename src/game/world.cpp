@@ -511,7 +511,10 @@ void World::recompute_stats(Unit& u) {
         if (it >= 0 && kItems[std::size_t(it)].scepter && feature(kFeatScepter)) u.scepter = true;
     if (u.lotus_until > now_ms) s.cast_speed += kLotusCastSpeed;  // [X-46][U-114]
     if (u.tmp_size_until > now_ms) s.model_size += u.tmp_size;     // [U-129]
-    if (u.transform_until > now_ms) s.attack.bonus += s.attack.base * u.transform_attack_pct / 100;  // [U-456]
+    if (u.transform_until > now_ms) {  // [U-456] the form: + attack %, + healing received % [U-481] (every source)
+        s.attack.bonus += s.attack.base * u.transform_attack_pct / 100;
+        s.heal_amp += u.transform_heal_pct * 100;
+    }
     u.attack_range = d.attack_range * sky_boost(d.element, sky).auto_range_pct / 100;  // [U-370] water autos at full moon
     if (d.stance && u.stance_b) {  // [U-72] knives stance: ranged, weaker hits
         s.range = Range::Ranged;

@@ -26,7 +26,7 @@ void World::regen(Unit& u) {
             if (u.items[sl] >= 0 && kItems[std::size_t(u.items[sl])].active == ItemActive::SpiritFlask && tick % cfg.tick_hz == 0)
                 u.item_impact[sl] += 30;  // 30 HP per second
     }
-    if (!u.st.has(StatusKind::Frozen) || u.untargetable_until <= now_ms) u.hp = std::min<std::int64_t>(max_hp, u.hp + per_tick(hp_rate, tick, cfg.tick_hz));
+    if (!u.st.has(StatusKind::Frozen) || u.untargetable_until <= now_ms) u.hp = std::min<std::int64_t>(max_hp, u.hp + lol_healing(u, per_tick(hp_rate, tick, cfg.tick_hz)));  // [U-481] regen is healing too
     // [U-81] revive: 5 × 5 % max HP, one per second
     if (u.flask_revive > 0 && now_ms >= u.flask_next_ms) {
         heal(u, max_hp * 5 / 100);
