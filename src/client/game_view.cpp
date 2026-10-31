@@ -824,10 +824,26 @@ void GameView::frame(NetClient& net, double now_s, Ui& ui) {
 }
 
 void GameView::draw_indicator(NetClient& net) {
-    if (drawing_slot_ >= 0)  // [U-402] the wall being drawn
-        for (std::size_t i = 1; i < draw_path_.size(); ++i)
-            line(r_, view_.sx(draw_path_[i - 1].first), view_.sy(draw_path_[i - 1].second), view_.sx(draw_path_[i].first),
-                 view_.sy(draw_path_[i].second), {255, 230, 140, 230});
+    if (drawing_slot_ >= 0) {  // [U-402][U-436] the wall being drawn: my range, the length used, red where it would not reach
+        const auto& me = net.cur.me;
+        const float rng = float(me.s_range[drawing_slot_]), maxlen = float(me.s_width[drawing_slot_]);
+        const DrawUnit* mu = me_unit();
+        if (mu && rng > 0) ground_ring(r_, view_, mu->x, mu->y, rng, {255, 230, 140, 120}, 72);
+        float used = 0;
+        for (std::size_t i = 1; i < draw_path_.size(); ++i) {
+            const auto [ax, ay] = draw_path_[i - 1];
+            const auto [bx, by] = draw_path_[i];
+            used += std::hypot(bx - ax, by - ay);
+            const bool reach = mu && std::hypot(bx - mu->x, by - mu->y) <= rng + 50 && used <= maxlen;
+            const Rgba c = reach ? Rgba{255, 230, 140, 235} : Rgba{255, 90, 80, 200};
+            line(r_, view_.sx(ax), view_.sy(ay), view_.sx(bx), view_.sy(by), c);
+            line(r_, view_.sx(ax), view_.sy(ay) + 1, view_.sx(bx), view_.sy(by) + 1, c);
+        }
+        if (ui_ && maxlen > 0) {
+            const std::string t = std::format("{:.0f} / {:.0f}", std::min(used, maxlen), maxlen);
+            text(r_, ui_->mx + 14, ui_->my - 14, t, used <= maxlen ? Rgba{255, 230, 140} : Rgba{255, 110, 100});
+        }
+    }
     // [U-289] my autoattack range like LoL: hold ` ; Ctrl + ` keeps it on. Edge-to-edge range → from my body's edge.
     {
         const bool* ks = SDL_GetKeyboardState(nullptr);
