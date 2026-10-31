@@ -678,6 +678,9 @@ Additions outside the plan live in `ENGINE-EXTRAS.md`, never here.
 - [U-472] Aatrox's ultimate does not slow: it FEARS minions away. One single ultimate on T; Y gets a totally random skill. Fear is a League of Legends mechanic.
 - [U-473] Omnivamp, spellvamp, lifesteal, on-hit mechanics (and fear) all exist in the game code, in one League of Legends mechanics section.
 - [U-474] Silence belongs to the League of Legends mechanics. Own mechanics: an effect that disables bending (per element: fire / water / earth / air) — bending skills AND bending autoattacks; silence = all skills, also non-bending; disarm = no autoattacks and no non-magical weapon skills; one for both kinds.
+- [U-475] Ability power, magic penetration and % magic penetration in the engine, under the League of Legends section.
+- [U-476] A Dota 2 section: the stats, resources and mechanics of Dota 2 that the engine did not have yet.
+- [U-477] Update the GitHub repo after all is done.
 
 ---
 *Hubert continues editing the plan later — new ideas get the next free `[U-xx]` number.*

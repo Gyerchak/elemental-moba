@@ -17,7 +17,7 @@ std::int64_t per_tick(std::int64_t per_s, std::uint64_t tick, std::uint32_t hz) 
 void World::regen(Unit& u) {
     if (u.kind != UnitKind::Champion) return;
     const std::int32_t max_hp = u.stats.health.total();
-    std::int64_t hp_rate = 600 + u.level * 60;  // hundredths / s [X-11]
+    std::int64_t hp_rate = 600 + u.level * 60 + u.stats.hp_regen;  // hundredths / s [X-11]; [U-476] + HP regen (Strength, items)
     const auto [fx_, fy_] = fountain(u.team);
     if (dist2(u.ux(), u.uy(), fx_, fy_) < 700LL * 700) hp_rate += max_hp / 8;  // fountain [X-12]
     if (u.flask_until > now_ms) {  // [U-81] intense flat heal; [U-209] counted on the flask

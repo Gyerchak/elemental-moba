@@ -1,6 +1,7 @@
 // [U-473] LEAGUE OF LEGENDS MECHANICS — one place for the LoL-style rules of the unified engine:
 //   lifesteal (autoattacks), spellvamp (skills), omnivamp (everything), champion vamp (only damage to champions),
-//   grievous wounds on hit, critical strikes, on-hit damage, fear, silence.
+//   grievous wounds on hit, critical strikes, on-hit damage, fear, silence. Ability power (SkillDef::ap → Scaling::ap_pct)
+//   and magic penetration (flat / %, added to the elemental pens in core elemental_damage) are LoL stats too [U-475].
 // Champions / items / skills only hold the NUMBERS (Stats fields, StatKey names, ChampionDef::crits, StatusKind::Fear);
 // the rules live here. Dota-style rules stay in their own places (denies, …).
 #include <algorithm>

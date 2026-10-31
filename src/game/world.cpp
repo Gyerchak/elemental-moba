@@ -334,6 +334,7 @@ PassiveId World::special_passive(const Unit& u) const {
 }
 bool World::has_passive(const Unit& u, PassiveId p) const {
     // passive skills (P, passive specials) always; [U-291] an active skill's own passive once the skill is learned
+    if (u.st.has(StatusKind::Break)) return false;  // [U-476] Dota break: passives off
     for (std::size_t s = 0; s < u.skill.size(); ++s) {
         const SkillDef* d = u.skill[s];
         if (!d || d->passive != p || p == PassiveId::None) continue;
@@ -484,11 +485,12 @@ void World::recompute_stats(Unit& u) {
     if (has_passive(u, PassiveId::Rooted)) s.tenacity += 2'000;
     if (has_passive(u, PassiveId::MetalSkin)) s.defence.bonus += 1'500;
     if (has_passive(u, PassiveId::LightFeet)) s.move_speed.bonus += 1'500;
-    for (std::size_t sl = 0; sl < u.skill.size(); ++sl)  // [U-468] what learned skills give (their own passives)
+    for (std::size_t sl = 0; sl < u.skill.size() && !u.st.has(StatusKind::Break); ++sl)  // [U-468] learned skills' own passives ([U-476] not under Break)
         if (const SkillDef* k = u.skill[sl]; k && (sl == 0 || u.ab[sl].rank > 0))
             for (const SkillDef::Learned& l : k->learned)
                 if (l.key != StatKey::Count) add_stat(s, l.key, l.base + l.per_rank * (std::max<std::int32_t>(1, u.ab[sl].rank) - 1));
     apply_loadout(s, u.loadout);                                   // [U-177] runes + specialisation
+    dota_attributes(s, u, d);                                      // [U-476] Strength / Agility / Intelligence
     if (u.lotus_until > now_ms) s.cast_speed += kLotusCastSpeed;  // [X-46][U-114]
     if (u.tmp_size_until > now_ms) s.model_size += u.tmp_size;     // [U-129]
     if (u.transform_until > now_ms) s.attack.bonus += s.attack.base * u.transform_attack_pct / 100;  // [U-456]
@@ -502,6 +504,10 @@ void World::recompute_stats(Unit& u) {
     u.stats = s;
     u.res_max = d.res_max;
     u.res_regen = d.res_regen;
+    if (s.resource == ResourceKind::Mana) {  // [U-476] Intelligence: +12 mana and +0.05 mana regen per point
+        u.res_max += s.intelligence * 12;
+        u.res_regen += s.intelligence / 20 + s.mana_regen;
+    }
     u.water_max = d.avatar && d.resource != ResourceKind::Water ? elements::kAvatarWaterMax : 0;  // [U-339]
     u.water = std::min(u.water, u.water_max);
     const std::int32_t new_max = s.health.total();

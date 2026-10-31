@@ -201,6 +201,8 @@ struct SkillDef {
                  cost_rank = 0;
     bool arcane = false;     // [U-464] non-elemental MAGIC (arcane power); physical sub = martial; else elemental
     bool aa_reset = false;   // [U-465] using it resets the autoattack timer (rare)
+    std::int16_t ap = 0;     // [U-475] damage + this % of ability power (LoL)
+    std::uint8_t dispel = 0; // [U-476] Dota: 1 = basic dispel (soft debuffs off the caster, buffs off enemies hit), 2 = strong (stuns too)
     bool pass_units = false; // [U-471] a dash goes through units (walls: through_walls — it jumps over them)
     // [U-468] numbers the skill gives while it is learned (its own passive): stat + value at rank 1 + per rank
     struct Learned { StatKey key = StatKey::Count; std::int32_t base = 0, per_rank = 0; };
@@ -284,7 +286,7 @@ struct AutoAttackDef {
         .multicast = {.max_casts = std::uint8_t(s.casts), .recast_window_ms = std::uint16_t(s.recast_ms)},
         .cast_move = s.move,
         .damage = {.base = s.dmg, .per_rank = s.dmg_rank, .ep_pct = std::int16_t(s.ep), .ad_pct = std::int16_t(s.ad),
-                   .bonus_ad_pct = std::int16_t(s.bonus_ad)},
+                   .bonus_ad_pct = std::int16_t(s.bonus_ad), .ap_pct = s.ap},
         .range = {.base = s.range, .per_rank = s.range_rank},  // [U-470]
         .width = {.base = s.width, .per_rank = s.width_rank},
         .radius = {.base = s.radius, .per_rank = s.radius_rank},
@@ -319,6 +321,10 @@ struct ChampionDef {
     SkillDef p;                                         // [U-104]
     bool stance = false;                                // [U-72] Space = switch stance
     bool crits = false;                                 // [U-463] its autoattacks can crit (crit stats shown)
+    // [U-476] Dota 2 attributes (dota.cpp): primary 0 none, 1 Strength, 2 Agility, 3 Intelligence, 4 Universal;
+    // points at level 1 and gain per level, hundredths of a point (Dota numbers 1:1, e.g. 2.8 per level = 280)
+    std::uint8_t attr = 0;
+    std::int32_t str = 0, agi = 0, intel = 0, str_lvl = 0, agi_lvl = 0, int_lvl = 0;
     std::uint32_t colour = 0xffffff;
     Role role = Role::Mage;                             // [U-180]
     bool auto_projectile = true;                        // [U-186] ranged autos fly as projectiles (melee: never)

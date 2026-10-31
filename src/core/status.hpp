@@ -33,6 +33,9 @@ enum class StatusKind : std::uint8_t {
     Fear,      // [U-472] runs away from the one who scared it (slowly, by `value` % slow); cannot act
     Disarm,    // [U-474] own: no weapon autoattacks, no non-magical (weapon) skills
     Subdue,    // [U-474] own: both kinds — no bending (all elements, skills + autoattacks) AND disarmed
+    Hex,       // [U-476] Dota 2: turned into a critter — no skills, no autoattacks, very slow (can still walk)
+    Break,     // [U-476] Dota 2: passives off (champion passives, procs, skills' own passives)
+    DebuffImmune,  // [U-476] Dota 2 (debuff immunity): no new crowd control / debuffs land
     Count
 };
 
@@ -41,6 +44,7 @@ enum class StatusKind : std::uint8_t {
         case StatusKind::Stun: case StatusKind::Root: case StatusKind::Slow: case StatusKind::Silence:
         case StatusKind::Mute: case StatusKind::Airborne: case StatusKind::Frozen: case StatusKind::Blind:
         case StatusKind::Bloodbound: case StatusKind::Fear: case StatusKind::Disarm: case StatusKind::Subdue:
+        case StatusKind::Hex: case StatusKind::Break:
             return true;
         default:
             return false;
@@ -109,8 +113,8 @@ public:
     [[nodiscard]] constexpr bool can_move() const { return !hard_cc() && !has(StatusKind::Root); }
     // [U-474] only the HARD crowd control here. Which skills / autoattacks are blocked by silence (LoL: lol.cpp) or by
     // chi block / disarm / subdue (own: bending_cc.cpp) depends on the skill → World::skill_block_reason / auto_allowed.
-    [[nodiscard]] constexpr bool can_cast() const { return !hard_cc(); }
-    [[nodiscard]] constexpr bool can_attack() const { return !hard_cc(); }
+    [[nodiscard]] constexpr bool can_cast() const { return !hard_cc() && !has(StatusKind::Hex); }   // [U-476] hex: both kinds
+    [[nodiscard]] constexpr bool can_attack() const { return !hard_cc() && !has(StatusKind::Hex); }
     // Move speed % after slows / hastes. Slows don't stack: strongest wins.
     [[nodiscard]] constexpr std::int32_t move_speed_pct() const {
         const std::int32_t pct = std::max(10, 100 - value(StatusKind::Slow) + value(StatusKind::Haste));

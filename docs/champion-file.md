@@ -47,7 +47,8 @@ Any existing skill works too: `w = Fire Whip`.
 
 - **What it does** — `kind` (Bolt Wave Burst Field Cone Dash Wall Pillar Tornado Shield Heal Haste Blink … Transform),
   `sub` (element), `dmg dmg_rank ep ad bonus_ad`, `range width radius speed`, `cast_ms cd_ms cd_rank cost`,
-  `dur_ms delay_ms tick_ms`, `cc cc_ms cc_val` (Stun Root Slow Silence ChiBlock Disarm Subdue Fear …), `knock`,
+  `dur_ms delay_ms tick_ms`, `cc cc_ms cc_val` (Stun Root Slow Silence ChiBlock Disarm Subdue Fear Hex Break
+  DebuffImmune …), `knock`, `ap` (% of ability power), `dispel` (1 basic, 2 strong),
   `hits = Minion SiegeMinion`. ChiBlock: `cc_val` = the elements (1 water, 2 earth, 4 fire, 8 air, add them; 0 = all).
 - **Shape** [U-462] — `geo = Circle / Ring / Line / Rect / Cone / Arc` (Auto = the kind's usual shape), `inner` = the
   hole of a Ring / Arc.
@@ -71,7 +72,9 @@ Any existing skill works too: `w = Fire Whip`.
 
 `health attack elemental_power defence elemental_defence attack_speed move_speed move_speed_pct elemental_haste
 non_elemental_haste cast_speed tenacity lifesteal omnivamp champion_vamp spellvamp crit_chance crit_damage arcane_power
-martial_power skill_power skill_range skill_radius on_hit_damage on_hit_max_hp` — 100 = 1 % for percentages.
+martial_power skill_power skill_range skill_radius on_hit_damage on_hit_max_hp ability_power magic_pen magic_pen_pct
+strength agility intelligence hp_regen mana_regen magic_resist evasion bash_chance bash_ms bash_damage damage_block
+block_chance true_strike mana_break heal_amp` — 100 = 1 % for percentages. Items can carry any of them (`ItemDef::more`).
 
 ## 5. League of Legends mechanics (engine: `src/game/mechanics/lol.cpp`)
 
@@ -86,6 +89,8 @@ martial_power skill_power skill_range skill_radius on_hit_damage on_hit_max_hp` 
 | On-hit | every autoattack that lands: + flat damage + % of the target's max HP |
 | Fear | cannot act, runs straight away from the one who scared it |
 | Silence | no abilities at all (bending or not); autoattacks still work |
+| Ability power | skills deal + `ap` % of it |
+| Magic penetration | flat / % — lower the target's elemental defence against non-physical damage (with the elemental pens) |
 
 ## 6. This game's own mechanics (engine: `src/game/mechanics/bending_cc.cpp`)
 
@@ -97,3 +102,32 @@ skill has no element and is not `arcane` (arcane = non-elemental magic, never bl
 | Chi Block | bending of the chosen elements is gone: those bending skills AND bending autoattacks; other skills work |
 | Disarm | no weapon autoattacks, no weapon skills; bending still works |
 | Subdue | both kinds: no bending at all and disarmed (only arcane magic is left) |
+
+## 7. Dota 2 mechanics (engine: `src/game/mechanics/dota.cpp`)
+
+Champion keys: `attr = Strength / Agility / Intelligence / Universal`, `strength agility intelligence` (points at
+level 1) and `strength_per_level agility_per_level intelligence_per_level` (decimals allowed: `2.8`), `resource = Mana`.
+
+| Mechanic | Rule |
+|---|---|
+| Strength | +22 HP and +0.1 HP regen per point |
+| Agility | +1/6 defence and +1 % attack speed per point |
+| Intelligence | +12 mana, +0.05 mana regen, +0.1 % magic resistance per point |
+| Primary attribute | +1 attack per point (Universal: +0.7 per point of all three) |
+| Mana | a resource: regenerates; Intelligence + `mana_regen` add to it |
+| HP regen | `hp_regen` per second on top of the base regen |
+| Magic resistance | non-physical damage × (1 − resistance), max 90 % |
+| Evasion / true strike | autoattacks miss by chance; true strike never misses |
+| Damage block | physical autoattacks taken − a flat amount (`block_chance`, 0 = always) |
+| Bash | on-hit chance: stun + damage |
+| Mana break | on-hit: burns the target's mana, half of it as damage |
+| Hex | no skills, no autoattacks, crawls slowly |
+| Break | passives off (champion passives, procs, skills' own passives) |
+| Debuff immunity | no new crowd control / debuffs land |
+| Dispel | `dispel = 1` basic / `2` strong: cleans the caster; strips buffs from enemies hit |
+| Heal amplification | `heal_amp`: more healing received |
+
+Already in the engine before (shared by both games): denies, lifesteal / spellvamp (Dota "spell lifesteal"),
+tenacity (Dota "status resistance"), skill power (Dota "spell amplification"), skill range (cast range), haste
+(cooldown reduction), splash autoattacks (cleave), crits, turn rate, day / night vision.
+Not yet: buyback, courier, neutral items, Aghanim upgrades, talents, invisibility + true sight, glyph.

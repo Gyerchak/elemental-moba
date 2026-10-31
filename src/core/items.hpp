@@ -49,6 +49,9 @@ struct ItemDef {
     std::int32_t crit_chance = 0, crit_damage = 0;                     // [U-463]
     std::int32_t arcane_power = 0, martial_power = 0, skill_power = 0;  // [U-464] % more skill damage by kind
     std::int32_t spellvamp = 0, on_hit_dmg = 0, on_hit_max_hp = 0;     // [U-473]
+    // [U-476] ANY stat by name (StatKey) — new stats need no new item fields
+    struct More { StatKey key = StatKey::Count; std::int32_t value = 0; };
+    std::array<More, 4> more{};
 };
 
 inline constexpr std::array kItems = {
@@ -143,6 +146,23 @@ inline constexpr std::array kItems = {
     // [U-473] spellvamp and on-hit (Claude ideas)
     ItemDef{.name = "Siphon Tome", .cost = 1'200, .elemental_power = 2'000, .classic_only = true, .spellvamp = 1'000},
     ItemDef{.name = "Venom Edge", .cost = 1'500, .attack_speed = 2'000, .on_hit_dmg = 1'500, .on_hit_max_hp = 200},
+    // [U-475] LoL ability power + magic penetration (Claude ideas)
+    ItemDef{.name = "Arcane Codex", .cost = 1'250, .more = {{{StatKey::AbilityPower, 4'000}}}},
+    ItemDef{.name = "Hollow Wand", .cost = 1'600, .more = {{{StatKey::AbilityPower, 3'000}, {StatKey::MagicPen, 1'500}}}},
+    ItemDef{.name = "Void Lens", .cost = 3'000, .limit = BuyLimit::One, .more = {{{StatKey::AbilityPower, 7'000}, {StatKey::MagicPenPct, 3'500}}}},
+    // [U-476] Dota 2 stats (Claude ideas)
+    ItemDef{.name = "Ogre Band", .cost = 450, .more = {{{StatKey::Strength, 600}}}},
+    ItemDef{.name = "Slippers of Speed", .cost = 450, .more = {{{StatKey::Agility, 600}}}},
+    ItemDef{.name = "Sage Circlet", .cost = 450, .more = {{{StatKey::Intelligence, 600}}}},
+    ItemDef{.name = "Triad Bracer", .cost = 1'100, .more = {{{StatKey::Strength, 500}, {StatKey::Agility, 500}, {StatKey::Intelligence, 500}}}},
+    ItemDef{.name = "Mist Cloak", .cost = 1'500, .more = {{{StatKey::MagicResist, 1'500}, {StatKey::HpRegen, 400}}}},
+    ItemDef{.name = "Dancer's Veil", .cost = 1'400, .more = {{{StatKey::Evasion, 2'000}}}},
+    ItemDef{.name = "Stout Buckler", .cost = 900, .health = 6'000, .more = {{{StatKey::DamageBlock, 2'000}, {StatKey::BlockChance, 5'000}}}},
+    ItemDef{.name = "Skull Mace", .cost = 2'800, .attack = 2'500, .limit = BuyLimit::One,
+            .more = {{{StatKey::BashChance, 1'500}, {StatKey::BashMs, 1'200}, {StatKey::BashDamage, 6'000}}}},
+    ItemDef{.name = "Hunter's Sight", .cost = 2'600, .attack = 3'500, .limit = BuyLimit::One, .more = {{{StatKey::TrueStrike, 1}}}},
+    ItemDef{.name = "Mana Leech Blade", .cost = 1'300, .attack = 1'000, .more = {{{StatKey::ManaBreak, 3'000}}}},
+    ItemDef{.name = "Mana Spring", .cost = 900, .more = {{{StatKey::ManaRegen, 150}, {StatKey::Intelligence, 300}}}},
 };
 inline constexpr std::int32_t kMaxElementResist = 6'000;  // [X-74] 60 %
 inline constexpr std::int32_t kMaxSlowResist = 8'000;     // [U-218] 80 %
@@ -244,6 +264,7 @@ constexpr void add_item(Stats& s, const ItemDef& i) {
     s.crit_chance += i.crit_chance, s.crit_damage += i.crit_damage;  // [U-463]
     s.arcane_power += i.arcane_power, s.martial_power += i.martial_power, s.skill_power += i.skill_power;  // [U-464]
     s.spellvamp += i.spellvamp, s.on_hit_dmg += i.on_hit_dmg, s.on_hit_max_hp += i.on_hit_max_hp;        // [U-473]
+    for (const ItemDef::More& m : i.more) add_stat(s, m.key, m.value);                                   // [U-476]
     s.grievous_on_hit = std::max(s.grievous_on_hit, i.grievous_on_hit);
     s.wall_damage += i.wall_damage;  // [U-288]
     s.wall_damage_stone += i.wall_damage_stone;

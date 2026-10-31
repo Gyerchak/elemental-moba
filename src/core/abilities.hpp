@@ -32,6 +32,7 @@ struct Scaling {
     std::int16_t ep_pct = 0;         // % of total elemental power
     std::int16_t ad_pct = 0;         // % of total attack
     std::int16_t bonus_ad_pct = 0;   // % of bonus attack
+    std::int16_t ap_pct = 0;         // [U-475] % of ability power (LoL)
 };
 
 struct ScaleCtx {
@@ -53,7 +54,8 @@ struct ScaleCtx {
            std::int64_t(s.per_level) * (std::max(c.level, 1u) - 1) + std::int64_t(s.per_stack) * c.stacks +
            std::int64_t(st.elemental_power.total()) * s.ep_pct / 10'000 +
            std::int64_t(st.attack.total()) * s.ad_pct / 10'000 +
-           std::int64_t(st.attack.bonus) * s.bonus_ad_pct / 10'000;
+           std::int64_t(st.attack.bonus) * s.bonus_ad_pct / 10'000 +
+           std::int64_t(st.ability_power) * s.ap_pct / 10'000;  // [U-475]
 }
 
 // [U-105] Every skill can carry its own passive (always-on effect while learned).

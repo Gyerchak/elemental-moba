@@ -11,6 +11,7 @@ namespace em {
 
 void World::heal(Unit& u, std::int32_t hundredths) {
     if (!u.alive) return;
+    if (hundredths > 0 && u.stats.heal_amp) hundredths = std::int32_t(std::int64_t(hundredths) * (10'000 + u.stats.heal_amp) / 10'000);  // [U-476]
     if (u.transform_until > now_ms && hundredths > 0) hundredths = hundredths * (100 + u.transform_heal_pct) / 100;  // [U-456]
     if (classic_rules(cfg.ruleset) && hundredths > 0)  // [U-416] grievous wounds: healing −value %
         for (int i = 0; i < u.st.size(); ++i)
@@ -22,6 +23,8 @@ void World::apply_cc(const Stats& src_stats, std::uint32_t src_id, Unit& dst, St
                      std::int32_t value, SubElement sub) {
     if (k == StatusKind::Count || ms <= 0 || !dst.alive) return;
     if (dst.is_structure()) return;
+    if (dst.st.has(StatusKind::DebuffImmune) && (is_cc(k) || k == StatusKind::Burn || k == StatusKind::Grievous || k == StatusKind::Wet))
+        return;  // [U-476] debuff immunity
     // [U-344] a wet unit does not catch fire (the hit that dried it counts as wet too)
     if (k == StatusKind::Burn && (dst.st.has(StatusKind::Wet) || dst.dried_ms == now_ms)) return;
     if (dst.kind == UnitKind::Boss && is_cc(k) && k != StatusKind::Slow) return;
@@ -117,8 +120,10 @@ void World::deal_damage(Unit* src, Unit& dst, std::int32_t points, SubElement su
         std::int64_t def = dst.stats.defence.total();
         if (dst.stats.range == Range::Melee && dst.kind == UnitKind::Champion) def = def * (100 + kMeleeDefenceBonusPct) / 100;
         dmg = dmg * 10'000 / (10'000 + std::max<std::int64_t>(0, def));
+        if (is_auto) dmg = dota_block(dst, dmg);  // [U-476] damage block
     } else {
-        dmg = elemental_damage(std::int32_t(dmg), as, dst.stats);
+        dmg = elemental_damage(std::int32_t(dmg), as, dst.stats);  // (+ LoL magic pen [U-475])
+        dmg = dota_magic_resist(dmg, dst);                         // [U-476] magic resistance %
         const std::int64_t before = dmg;
         dmg = after_element_resist(std::int32_t(dmg), base_element(sub), dst.stats);  // [U-136]
         // [U-209] credit the prevented damage to the resist items, split by their resist value
@@ -381,6 +386,7 @@ void World::fire_auto(Unit& u, Unit& target) {
                         (u.kind == UnitKind::Minion && u.mtype != MinionType::Melee && u.mtype != MinionType::Super);
     const bool projectile = ranged && (u.kind != UnitKind::Champion || champions()[std::size_t(u.champ)].auto_projectile);
     if (!projectile) {  // melee, or a ranged champion whose autos hit at once [U-186]
+        if (dota_evaded(u, *t)) return;  // [U-476] evasion
         hit_flags_ = crit ? kHitCrit : 0;
         deal_damage(&u, *t, dmg, sub, sub == SubElement::Physical, true);
         hit_flags_ = 0;
@@ -412,7 +418,7 @@ void World::fire_auto(Unit& u, Unit& target) {
 // [U-217] the special shapes of an autoattack, after the main hit: splash around the target, a line behind it,
 // or chain jumps. Champions use their AutoAttackDef; plain single hits do nothing here.
 void World::passive_proc(Unit& u, Unit* target, std::uint8_t trigger) {
-    if (u.kind != UnitKind::Champion || !u.alive || now_ms < u.proc_ready_ms) return;
+    if (u.kind != UnitKind::Champion || !u.alive || now_ms < u.proc_ready_ms || u.st.has(StatusKind::Break)) return;  // [U-476]
     const SkillDef* p = u.skill[std::size_t(Slot::P)];
     if (!p || p->proc != trigger) return;
     if (trigger == 4 && u.hp * 100 > std::int64_t(u.stats.health.total()) * p->proc_hp_pct) return;
@@ -437,6 +443,7 @@ void World::auto_extras(Unit& u, Unit& primary, std::int32_t dmg, SubElement sub
     if (u.kind != UnitKind::Champion) return;
     passive_proc(u, &primary, 1);  // [U-416] on-hit passives (empowered autoattack)
     lol_on_hit(u, primary, physical);  // [U-473] on-hit damage (lol.cpp)
+    dota_on_hit(u, primary);           // [U-476] bash, mana break (dota.cpp)
     if (u.jbuff == std::uint8_t(JungleBuff::Ember) && u.jbuff_until > now_ms && primary.alive) {  // [U-366]
         apply_cc(u.stats, u.id, primary, StatusKind::Burn, 2'000, primary.stats.health.total() / 200);  // per second: 1 % over 2 s
         apply_cc(u.stats, u.id, primary, StatusKind::Slow, 1'000, kEmberSlowPct);

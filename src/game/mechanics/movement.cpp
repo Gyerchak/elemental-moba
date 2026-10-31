@@ -21,6 +21,7 @@ std::int32_t World::move_speed_sub(const Unit& u) const {
     std::int64_t ms100 = u.stats.move_speed.total();
     ms100 = ms100 * (10'000 + u.stats.move_speed_pct) / 10'000;
     ms100 = ms100 * u.st.move_speed_pct() / 100;
+    if (u.st.has(StatusKind::Hex)) ms100 = std::min<std::int64_t>(ms100, 14'000);  // [U-476] a critter crawls
     if (u.casting && u.cast.slot < std::uint8_t(Slot::Count)) {
         const SkillDef* d = u.skill[u.cast.slot];
         if (d && d->move == CastMove::Slowed) ms100 /= 2;  // [U-53]

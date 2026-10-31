@@ -22,6 +22,7 @@ enum class ResourceKind : std::uint8_t {
     Ammo,    // non-benders [U-64]
     Energy,  // non-benders [U-64]
     Rage,    // [U-268][?-10] fire: chaotic flame — filled by dealing / taking damage, drains out of combat
+    Mana,    // [U-476] Dota 2 / LoL mana: regenerates; Intelligence adds max mana and regen (dota.cpp)
 };
 // [U-268] fire fuel numbers (Claude idea placeholders)
 inline constexpr std::int32_t kLifePerFuel = 2;        // calm flame: 1 missing fuel = 2 HP
@@ -66,6 +67,16 @@ struct Stats {
     std::int32_t spellvamp = 0;       // [U-473] heal by this % of SKILL damage dealt
     std::int32_t on_hit_dmg = 0;      // [U-473] on-hit: + flat damage on every autoattack hit (hundredths)
     std::int32_t on_hit_max_hp = 0;   // [U-473] on-hit: + this % of the target's max HP (100 = 1 %)
+    // [U-475] League of Legends: ability power (skills scale with SkillDef::ap), magic penetration flat / % — the
+    // magic damage of this game is the non-physical damage (vs elemental defence), so they add to the elemental pens
+    std::int32_t ability_power = 0, magic_pen = 0, magic_pen_pct = 0;
+    // [U-476] Dota 2 (dota.cpp): attributes (hundredths of a point), regen per second (hundredths), magic resistance
+    // and evasion (100 = 1 %), bash (chance / stun ms / damage), damage block (flat hundredths, chance), true strike,
+    // mana break (mana burned per hit, hundredths), heal amplification
+    std::int32_t strength = 0, agility = 0, intelligence = 0;
+    std::int32_t hp_regen = 0, mana_regen = 0, magic_resist = 0, evasion = 0;
+    std::int32_t bash_chance = 0, bash_ms = 0, bash_dmg = 0, damage_block = 0, block_chance = 0, true_strike = 0, mana_break = 0;
+    std::int32_t heal_amp = 0;
     // [U-463] critical strikes (autoattacks of champions that can crit: ChampionDef::crits), 100 = 1 %
     std::int32_t crit_chance = 0, crit_damage = 17'500;  // 0 % / 175 % of the hit
     // [U-464] skill power by kind of skill, % more skill damage (100 = 1 %), on top of elemental power:
@@ -80,13 +91,18 @@ struct Stats {
 enum class StatKey : std::uint8_t {
     Health, Attack, ElementalPower, Defence, ElementalDefence, AttackSpeed, MoveSpeed, MoveSpeedPct, ElementalHaste,
     NonElementalHaste, CastSpeed, Tenacity, Lifesteal, Omnivamp, ChampionVamp, CritChance, CritDamage, ArcanePower,
-    MartialPower, SkillPower, SkillRange, SkillRadius, Spellvamp, OnHitDamage, OnHitMaxHp, Count
+    MartialPower, SkillPower, SkillRange, SkillRadius, Spellvamp, OnHitDamage, OnHitMaxHp,
+    AbilityPower, MagicPen, MagicPenPct,                                                   // [U-475] LoL
+    Strength, Agility, Intelligence, HpRegen, ManaRegen, MagicResist, Evasion, BashChance,  // [U-476] Dota 2
+    BashMs, BashDamage, DamageBlock, BlockChance, TrueStrike, ManaBreak, HealAmp, Count
 };
 inline constexpr const char* kStatKeyNames[] = {
     "health", "attack", "elemental_power", "defence", "elemental_defence", "attack_speed", "move_speed", "move_speed_pct",
     "elemental_haste", "non_elemental_haste", "cast_speed", "tenacity", "lifesteal", "omnivamp", "champion_vamp", "crit_chance",
     "crit_damage", "arcane_power", "martial_power", "skill_power", "skill_range", "skill_radius", "spellvamp", "on_hit_damage",
-    "on_hit_max_hp"};
+    "on_hit_max_hp", "ability_power", "magic_pen", "magic_pen_pct", "strength", "agility", "intelligence", "hp_regen",
+    "mana_regen", "magic_resist", "evasion", "bash_chance", "bash_ms", "bash_damage", "damage_block", "block_chance",
+    "true_strike", "mana_break", "heal_amp"};
 static_assert(std::size(kStatKeyNames) == std::size_t(StatKey::Count));
 constexpr void add_stat(Stats& s, StatKey k, std::int32_t v) {
     switch (k) {
@@ -115,6 +131,24 @@ constexpr void add_stat(Stats& s, StatKey k, std::int32_t v) {
         case StatKey::Spellvamp: s.spellvamp += v; break;
         case StatKey::OnHitDamage: s.on_hit_dmg += v; break;
         case StatKey::OnHitMaxHp: s.on_hit_max_hp += v; break;
+        case StatKey::AbilityPower: s.ability_power += v; break;
+        case StatKey::MagicPen: s.magic_pen += v; break;
+        case StatKey::MagicPenPct: s.magic_pen_pct += v; break;
+        case StatKey::Strength: s.strength += v; break;
+        case StatKey::Agility: s.agility += v; break;
+        case StatKey::Intelligence: s.intelligence += v; break;
+        case StatKey::HpRegen: s.hp_regen += v; break;
+        case StatKey::ManaRegen: s.mana_regen += v; break;
+        case StatKey::MagicResist: s.magic_resist += v; break;
+        case StatKey::Evasion: s.evasion += v; break;
+        case StatKey::BashChance: s.bash_chance += v; break;
+        case StatKey::BashMs: s.bash_ms += v; break;
+        case StatKey::BashDamage: s.bash_dmg += v; break;
+        case StatKey::DamageBlock: s.damage_block += v; break;
+        case StatKey::BlockChance: s.block_chance += v; break;
+        case StatKey::TrueStrike: s.true_strike += v; break;
+        case StatKey::ManaBreak: s.mana_break += v; break;
+        case StatKey::HealAmp: s.heal_amp += v; break;
         case StatKey::Count: break;
     }
 }
@@ -163,8 +197,8 @@ static_assert([] {
 [[nodiscard]] constexpr std::int32_t elemental_damage(std::int32_t raw, const Stats& attacker, const Stats& target) {
     std::int64_t def = target.elemental_defence.total();
     if (target.range == Range::Melee) def = def * (100 + kMeleeDefenceBonusPct) / 100;
-    def = def * (10'000 - attacker.elemental_penetration) / 10'000;
-    def = std::max<std::int64_t>(0, def - attacker.elemental_lethality);
+    def = def * std::max<std::int64_t>(0, 10'000 - attacker.elemental_penetration - attacker.magic_pen_pct) / 10'000;  // [U-475] + LoL % magic pen
+    def = std::max<std::int64_t>(0, def - attacker.elemental_lethality - attacker.magic_pen);                         // [U-475] + LoL flat magic pen
     return std::int32_t(std::int64_t(raw) * 10'000 / (10'000 + def));  // def in hundredths
 }
 

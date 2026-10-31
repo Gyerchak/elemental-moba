@@ -19,7 +19,7 @@ namespace {
 const char* kKeys[] = {"P", "Q", "W", "E", "R", "T", "Y", "G", "H"};  // [U-289] specials (F / G in the code) show as G / H
 std::string sec1(std::int64_t ms) { return std::format("{:.1f}", std::max<std::int64_t>(0, ms) / 1000.0); }
 const char* res_name(ResourceKind k) {
-    return k == ResourceKind::Fuel ? "calm flame" : k == ResourceKind::Rage ? "rage" : k == ResourceKind::Water ? "water" : k == ResourceKind::Energy ? "energy" : "";
+    return k == ResourceKind::Fuel ? "calm flame" : k == ResourceKind::Rage ? "rage" : k == ResourceKind::Water ? "water" : k == ResourceKind::Energy ? "energy" : k == ResourceKind::Mana ? "mana" : "";
 }
 const char* move_name(CastMove m) { return m == CastMove::Free ? "can move while casting" : m == CastMove::Slowed ? "slowed while casting" : "rooted while casting"; }
 const char* cc_name(StatusKind k) { return k == StatusKind::Count ? "" : status_name(int(k)); }
@@ -364,9 +364,26 @@ void GameView::draw_bottom_panel(NetClient& net, double now_s, Ui& ui) {
                 if (me.uses & 4) stats.push_back(std::format("MAR  +{}%", me.martial_power / 100));
                 if (me.skill_power) stats.push_back(std::format("SKP  +{}%", me.skill_power / 100));
                 if (me.vamp) stats.push_back(std::format("VAMP {}%", me.vamp / 100));
+                // [U-475] LoL: ability power / magic pen — only when this champion has AP skills or the stats
+                if ((me.uses & 8) || me.ap) stats.push_back(std::format("AP   {}", me.ap / 100));
+                if (me.mpen || me.mpen_pct) stats.push_back(std::format("MPEN {}|{}%", me.mpen / 100, me.mpen_pct / 100));
+                // [U-476] Dota: attributes, magic resistance, evasion, regen — only when present
+                if (me.str || me.agi || me.intel)
+                    stats.push_back(std::format("STR {}", me.str / 100)), stats.push_back(std::format("AGI {}", me.agi / 100)),
+                        stats.push_back(std::format("INT {}", me.intel / 100));
+                if (me.mres) stats.push_back(std::format("MRES {}%", me.mres / 100));
+                if (me.eva) stats.push_back(std::format("EVA  {}%", me.eva / 100));
+                if (me.hp_regen) stats.push_back(std::format("HP5  +{:.1f}/s", me.hp_regen / 100.0));
             }
         }
-        for (std::size_t k = 0; k < stats.size(); ++k) text(r_, sx0 + float(k / 6) * 78, y0 + 10 + float(k % 6) * 12, stats[k], {205, 205, 215});
+        for (std::size_t k = 0; k < std::min<std::size_t>(stats.size(), 12); ++k)
+            text(r_, sx0 + float(k / 6) * 78, y0 + 10 + float(k % 6) * 12, stats[k], {205, 205, 215});
+        if (stats.size() > 12) {  // [U-476] more stats than fit beside the skills: a panel above the bar
+            const std::size_t more = stats.size() - 12, cols = (more + 5) / 6;
+            const float px = sx0, py = y0 - 28 - 6 * 12;
+            fill_rect(r_, px - 4, py - 4, float(cols) * 92 + 6, 6 * 12 + 8, {8, 8, 14, 225});
+            for (std::size_t k = 0; k < more; ++k) text(r_, px + float(k / 6) * 92, py + float(k % 6) * 12, stats[12 + k], {205, 205, 215});
+        }
         if (!expand_stats_) text(r_, sx0 + 78, y0 + 10, tr("C = all"), {130, 130, 150});  // (beside the stats, not on them)
     } else {
         const Loadout& lo = me.loadout;

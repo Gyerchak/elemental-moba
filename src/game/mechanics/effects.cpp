@@ -89,6 +89,7 @@ void World::effect_hits(Effect& e) {
             for (std::size_t sl = 0; sl < owner->skill.size(); ++sl)
                 if (owner->skill[sl] == e.def) dmg_tag_.slot = std::uint8_t(sl);
         deal_damage(owner, o, dmg, e.sub, e.physical, false, &e.src);
+        if (e.def && e.def->dispel && o.alive && o.team != e.team) dota_dispel(o, e.def->dispel >= 2, false);  // [U-476] strip buffs
         if (e.def && e.def->tether_ms > 0 && o.alive && owner && o.team != owner->team)  // [U-456] the chain holds on
             tethers.push_back({owner->id, o.id, o.ux(), o.uy(), e.def->tether_radius, e.def->pull, now_ms + e.def->tether_ms, e.def, dmg, e.sub, e.physical});
         if (owner && o.team != owner->team) {  // [U-416] passives that trigger on a skill hit
@@ -187,6 +188,10 @@ void World::step_effects() {
             const std::int64_t sp = std::int64_t(e.length) * kSub / cfg.tick_hz;
             if (d <= sp || touches(shape_of(e), hitbox(*t))) {
                 Unit* owner = find(e.owner);
+                if (owner && dota_evaded(*owner, *t)) {  // [U-476] evasion
+                    e.dead = true;
+                    continue;
+                }
                 hit_flags_ = e.crit ? kHitCrit : 0;  // [U-463]
                 deal_damage(owner, *t, e.damage, e.sub, e.physical, true, &e.src);
                 hit_flags_ = 0;

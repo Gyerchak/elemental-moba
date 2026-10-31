@@ -43,6 +43,9 @@ constexpr Look kStatus[] = {
     {"FER", "Fear", "runs away in fear: cannot act", {150, 60, 160}, true},  // [U-472]
     {"DSA", "Disarmed", "no weapon autoattacks, no weapon skills", {200, 160, 110}, true},  // [U-474]
     {"SBD", "Subdued", "no bending and disarmed: only non-elemental magic is left", {120, 100, 140}, true},
+    {"HEX", "Hexed", "a harmless critter: no skills, no autoattacks, very slow", {120, 200, 120}, true},  // [U-476]
+    {"BRK", "Break", "passives switched off", {150, 110, 90}, true},
+    {"IMM", "Debuff immune", "no new crowd control or debuffs", {255, 210, 90}, false},
 };
 static_assert(std::size(kStatus) == std::size_t(StatusKind::Count));
 

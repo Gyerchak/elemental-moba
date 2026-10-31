@@ -536,10 +536,13 @@ void Server::send_snapshot(Player& p) {
     m.model_size = W.size_pct(*me);
     m.crit_chance = me->stats.crit_chance, m.crit_damage = me->stats.crit_damage;  // [U-463][U-464][U-468]
     m.arcane_power = me->stats.arcane_power, m.martial_power = me->stats.martial_power, m.skill_power = me->stats.skill_power;
-    m.vamp = me->stats.omnivamp + me->stats.champion_vamp;
+    m.vamp = me->stats.omnivamp + me->stats.champion_vamp + me->stats.spellvamp + me->stats.lifesteal;
+    m.ap = me->stats.ability_power, m.mpen = me->stats.magic_pen, m.mpen_pct = me->stats.magic_pen_pct;  // [U-475][U-476]
+    m.str = me->stats.strength, m.agi = me->stats.agility, m.intel = me->stats.intelligence;
+    m.mres = me->stats.magic_resist, m.eva = me->stats.evasion, m.hp_regen = me->stats.hp_regen;
     m.uses = champions()[std::size_t(me->champ)].crits ? 1 : 0;
     for (const SkillDef* k : me->skill)
-        if (k) m.uses |= std::uint8_t(k->arcane ? 2 : k->sub == SubElement::Physical && k->dmg > 0 ? 4 : 0);
+        if (k) m.uses |= std::uint8_t((k->arcane ? 2 : k->sub == SubElement::Physical && k->dmg > 0 ? 4 : 0) | (k->ap ? 8 : 0));  // 8 = AP skills
     w.put(m);
     // my gold / XP rewards [U-159]
     std::vector<NetReward> rw;

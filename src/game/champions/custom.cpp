@@ -6,6 +6,7 @@
 #include <cctype>
 #include <type_traits>
 #include <charconv>
+#include <cmath>
 #include <deque>
 #include <format>
 #include <sstream>
@@ -33,11 +34,11 @@ constexpr std::string_view kZones[] = {"Auto", "Centre", "Edge", "Tip"};        
 constexpr std::string_view kSubs[] = {"Water", "Ice", "Wood", "Blood", "Mud", "Steam", "Air", "Earth", "Lava", "Metal", "EarthArmor",
                                       "MetalArmor", "Fire", "BlueFire", "Lightning", "Combustion", "Physical"};
 constexpr std::string_view kStatuses[] = {"Stun", "Root", "Slow", "Silence", "Mute", "Airborne", "Frozen", "Blind", "Burn", "Shield",
-                                          "Haste", "Flying", "Bloodbound", "Channel", "Swimming", "WaterRide", "Redirect", "Wet", "Grievous", "Fear", "Disarm", "Subdue", "None"};
+                                          "Haste", "Flying", "Bloodbound", "Channel", "Swimming", "WaterRide", "Redirect", "Wet", "Grievous", "Fear", "Disarm", "Subdue", "Hex", "Break", "DebuffImmune", "None"};
 // [U-474] "ChiBlock" = the chi block status (its wire / enum name is Mute)
 int status_index(std::string_view v);
 constexpr std::string_view kElements[] = {"Water", "Earth", "Fire", "Air", "None"};
-constexpr std::string_view kResources[] = {"Water", "Fuel", "None", "Ammo", "Energy", "Rage"};
+constexpr std::string_view kResources[] = {"Water", "Fuel", "None", "Ammo", "Energy", "Rage", "Mana"};
 constexpr std::string_view kRoles[] = {"Mage", "Marksman", "Fighter", "Tank", "Assassin", "Support"};
 constexpr std::string_view kShapes[] = {"Single", "Splash", "Line", "Chain"};
 template <std::size_t N>
@@ -155,6 +156,13 @@ std::string parse_text(const std::string& text, ChampionDef& out) {
             dst = std::int32_t(std::clamp<long long>(x * scale, -1'000'000'000LL, 1'000'000'000LL));
             return true;
         };
+        auto decimal = [&](std::int32_t& dst) -> bool {  // [U-476] 2.8 → 280 (hundredths), for Dota-style gains
+            double x = 0;
+            const auto [p, ec] = std::from_chars(v.data(), v.data() + v.size(), x);
+            if (ec != std::errc{} || p != v.data() + v.size() || !(x > -1e6 && x < 1e6)) return false;
+            dst = std::int32_t(std::llround(x * 100));
+            return true;
+        };
         bool ok = true;
         if (k == "base") {
             const auto it = std::ranges::find_if(champions(), [&](const ChampionDef& c) { return c.name == v; });
@@ -199,7 +207,18 @@ std::string parse_text(const std::string& text, ChampionDef& out) {
             out.range = v == "Ranged" ? Range::Ranged : Range::Melee;
         } else if (k == "mage") {
             out.mage = v == "1" || v == "yes";
-        } else if (k == "crits") {  // [U-463] its autoattacks can crit (crit stats shown)
+        } else if (k == "attr") {  // [U-476] Dota 2 primary attribute
+            constexpr std::string_view kAttrs[] = {"None", "Strength", "Agility", "Intelligence", "Universal"};
+            const int e = enum_of(kAttrs, v);
+            if (e < 0) return std::format("line {}: attr = None / Strength / Agility / Intelligence / Universal", n);
+            out.attr = std::uint8_t(e);
+        } else if (k == "strength") ok = decimal(out.str);  // [U-476] points (2.8 per level → strength_per_level = 2.8)
+        else if (k == "agility") ok = decimal(out.agi);
+        else if (k == "intelligence") ok = decimal(out.intel);
+        else if (k == "strength_per_level") ok = decimal(out.str_lvl);
+        else if (k == "agility_per_level") ok = decimal(out.agi_lvl);
+        else if (k == "intelligence_per_level") ok = decimal(out.int_lvl);
+        else if (k == "crits") {  // [U-463] its autoattacks can crit (crit stats shown)
             out.crits = v == "1" || v == "yes";
         } else if (k == "resource_max") ok = number(out.res_max, 100);
         else if (k == "resource_regen") ok = number(out.res_regen, 100);
@@ -369,6 +388,8 @@ std::string parse_text(const std::string& text, ChampionDef& out) {
                 }
             }
             else if (f == "inner") ok = num(sk.inner, 0, 2'000);
+            else if (f == "ap") ok = num(sk.ap, 0, 1'000);        // [U-475] % of ability power
+            else if (f == "dispel") ok = num(sk.dispel, 0, 2);   // [U-476] 1 basic, 2 strong
             else if (f == "sweet_size") ok = num(sk.sweet_size, 0, 100);
             else if (f == "tether_ms") ok = num(sk.tether_ms, 0, 10'000);  // [U-456] chains
             else if (f == "tether_radius") ok = num(sk.tether_radius, 0, 3'000);

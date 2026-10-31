@@ -700,6 +700,13 @@ public:
     [[nodiscard]] SubElement auto_sub(const Unit& u) const;           // what the unit's autoattack is made of
     [[nodiscard]] const char* skill_block_reason(const Unit& u, const SkillDef& d) const;  // nullptr = may cast
     [[nodiscard]] bool auto_allowed(const Unit& u) const;
+    // ---- [U-476] Dota 2 mechanics (game/mechanics/dota.cpp)
+    void dota_attributes(Stats& s, Unit& u, const ChampionDef& d);
+    [[nodiscard]] std::int64_t dota_magic_resist(std::int64_t dmg, const Unit& dst) const;
+    [[nodiscard]] bool dota_evaded(const Unit& attacker, const Unit& target);
+    [[nodiscard]] std::int64_t dota_block(const Unit& dst, std::int64_t dmg);
+    void dota_on_hit(Unit& u, Unit& target);
+    void dota_dispel(Unit& u, bool strong, bool debuffs);
     void attack_on_the_move(Unit& u);
     void start_cast(Unit& u, const Order& o);
     void finish_cast(Unit& u);

@@ -21,6 +21,7 @@ Rgba resource_colour(std::uint8_t kind, std::uint64_t t) {
             const float f = 0.5f + 0.5f * std::sin(float(t % 100'000) * 0.023f) * std::sin(float(t % 100'000) * 0.0071f);
             return mixc({200, 20, 40, 255}, {255, 110, 0, 255}, int(f * 100));
         }
+        case 6: return {70, 110, 255, 255};    // [U-476] mana
         default: return {235, 225, 90, 255};  // energy / ammo
     }
 }

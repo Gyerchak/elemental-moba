@@ -24,10 +24,12 @@ Search everything outside the plan: `grep -rn "\[X-" .`
 | `SPEC.md`                | User plan, cleaned up and numbered `[U-xx]`.          |
 | `ENGINE-EXTRAS.md`       | Everything added outside the plan `[X-xx]`.           |
 | `OPEN-QUESTIONS.md`      | Unclear points `[?-xx]` + the assumption used.        |
-| `PLAN.md`                | Milestones M0…M9, every task tagged U / X.            |
+| `PLAN.md`                | Milestones M0…M22, every task tagged U / X.           |
+| `docs/champion-file.md`  | Build own champions: keys, shapes, sweet spots, standard skills, stats, LoL / Dota 2 / own mechanics. |
+| `docs/INTERACTIONS.md`   | Every element / terrain interaction (generated).      |
 | `docs/map-layout.md`     | Default map: zones, coordinates, symmetry.            |
 | `docs/time-and-sky.md`   | Day/night, moon, eclipses, comet — exact timings.     |
-| `CMakeLists.txt`, `src/`, `tools/` | C++23 core (placeholder start, no external deps). |
+| `CMakeLists.txt`, `src/`, `tools/` | C++23 game (SDL3 + enet). Mechanics by origin: `src/game/mechanics/lol.cpp`, `dota.cpp`, `bending_cc.cpp`. |
 
 ## Build
 
