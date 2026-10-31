@@ -54,6 +54,8 @@ void Sprites::draw(SDL_Renderer* r, const SpriteSheet& s, const std::string& ani
     const float size = s.ortho_m * kUnitsPerMetre * scale;  // the frame width on screen
     // [U-389] whole pixels: fractional positions made thin lines shimmer while moving / zoomed out
     const SDL_FRect dst{std::round(sx - size * s.ax), std::round(sy - size * s.ay), std::round(size), std::round(size)};
+    if (!std::isfinite(dst.x) || !std::isfinite(dst.y) || !(size > 0) || size > 20'000.f || std::abs(dst.x) > 60'000.f || std::abs(dst.y) > 60'000.f)
+        return;  // [U-467] a bad position must never become a screen-wide texture
     SDL_SetTextureColorMod(s.tex, tint.r, tint.g, tint.b);
     SDL_SetTextureAlphaMod(s.tex, tint.a);
     SDL_RenderTexture(r, s.tex, &src, &dst);

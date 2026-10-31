@@ -37,8 +37,11 @@ inline constexpr std::int32_t kWindSenseMs = 10'000;
 inline constexpr std::int32_t kWindPeriodMs = 250;
 
 // [U-151][X-102] Hearing: every champion hears what it cannot see. Team-shared like vision.
-inline constexpr std::int32_t kHearSteps = 900;    // footsteps
-inline constexpr std::int32_t kHearLoud = 1'600;   // attacks, casts, explosions
+// [U-466] the SENSE hears only footsteps (a unit that stands still is silent, even while fighting), within half the
+// champions' full day vision (1 200 → 600); explosions / fields / storms the same range. kHearLoud = how far the
+// client's audio carries (sound volume), not the sense.
+inline constexpr std::int32_t kHearRange = 600;
+inline constexpr std::int32_t kHearLoud = 1'600;
 inline constexpr std::int32_t kSoundPeriodMs = 400;
 
 // [U-142] Cannot sense flying things. [?-26] Only things that MOVE make tremors.

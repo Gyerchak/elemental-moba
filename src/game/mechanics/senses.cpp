@@ -95,11 +95,10 @@ void World::step_senses() {
             };
             for (Unit& o : units) {
                 if (!o.alive || o.team == team || o.is_structure() || o.kind == UnitKind::Inhibitor) continue;
-                const bool loud = o.casting || o.windup_end_ms > 0 || now_ms - o.attack_ready_ms < 300;
-                const bool steps = now_ms - o.last_move_ms < 400;
-                if (!loud && !steps) continue;
+                if (now_ms - o.last_move_ms >= 400) continue;  // [U-466] standing still = silent
+                const bool loud = o.casting || o.windup_end_ms > 0;  // (moving while casting: a louder wave, same range)
                 if (visible_to(team, o)) continue;
-                if (!heard(o.ux(), o.uy(), loud ? kHearLoud : kHearSteps)) continue;
+                if (!heard(o.ux(), o.uy(), kHearRange)) continue;
                 const std::int32_t jx = std::int32_t(mix_hash(o.id + 9, std::uint32_t(now_ms / 400)) % 81) - 40;
                 const std::int32_t jy = std::int32_t(mix_hash(o.id + 99, std::uint32_t(now_ms / 400)) % 81) - 40;
                 waves.push_back({{loud ? WaveKind::SoundLoud : WaveKind::Sound, o.ux() + jx, o.uy() + jy}, now_ms, team, 0});
@@ -107,7 +106,7 @@ void World::step_senses() {
             }
             for (const Effect& e : fx)  // explosions, fields, storms
                 if (!e.dead && e.team != team && (e.kind == FxKind::Burst || e.kind == FxKind::Field || e.kind == FxKind::Tornado) &&
-                    !visible_to(team, e) && heard(e.ux(), e.uy(), kHearLoud))
+                    !visible_to(team, e) && heard(e.ux(), e.uy(), kHearRange))
                     waves.push_back({{WaveKind::SoundLoud, e.ux(), e.uy()}, now_ms, team, 0});
         }
     // terrain changed by someone's earthbending → bending wave for the OTHER team's seismic senses [U-142]

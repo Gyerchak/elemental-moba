@@ -26,6 +26,10 @@ void World::effect_hits(Effect& e) {
         if (o.is_structure() && (e.kind == FxKind::Field || e.kind == FxKind::Tornado)) continue;
         if (!reaches(e, o)) continue;  // [U-191][U-216] too high for this hitbox (flying, airborne, raised ground)
         if (!touches(sh, hitbox(o))) continue;  // ONE rule: any touch = hit
+        if (e.inner > 0) {  // [U-462] Ring / Arc: a body completely inside the hole is not hit
+            const std::int64_t in = std::int64_t(e.inner) - body_reach(*o.body, size_pct(o));
+            if (in > 0 && dist2(o.ux(), o.uy(), e.ux(), e.uy()) < in * in) continue;
+        }
         if (e.def && e.def->hits && !(e.def->hits & cat_bit(o.category()))) continue;  // [U-311] not a unit this skill hits
         // [U-185] lightning redirection: the bolt changes owner and flies on towards the redirector's cursor
         if (e.sub == SubElement::Lightning && (e.kind == FxKind::Bolt || e.kind == FxKind::Wave) && o.st.has(StatusKind::Redirect)) {
@@ -54,13 +58,20 @@ void World::effect_hits(Effect& e) {
         // [U-222] sweet spot: a better hit in the best part of the hitbox (not a crit [U-221])
         bool sweet = false;
         const std::int32_t sweet_pct = e.sweet >= 0 ? e.sweet : e.def ? e.def->sweet_pct : 0;  // [U-456] per cast stage
-        if (e.def && sweet_pct > 0) {
-            const std::int64_t d = isqrt(dist2(o.ux(), o.uy(), e.ux(), e.uy()));
-            switch (e.kind) {
-                case FxKind::Burst: case FxKind::Field: sweet = d <= e.radius * 40 / 100; break;
-                case FxKind::Cone: sweet = d >= e.length * 75 / 100; break;
-                case FxKind::Bolt: case FxKind::Wave: sweet = e.travel_left <= e.travel_total / 5; break;
-                default: break;
+        if (e.def && sweet_pct > 0) {  // [U-461] one rule for every shape (see SweetZone)
+            const SweetZone z = sweet_zone_for(e.kind, Geo(e.geo), SweetZone(e.sweet_zone));
+            const std::int64_t sz = sweet_size_for(z, e.sweet_size);
+            const std::int64_t rx = o.ux() - e.ux(), ry = o.uy() - e.uy();
+            const bool caster = from_caster(e.kind, Geo(e.geo));
+            const std::int64_t along = (rx * e.dir.x + ry * e.dir.y) / kOne;
+            const std::int64_t r = Geo(e.geo) == Geo::Rect ? std::abs(along) : isqrt(rx * rx + ry * ry);
+            switch (z) {
+                case SweetZone::Centre:
+                    sweet = caster ? std::abs(along - e.length / 2) <= e.length * sz / 200 : r <= e.radius * sz / 100;
+                    break;
+                case SweetZone::Edge: sweet = caster ? along >= e.length * (100 - sz) / 100 : r >= e.radius * (100 - sz) / 100; break;
+                case SweetZone::Tip: sweet = e.travel_left <= e.travel_total * sz / 100; break;
+                case SweetZone::Auto: break;
             }
             if (sweet) dmg = dmg * (100 + sweet_pct) / 100;
         }
@@ -176,7 +187,9 @@ void World::step_effects() {
             const std::int64_t sp = std::int64_t(e.length) * kSub / cfg.tick_hz;
             if (d <= sp || touches(shape_of(e), hitbox(*t))) {
                 Unit* owner = find(e.owner);
+                hit_flags_ = e.crit ? kHitCrit : 0;  // [U-463]
                 deal_damage(owner, *t, e.damage, e.sub, e.physical, true, &e.src);
+                hit_flags_ = 0;
                 if (owner && t->alive) auto_extras(*owner, *t, e.damage, e.sub, e.physical);  // [U-217]
                 if (owner && owner->kind == UnitKind::Champion) {
                     if (has_passive(*owner, PassiveId::Frostbite)) apply_cc(e.src, e.owner, *t, StatusKind::Slow, 1'000, 15);
@@ -287,12 +300,19 @@ void World::step_effects() {
         // dash: drag the owner
         Unit* owner = find(e.owner);
         if (e.def && e.def->kind == SkillKind::Dash) {
-            if (!owner || !owner->alive || !walkable_at(*owner, e.x, e.y)) {
+            if (owner && e.def->pass_units) owner->ghost_until = now_ms + 100;  // [U-471]
+            if (!owner || !owner->alive) {
                 e.dead = true;
                 continue;
             }
-            owner->x = e.x;
-            owner->y = e.y;
+            if (!walkable_at(*owner, e.x, e.y)) {
+                // [U-471] through_walls: the dash goes on over the wall, the dasher lands on the first free spot behind it
+                if (!e.def->through_walls || e.travel_left <= 0) e.dead = true;
+                if (e.dead) continue;
+            } else {
+                owner->x = e.x;
+                owner->y = e.y;
+            }
             owner->moving = true;
             owner->walk_phase += 24;
             if (e.travel_left <= 0) e.dead = true;

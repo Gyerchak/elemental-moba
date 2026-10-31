@@ -46,6 +46,9 @@ struct ItemDef {
     // [U-416] classic rule sets (LoL- / Dota-like): vamp + healing reduction; such items are sold only there
     std::int32_t lifesteal = 0, omnivamp = 0, grievous_on_hit = 0;
     bool classic_only = false;
+    std::int32_t crit_chance = 0, crit_damage = 0;                     // [U-463]
+    std::int32_t arcane_power = 0, martial_power = 0, skill_power = 0;  // [U-464] % more skill damage by kind
+    std::int32_t spellvamp = 0, on_hit_dmg = 0, on_hit_max_hp = 0;     // [U-473]
 };
 
 inline constexpr std::array kItems = {
@@ -130,6 +133,16 @@ inline constexpr std::array kItems = {
             .from = {"Spirit Pearl", "Ruby Heart"}, .omnivamp = 1'000, .classic_only = true},
     ItemDef{.name = "Thorned Chain", .cost = 800, .attack = 1'500, .grievous_on_hit = 4'000, .classic_only = true},
     ItemDef{.name = "Withering Charm", .cost = 800, .elemental_power = 2'000, .grievous_on_hit = 4'000, .classic_only = true},
+    // [U-463][U-464] crits (only champions that can crit use them) and skill power by kind of skill (Claude ideas)
+    ItemDef{.name = "Keen Edge", .cost = 1'300, .attack = 1'000, .crit_chance = 1'500},
+    ItemDef{.name = "Executioner Greatblade", .cost = 3'400, .attack = 5'500, .limit = BuyLimit::One, .from = {"Keen Edge", "Long Spear"},
+            .crit_chance = 2'500, .crit_damage = 4'000},
+    ItemDef{.name = "Rune Focus", .cost = 1'100, .health = 6'000, .arcane_power = 1'200},
+    ItemDef{.name = "War Manual", .cost = 1'100, .attack = 800, .martial_power = 1'200},
+    ItemDef{.name = "Prism Core", .cost = 2'400, .elemental_power = 2'500, .limit = BuyLimit::One, .skill_power = 800},
+    // [U-473] spellvamp and on-hit (Claude ideas)
+    ItemDef{.name = "Siphon Tome", .cost = 1'200, .elemental_power = 2'000, .classic_only = true, .spellvamp = 1'000},
+    ItemDef{.name = "Venom Edge", .cost = 1'500, .attack_speed = 2'000, .on_hit_dmg = 1'500, .on_hit_max_hp = 200},
 };
 inline constexpr std::int32_t kMaxElementResist = 6'000;  // [X-74] 60 %
 inline constexpr std::int32_t kMaxSlowResist = 8'000;     // [U-218] 80 %
@@ -228,6 +241,9 @@ constexpr void add_item(Stats& s, const ItemDef& i) {
     s.move_speed_pct += i.move_speed_pct;
     s.lifesteal += i.lifesteal;  // [U-416]
     s.omnivamp += i.omnivamp;
+    s.crit_chance += i.crit_chance, s.crit_damage += i.crit_damage;  // [U-463]
+    s.arcane_power += i.arcane_power, s.martial_power += i.martial_power, s.skill_power += i.skill_power;  // [U-464]
+    s.spellvamp += i.spellvamp, s.on_hit_dmg += i.on_hit_dmg, s.on_hit_max_hp += i.on_hit_max_hp;        // [U-473]
     s.grievous_on_hit = std::max(s.grievous_on_hit, i.grievous_on_hit);
     s.wall_damage += i.wall_damage;  // [U-288]
     s.wall_damage_stone += i.wall_damage_stone;

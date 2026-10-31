@@ -40,6 +40,7 @@ constexpr Look kStatus[] = {
     {"RDR", "Redirection", "lightning redirection window is open", {255, 240, 120}, false},
     {"WET", "Wet", "lightning damage taken +25 %; the next fire hit −25 % (then dry)", {80, 160, 255}, true},
     {"GRV", "Grievous wounds", "healing on it is reduced", {170, 60, 60}, true},
+    {"FER", "Fear", "runs away in fear: cannot act", {150, 60, 160}, true},  // [U-472]
 };
 static_assert(std::size(kStatus) == std::size_t(StatusKind::Count));
 

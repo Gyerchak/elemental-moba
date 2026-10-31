@@ -228,11 +228,24 @@ void Server::run(std::stop_token stop) {
         // fixed ticks; catch up at most 4 behind
         int steps = 0;
         const auto t0 = clock::now();
+        if (clock::now() - next > std::chrono::milliseconds(250)) next = clock::now();  // [U-469] after a stall: drop the lost time
+                                                                                       // (no fast-forward burst of ticks)
         while (clock::now() >= next && steps < 4) {
             next += tick_len;
             ++steps;
             if (!world_) continue;
+            const auto s0 = clock::now();
             world_->step();
+            if (const auto took = clock::now() - s0; took > std::chrono::milliseconds(50)) {  // [U-469] watchdog → logs/slow_ticks.txt
+                std::string parts;
+                for (int k = 0; k < World::kProfParts; ++k)
+                    if (world_->prof_ms[std::size_t(k)] > 1) parts += std::format(" {} {:.0f}", World::kProfNames[k], world_->prof_ms[std::size_t(k)]);
+                std::error_code ec;
+                std::filesystem::create_directories("logs", ec);
+                if (std::ofstream lg("logs/slow_ticks.txt", std::ios::app); lg)
+                    lg << std::format("tick {} ({:.1f} s)  {:.0f} ms:{}  units {} fx {}\n", world_->tick, world_->now_ms / 1000.0,
+                                      std::chrono::duration<double, std::milli>(took).count(), parts, world_->units.size(), world_->fx.size());
+            }
             match_ms = world_->now_ms;
             // terrain changes (reliable)
             if (!world_->cell_changes.empty()) {

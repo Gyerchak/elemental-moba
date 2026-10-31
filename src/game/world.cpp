@@ -103,7 +103,18 @@ Shape World::hitbox(const Unit& u) const {
 }
 
 Shape fx_shape(FxKind kind, std::int32_t ux, std::int32_t uy, std::int32_t radius, std::int32_t width,
-               std::int32_t length, Dir dir, Flow flow, std::uint32_t seed, std::uint32_t t) {
+               std::int32_t length, Dir dir, Flow flow, std::uint32_t seed, std::uint32_t t, std::uint8_t geo, std::int32_t inner) {
+    switch (Geo(geo)) {  // [U-462] a chosen shape rule first
+        case Geo::Circle: return fluid_blob(ux, uy, radius, flow, seed, t);
+        case Geo::Ring: return ring_shape(ux, uy, radius, inner);
+        case Geo::Line: return fluid_line(ux, uy, dir, std::max(1, length), std::max(8, width), flow, seed, t);
+        case Geo::Rect: {
+            const std::int32_t w = width > 0 ? width : radius;
+            return fluid_line(ux - dir.x * radius / kOne, uy - dir.y * radius / kOne, dir, std::max(1, 2 * radius), std::max(8, w), flow, seed, t);
+        }
+        case Geo::Cone: case Geo::Arc: return fluid_cone(ux, uy, dir, length, width, flow, seed, t);
+        case Geo::Auto: break;
+    }
     switch (kind) {
         case FxKind::Bolt:
         case FxKind::Auto:
@@ -129,7 +140,55 @@ Shape fx_shape(FxKind kind, std::int32_t ux, std::int32_t uy, std::int32_t radiu
 }
 
 Shape World::shape_of(const Effect& e) const {
-    return fx_shape(e.kind, e.ux(), e.uy(), e.radius, e.width, e.length, e.dir, e.flow, e.seed, std::uint32_t(tick));
+    return fx_shape(e.kind, e.ux(), e.uy(), e.radius, e.width, e.length, e.dir, e.flow, e.seed, std::uint32_t(tick), e.geo, e.inner);
+}
+
+// ---------------------------------------------------------------- [U-461] sweet spots
+bool from_caster(FxKind kind, Geo geo) { return geo == Geo::Line || geo == Geo::Cone || geo == Geo::Arc || (geo == Geo::Auto && kind == FxKind::Cone); }
+SweetZone sweet_zone_for(FxKind kind, Geo geo, SweetZone z) {
+    if (z != SweetZone::Auto) return z;
+    if (from_caster(kind, geo)) return SweetZone::Edge;
+    return kind == FxKind::Bolt || kind == FxKind::Wave ? SweetZone::Tip : SweetZone::Centre;
+}
+int sweet_size_for(SweetZone z, int size) {
+    if (size > 0) return std::min(size, 100);
+    return z == SweetZone::Edge ? 25 : z == SweetZone::Tip ? 20 : 40;
+}
+Shape sweet_shape(FxKind kind, Geo geo, SweetZone z, int size, std::int32_t x, std::int32_t y, std::int32_t radius, std::int32_t width,
+                  std::int32_t length, Dir dir) {
+    z = sweet_zone_for(kind, geo, z);
+    const std::int32_t s = sweet_size_for(z, size);
+    Shape out;
+    if (z == SweetZone::Tip) return out;
+    if (from_caster(kind, geo)) {
+        const bool cone = geo != Geo::Line;
+        const std::int32_t from = z == SweetZone::Edge ? length * (100 - s) / 100 : length * (100 - s) / 200, len = length * s / 100;
+        if (!cone) return fluid_line(x + dir.x * from / kOne, y + dir.y * from / kOne, dir, std::max(1, len), std::max(8, width), Flow::Plain, 0, 0);
+        // a cone: one row of circles across the band (the cone's width there)
+        const std::int32_t along = from + len / 2, w = width * (20 + 80 * along / std::max(1, length)) / 100;
+        const std::int32_t r = std::max(8, len / 2);
+        const int n = std::clamp(w / std::max(1, r) + 1, 1, kMaxCircles);
+        for (int i = 0; i < n; ++i) {
+            const std::int32_t side = n == 1 ? 0 : -w / 2 + w * i / (n - 1);
+            out.add({x + rot_x(dir, along, side), y + rot_y(dir, along, side), r});
+        }
+        return out;
+    }
+    if (geo == Geo::Rect) {
+        const std::int32_t w = width > 0 ? width : radius;
+        if (z == SweetZone::Centre)
+            return fluid_line(x - dir.x * radius * s / 100 / kOne, y - dir.y * radius * s / 100 / kOne, dir, std::max(1, 2 * radius * s / 100), w, Flow::Plain, 0, 0);
+        for (int end : {-1, 1}) {  // both far ends
+            const std::int32_t c = end * radius * (200 - s) / 200;
+            out.add({x + dir.x * c / kOne, y + dir.y * c / kOne, std::max(8, std::max(w / 2, radius * s / 200))});
+        }
+        return out;
+    }
+    if (z == SweetZone::Centre) {
+        out.add({x, y, std::max(6, radius * s / 100)});
+        return out;
+    }
+    return ring_shape(x, y, radius, radius * (100 - s) / 100);  // Edge of a circle / ring
 }
 
 namespace {
@@ -204,6 +263,8 @@ ResolvedAbility World::resolved(const Unit& u, Slot s) const {
     if (u.team != Team::Neutral) b.power_pct += lion_stacks[std::size_t(u.team) & 1] * kLionTurtlePctPerStack;  // [U-364]
     if (u.jbuff == std::uint8_t(JungleBuff::Wisdom) && u.jbuff_until > now_ms) b.cd_pct = b.cd_pct * kWisdomCdPct / 100;  // [U-366]
     const int extra = has_passive(u, PassiveId::MistForm) ? 10 : 0;
+    // [U-464] skill power for every skill + the power of its kind (arcane / martial); elemental = elemental power
+    b.power_pct += (u.stats.skill_power + (d->arcane ? u.stats.arcane_power : skill_sub(u, *d) == SubElement::Physical ? u.stats.martial_power : 0)) / 100;
     const std::uint32_t rank = std::max<std::uint32_t>(1, u.ab[std::size_t(s)].rank);
     return resolve(to_ability(*d, s), ScaleCtx{.stats = u.stats, .rank = rank, .level = std::uint32_t(u.level),
                                                .power_pct = b.power_pct, .size_pct = b.size_pct + extra,
@@ -422,6 +483,10 @@ void World::recompute_stats(Unit& u) {
     if (has_passive(u, PassiveId::Rooted)) s.tenacity += 2'000;
     if (has_passive(u, PassiveId::MetalSkin)) s.defence.bonus += 1'500;
     if (has_passive(u, PassiveId::LightFeet)) s.move_speed.bonus += 1'500;
+    for (std::size_t sl = 0; sl < u.skill.size(); ++sl)  // [U-468] what learned skills give (their own passives)
+        if (const SkillDef* k = u.skill[sl]; k && (sl == 0 || u.ab[sl].rank > 0))
+            for (const SkillDef::Learned& l : k->learned)
+                if (l.key != StatKey::Count) add_stat(s, l.key, l.base + l.per_rank * (std::max<std::int32_t>(1, u.ab[sl].rank) - 1));
     apply_loadout(s, u.loadout);                                   // [U-177] runes + specialisation
     if (u.lotus_until > now_ms) s.cast_speed += kLotusCastSpeed;  // [X-46][U-114]
     if (u.tmp_size_until > now_ms) s.model_size += u.tmp_size;     // [U-129]

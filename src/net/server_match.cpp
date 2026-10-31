@@ -51,6 +51,7 @@ void Server::start_match() {
     mc.mode = cfg_.mode;              // [U-454]
     mc.seed = std::uint32_t(std::chrono::steady_clock::now().time_since_epoch().count() | 1);
     world_ = std::make_unique<World>(mc);
+    world_->profile = true;  // [U-469] the watchdog below names the slow part
     // [U-276] skill-based matchmaking: humans are split into two teams of equal strength (snake draft by MMR)
     if (cfg_.ranked && cfg_.matchmaking && !cfg_.practice) {
         std::vector<std::pair<int, Player*>> hs;
@@ -237,6 +238,8 @@ void Server::send_snapshot(Player& p) {
         n.combo = std::uint8_t(e.combo);
         n.armed = e.kind != FxKind::Burst || W.now_ms >= e.arm_ms;
         n.ally = e.ally;
+        n.geo = e.geo, n.szone = e.sweet_zone, n.ssize = e.sweet_size, n.inner = std::int16_t(e.inner);  // [U-461][U-462]
+        n.spct = std::uint8_t(std::clamp<int>(e.sweet >= 0 ? e.sweet : e.def ? e.def->sweet_pct : 0, 0, 255));
         if (e.def) {  // [U-459]
             const SkillDef::Visual& v = e.def->vis;
             n.vcol = v.colour, n.vfill = v.fill, n.vglow = v.glow, n.vtrail = v.trail, n.vflash = v.flash, n.vpart = v.particles, n.vmark_ms = v.mark_ms;
@@ -531,6 +534,12 @@ void Server::send_snapshot(Player& p) {
     m.haste = me->stats.elemental_haste / 100;
     m.tenacity = me->stats.tenacity / 100;
     m.model_size = W.size_pct(*me);
+    m.crit_chance = me->stats.crit_chance, m.crit_damage = me->stats.crit_damage;  // [U-463][U-464][U-468]
+    m.arcane_power = me->stats.arcane_power, m.martial_power = me->stats.martial_power, m.skill_power = me->stats.skill_power;
+    m.vamp = me->stats.omnivamp + me->stats.champion_vamp;
+    m.uses = champions()[std::size_t(me->champ)].crits ? 1 : 0;
+    for (const SkillDef* k : me->skill)
+        if (k) m.uses |= std::uint8_t(k->arcane ? 2 : k->sub == SubElement::Physical && k->dmg > 0 ? 4 : 0);
     w.put(m);
     // my gold / XP rewards [U-159]
     std::vector<NetReward> rw;

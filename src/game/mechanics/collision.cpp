@@ -10,6 +10,7 @@ namespace em {
 std::uint8_t World::collide_mask(const Unit& u) const {
     std::uint8_t m = u.collide;
     if (u.flying()) m &= std::uint8_t(~(kCollTerrain | kCollTree | kCollWall));  // [U-51][U-77] fly over terrain
+    if (u.ghost_until > now_ms) m &= std::uint8_t(~kCollUnit);                    // [U-471] dashing through units
     return m;
 }
 
@@ -144,7 +145,7 @@ void World::resolve_overlaps(Unit& u) {
     for (Unit& o : units) {
         if (&o == &u || !o.alive) continue;
         const bool structure = o.is_structure() || o.kind == UnitKind::Inhibitor;
-        if (structure ? !(collide_mask(u) & kCollStructure) : !(u.collide & o.collide & kCollUnit)) continue;  // [U-367]
+        if (structure ? !(collide_mask(u) & kCollStructure) : !(collide_mask(u) & o.collide & kCollUnit)) continue;  // [U-367][U-471]
         if (!structure && (o.flying() || !targetable(o) || !targetable(u))) continue;
         const std::int64_t rr = reach + body_reach(*o.body, size_pct(o));
         if (dist2(u.ux(), u.uy(), o.ux(), o.uy()) > rr * rr) continue;

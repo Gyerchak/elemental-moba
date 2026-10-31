@@ -237,6 +237,20 @@ enum class Flow : std::uint8_t { Water, Fire, Earth, Air, Plain };
     return s;
 }
 
+// [U-462] Ring: 12 circles around the band between `inner` and `outer` (the hole is cut out by the hit test).
+[[nodiscard]] constexpr Shape ring_shape(std::int32_t x, std::int32_t y, std::int32_t outer, std::int32_t inner) {
+    Shape s;
+    inner = std::clamp(inner, 0, std::max(0, outer - 8));
+    const std::int32_t mid = (outer + inner) / 2, half = std::max(4, (outer - inner) / 2);
+    const std::int32_t gap = mid * 27 / 100;  // ≈ π·mid / 12 → the circles overlap along the ring
+    const std::int32_t r = std::max(half, gap);
+    for (int i = 0; i < kMaxCircles; ++i) {
+        const Dir d = kDirs[std::size_t(i * 64 / kMaxCircles) & 63];
+        s.add({x + std::int32_t(std::int64_t(d.x) * mid / kOne), y + std::int32_t(std::int64_t(d.y) * mid / kOne), r});
+    }
+    return s;
+}
+
 // ---------------------------------------------------------------- bushes [U-140][X-78]
 // Hidden only if EVERY sample point of every body circle is on a brush cell.
 // Samples: centre + 12 points on the edge of each circle.

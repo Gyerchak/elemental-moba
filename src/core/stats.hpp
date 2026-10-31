@@ -62,9 +62,62 @@ struct Stats {
     std::int32_t lifesteal = 0;       // heal by this % of autoattack damage dealt
     std::int32_t omnivamp = 0;        // heal by this % of ALL damage dealt
     std::int32_t grievous_on_hit = 0; // hits put "grievous wounds" on the target: its healing −this % for 3 s
+    std::int32_t champion_vamp = 0;   // [U-468] heal by this % of damage dealt to CHAMPIONS (e.g. a dash skill's passive)
+    std::int32_t spellvamp = 0;       // [U-473] heal by this % of SKILL damage dealt
+    std::int32_t on_hit_dmg = 0;      // [U-473] on-hit: + flat damage on every autoattack hit (hundredths)
+    std::int32_t on_hit_max_hp = 0;   // [U-473] on-hit: + this % of the target's max HP (100 = 1 %)
+    // [U-463] critical strikes (autoattacks of champions that can crit: ChampionDef::crits), 100 = 1 %
+    std::int32_t crit_chance = 0, crit_damage = 17'500;  // 0 % / 175 % of the hit
+    // [U-464] skill power by kind of skill, % more skill damage (100 = 1 %), on top of elemental power:
+    //   arcane = non-elemental magic skills, martial = non-magic (physical) skills, skill = every skill
+    std::int32_t arcane_power = 0, martial_power = 0, skill_power = 0;
     Range range = Range::Melee;
     ResourceKind resource = ResourceKind::None;
 };
+
+// [U-462][U-468] One name per adjustable number: skills' "while learned" bonuses (SkillDef::learned), .champ keys,
+// tooltips. Values in the stat's own unit (hundredths for health / attack / power / %, units for ranges).
+enum class StatKey : std::uint8_t {
+    Health, Attack, ElementalPower, Defence, ElementalDefence, AttackSpeed, MoveSpeed, MoveSpeedPct, ElementalHaste,
+    NonElementalHaste, CastSpeed, Tenacity, Lifesteal, Omnivamp, ChampionVamp, CritChance, CritDamage, ArcanePower,
+    MartialPower, SkillPower, SkillRange, SkillRadius, Spellvamp, OnHitDamage, OnHitMaxHp, Count
+};
+inline constexpr const char* kStatKeyNames[] = {
+    "health", "attack", "elemental_power", "defence", "elemental_defence", "attack_speed", "move_speed", "move_speed_pct",
+    "elemental_haste", "non_elemental_haste", "cast_speed", "tenacity", "lifesteal", "omnivamp", "champion_vamp", "crit_chance",
+    "crit_damage", "arcane_power", "martial_power", "skill_power", "skill_range", "skill_radius", "spellvamp", "on_hit_damage",
+    "on_hit_max_hp"};
+static_assert(std::size(kStatKeyNames) == std::size_t(StatKey::Count));
+constexpr void add_stat(Stats& s, StatKey k, std::int32_t v) {
+    switch (k) {
+        case StatKey::Health: s.health.bonus += v; break;
+        case StatKey::Attack: s.attack.bonus += v; break;
+        case StatKey::ElementalPower: s.elemental_power.bonus += v; break;
+        case StatKey::Defence: s.defence.bonus += v; break;
+        case StatKey::ElementalDefence: s.elemental_defence.bonus += v; break;
+        case StatKey::AttackSpeed: s.attack_speed.bonus += v; break;
+        case StatKey::MoveSpeed: s.move_speed.bonus += v; break;
+        case StatKey::MoveSpeedPct: s.move_speed_pct += v; break;
+        case StatKey::ElementalHaste: s.elemental_haste += v; break;
+        case StatKey::NonElementalHaste: s.non_elemental_haste += v; break;
+        case StatKey::CastSpeed: s.cast_speed += v; break;
+        case StatKey::Tenacity: s.tenacity += v; break;
+        case StatKey::Lifesteal: s.lifesteal += v; break;
+        case StatKey::Omnivamp: s.omnivamp += v; break;
+        case StatKey::ChampionVamp: s.champion_vamp += v; break;
+        case StatKey::CritChance: s.crit_chance += v; break;
+        case StatKey::CritDamage: s.crit_damage += v; break;
+        case StatKey::ArcanePower: s.arcane_power += v; break;
+        case StatKey::MartialPower: s.martial_power += v; break;
+        case StatKey::SkillPower: s.skill_power += v; break;
+        case StatKey::SkillRange: s.skill_range += v; break;
+        case StatKey::SkillRadius: s.skill_radius += v; break;
+        case StatKey::Spellvamp: s.spellvamp += v; break;
+        case StatKey::OnHitDamage: s.on_hit_dmg += v; break;
+        case StatKey::OnHitMaxHp: s.on_hit_max_hp += v; break;
+        case StatKey::Count: break;
+    }
+}
 
 // [U-54] Radius-only skills get width/length stats at 1/3 value.
 [[nodiscard]] constexpr std::int32_t radius_bonus(const Stats& s) {

@@ -2,6 +2,8 @@
 // The screens themselves are in client/screens/*.cpp.
 #include "game/versions.hpp"
 #include "client/app.hpp"
+#include <fstream>
+#include <filesystem>
 
 #include <algorithm>
 #include <chrono>
@@ -196,8 +198,12 @@ int App::run() {
             if (want_text) SDL_StartTextInput(win_);
             else SDL_StopTextInput(win_);
         }
+        // [U-469] watchdog: a frame over 200 ms is written to logs/slow_frames.txt (network / drawing / present)
+        const auto w0 = clock::now();
         net_.poll(now_s_);
+        const auto w1 = clock::now();
         frame(now_s_);
+        const auto w2 = clock::now();
         // autotest: screenshot + quit
         if (opt_.autotest_s > 0 && screen_ == Screen::Game && match_start_s_ >= 0 && now_s_ - match_start_s_ >= opt_.autotest_s && !shot_done_) {
             // [U-446] --shots N: N frames in a row (shot_00.bmp …) → frame-to-frame glitches (flicker, jumps) can be compared
@@ -212,6 +218,14 @@ int App::run() {
         }
         SDL_RenderPresent(ren_);
         gfx::end_frame_text();
+        if (const auto w3 = clock::now(); w3 - w0 > std::chrono::milliseconds(200)) {
+            auto ms = [](auto d) { return std::chrono::duration<double, std::milli>(d).count(); };
+            std::error_code ec;
+            std::filesystem::create_directories("logs", ec);
+            if (std::ofstream lg("logs/slow_frames.txt", std::ios::app); lg)
+                lg << std::format("{:.1f} s  screen {}  network {:.0f} ms  frame {:.0f} ms  present {:.0f} ms  fx {}  units {}\n", now_s_, int(screen_),
+                                  ms(w1 - w0), ms(w2 - w1), ms(w3 - w2), net_.cur.fx.size(), net_.cur.units.size());
+        }
     }
     return 0;
 }

@@ -25,7 +25,17 @@ Rgba resource_colour(std::uint8_t kind, std::uint64_t t) {
     }
 }
 
+// [U-467] whole-screen glitches: ONE triangle with a NaN / infinite / gigantic corner (a bad position, a zoom of 0, a
+// huge radius) is stretched over the whole screen by the GPU. Every primitive checks its numbers first and skips such
+// a shape (a missing circle for one frame is invisible; a screen-wide smear is not).
+namespace {
+constexpr float kSaneLimit = 60'000.f;
+[[nodiscard]] bool sane(float v) { return std::isfinite(v) && std::abs(v) < kSaneLimit; }
+[[nodiscard]] bool sane(float x, float y, float r = 0) { return sane(x) && sane(y) && sane(r) && r < kSaneLimit / 4; }
+}  // namespace
+
 void fill_circle(SDL_Renderer* r, float x, float y, float rad, Rgba c, int seg) {
+    if (!sane(x, y, rad)) return;
     if (rad <= 0.3f) return;
     // [U-389] reused buffers: no heap allocation per shape (hundreds per frame used to hitch)
     thread_local std::vector<SDL_Vertex> v;
@@ -43,6 +53,7 @@ void fill_circle(SDL_Renderer* r, float x, float y, float rad, Rgba c, int seg) 
 }
 
 void circle(SDL_Renderer* r, float x, float y, float rad, Rgba c, int seg) {
+    if (!sane(x, y, rad)) return;  // [U-467]
     thread_local std::vector<SDL_FPoint> p;  // [U-389] reused
     p.resize(std::size_t(seg) + 1);
     for (int i = 0; i <= seg; ++i) {
@@ -55,6 +66,7 @@ void circle(SDL_Renderer* r, float x, float y, float rad, Rgba c, int seg) {
 
 void fill_ellipse(SDL_Renderer* r, float x, float y, float rx, float ry, Rgba c, int seg) {
     if (rx <= 0.3f || ry <= 0.2f) return;
+    if (!sane(x, y, rx) || !sane(ry) || ry > kSaneLimit / 4) return;  // [U-467]
     // [U-389] reused buffers: no heap allocation per shape (hundreds per frame used to hitch)
     thread_local std::vector<SDL_Vertex> v;
     thread_local std::vector<int> idx;
@@ -71,6 +83,7 @@ void fill_ellipse(SDL_Renderer* r, float x, float y, float rx, float ry, Rgba c,
 }
 
 void ellipse(SDL_Renderer* r, float x, float y, float rx, float ry, Rgba c, int seg) {
+    if (!sane(x, y, rx) || !sane(ry) || ry > kSaneLimit / 4) return;  // [U-467]
     thread_local std::vector<SDL_FPoint> p;  // [U-389] reused
     p.resize(std::size_t(seg) + 1);
     for (int i = 0; i <= seg; ++i) {
@@ -116,6 +129,7 @@ void ring_arc(SDL_Renderer* r, float cx, float cy, float rad, float progress, Rg
 }
 
 void fill_rect(SDL_Renderer* r, float x, float y, float w, float h, Rgba c) {
+    if (!sane(x, y) || !sane(w, h)) return;  // [U-467]
     set_color(r, c);
     const SDL_FRect f{x, y, w, h};
     SDL_RenderFillRect(r, &f);
@@ -126,6 +140,7 @@ void rect(SDL_Renderer* r, float x, float y, float w, float h, Rgba c) {
     SDL_RenderRect(r, &f);
 }
 void line(SDL_Renderer* r, float x0, float y0, float x1, float y1, Rgba c) {
+    if (!sane(x0, y0) || !sane(x1, y1)) return;  // [U-467]
     set_color(r, c);
     SDL_RenderLine(r, x0, y0, x1, y1);
 }
@@ -250,6 +265,10 @@ void outline_shape(SDL_Renderer* r, const View& v, const Shape& s, Rgba edge, fl
                 out = dx * dx + dy * dy > float(s.c[j].r) * float(s.c[j].r);
             }
             const SDL_FPoint p{v.sx(wx), v.sy(wy)};
+            if (!sane(p.x, p.y)) {  // [U-467]
+                prev_out = false;
+                continue;
+            }
             if (out && prev_out) {
                 SDL_RenderLine(r, prev.x, prev.y, p.x, p.y);
                 if (thickness > 1.2f) SDL_RenderLine(r, prev.x + 1, prev.y, p.x + 1, p.y);

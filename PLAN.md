@@ -229,3 +229,10 @@ clang 22 and GCC 16 (`README.md` → Build / Play).
 - [x] Programmable skill look on the exact hitbox (vis.*) [U-459]; own champion models from .champ (model.*) [U-460].
 - [x] `dump_content --check-champ FILE` validates an own champion file.
 - [ ] Fear status (Aatrox ult uses a slow for now); lifesteal on Umbral Dash; skill icons for the copy.
+
+## M22 — Round 18: shapes, sweet spots, stats, LoL mechanics (2026-10-31)
+- [x] Geo shapes + sweet zones visible before / after the cast; standard skill templates; docs/champion-file.md [U-461][U-462].
+- [x] Crits, arcane / martial / skill power, rank growth for every number + tooltips, aa reset, ghost dashes [U-463..U-465][U-470][U-471].
+- [x] LoL mechanics module (vamp kinds, on-hit, crits, fear); Aatrox: one ult on T (fears minions), random Y, dash omnivamp [U-468][U-472][U-473].
+- [x] Hearing only from moving units, 600 range [U-466]; glitch guards [U-467]; freeze: watchdog logs + no fast-forward [U-469].
+- [ ] The freeze itself: not reproduced in headless runs — read logs/slow_*.txt after the next one.

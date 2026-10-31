@@ -10,6 +10,10 @@
 
 #include "game/world.hpp"
 #include "game/match/maps.hpp"
+#include "game/champions/custom.hpp"
+#include <filesystem>
+#include <fstream>
+#include <iterator>
 
 int main(int argc, char** argv) {
     using namespace em;
@@ -29,8 +33,25 @@ int main(int argc, char** argv) {
     std::vector<Slow> slow;
     std::array<double, World::kProfParts> total{};
     const int ts = cur_map().team_size;  // [U-420] 5 v 5, 3 v 3 …
-    for (int i = 0; i < 2 * ts; ++i)
-        w.add_champion(i < ts ? Team::FireNation : Team::EarthNation, i, int(i % 2), -1, -1, true, -1, "");
+    // [U-469] EM_CUSTOM=1: the own champions (custom_champions/*.champ) play too — the first players of each team
+    std::vector<int> own;
+    if (std::getenv("EM_CUSTOM")) {
+        std::error_code ec;
+        for (const auto& f : std::filesystem::directory_iterator("custom_champions", ec)) {
+            if (f.path().extension() != ".champ") continue;
+            std::ifstream in(f.path(), std::ios::binary);
+            static std::vector<ChampionDef> keep;  // (register_champion keeps a pointer-stable copy? keep ours alive anyway)
+            keep.reserve(64);
+            keep.emplace_back();
+            if (parse_champion_text(std::string((std::istreambuf_iterator<char>(in)), {}), keep.back()).empty()) own.push_back(register_champion(keep.back()));
+        }
+        std::println("own champions in this match: {}", own.size());
+    }
+    for (int i = 0; i < 2 * ts; ++i) {
+        const int slot = i % ts;
+        const int champ = slot < int(own.size()) ? own[std::size_t(slot)] : i;
+        w.add_champion(i < ts ? Team::FireNation : Team::EarthNation, champ, int(i % 2), -1, -1, true, -1, "");
+    }
     const auto t0 = std::chrono::steady_clock::now();
     std::size_t feed_seen = 0;
     while (!w.over && w.now_ms < std::int64_t(minutes) * 60'000) {

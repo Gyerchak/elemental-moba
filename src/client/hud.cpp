@@ -185,11 +185,38 @@ void GameView::draw_skill_tooltip(NetClient& net, int i, float x, float y, bool 
     }
     const auto it = net.roster.find(net.my_unit);
     const ChampionDef* cd = it != net.roster.end() ? &champions()[std::size_t(it->second.champ)] : nullptr;
+    // [U-470] every number that grows with rank: its value now (rank-scaled)
+    const int rk = rank - 1;
+    const std::int32_t cc_ms = d->cc_ms + d->cc_ms_rank * rk, cc_val = d->cc_val + d->cc_val_rank * rk, dur_ms = d->dur_ms + d->dur_ms_rank * rk;
+    const std::int32_t knock = d->knock + d->knock_rank * rk;
+    auto zone_text = [&](SweetZone z, int size, FxKind k, Geo g) {  // [U-461]
+        z = sweet_zone_for(k, g, z);
+        const int sz = sweet_size_for(z, size);
+        return z == SweetZone::Centre ? std::format("the middle {}%", sz) : z == SweetZone::Edge ? std::format("the outer {}%", sz)
+                                                                          : std::format("the last {}% of its flight", sz);
+    };
+    auto fx_of = [](SkillKind k) {
+        return k == SkillKind::Cone ? FxKind::Cone : k == SkillKind::Bolt || k == SkillKind::Dash ? FxKind::Bolt : k == SkillKind::Wave ? FxKind::Wave : FxKind::Burst;
+    };
+    constexpr const char* kGeoNames[] = {"", "circle", "ring", "line", "rectangle", "cone", "arc"};
     if (plus) {  // what the next rank gives
         L.push_back(std::format("Next rank ({} → {}):", me.rank[i], me.rank[i] + 1));
         if (d->dmg_rank) L.push_back(std::format("  damage +{}", d->dmg_rank));
         if (d->cd_rank) L.push_back(std::format("  cooldown {:+.1f} s", d->cd_rank / 1000.0));
-        if (!d->dmg_rank && !d->cd_rank) L.push_back("  rank counts for scaling only");
+        bool any = d->dmg_rank || d->cd_rank;
+        for (auto [name, per, ms] : {std::tuple{"crowd control", d->cc_ms_rank, true}, {"crowd control strength", d->cc_val_rank, false},
+                                     {"duration", d->dur_ms_rank, true}, {"range", d->range_rank, false}, {"width", d->width_rank, false},
+                                     {"radius", d->radius_rank, false}, {"knock back", d->knock_rank, false}, {"cost", d->cost_rank, false}})
+            if (per) {  // [U-470]
+                L.push_back(ms ? std::format("  {} {:+.2f} s", name, per / 1000.0) : std::format("  {} {:+}", name, per));
+                any = true;
+            }
+        for (const SkillDef::Learned& l : d->learned)
+            if (l.key != StatKey::Count && l.per_rank) {
+                L.push_back(std::format("  {} {:+.1f}%", kStatKeyNames[int(l.key)], l.per_rank / 100.0));
+                any = true;
+            }
+        if (!any) L.push_back("  rank counts for scaling only");
         if (d->ultimate) L.push_back(std::format("  {} {}", tr("ultimate: a new rank every"), d->rank_step ? d->rank_step : 6));
     } else if (d->kind == SkillKind::Passive) {
         L.push_back("Passive: always on.");
@@ -206,10 +233,33 @@ void GameView::draw_skill_tooltip(NetClient& net, int i, float x, float y, bool 
             geo += std::format("speed {}", me.s_speed[i]);
         if (!geo.empty()) L.push_back(geo);
         if (d->delay_ms) L.push_back(std::format("Delay {} ms", d->delay_ms));
-        if (d->dur_ms) L.push_back(std::format("Lasts {} s{}", sec1(d->dur_ms), d->kind == SkillKind::Field ? std::format(", hits every {} ms", d->tick_ms) : ""));
-        if (d->cc != StatusKind::Count) L.push_back(std::format("{} {} s{}", cc_name(d->cc), sec1(d->cc_ms), d->cc_val ? std::format(" ({})", d->cc_val) : ""));
-        if (d->knock) L.push_back(std::format("Knock back {}", d->knock));
+        if (dur_ms) L.push_back(std::format("Lasts {} s{}", sec1(dur_ms), d->kind == SkillKind::Field ? std::format(", hits every {} ms", d->tick_ms) : ""));
+        if (d->cc != StatusKind::Count) L.push_back(std::format("{} {} s{}", cc_name(d->cc), sec1(cc_ms), cc_val ? std::format(" ({})", cc_val) : ""));
+        if (knock) L.push_back(std::format("Knock back {}", knock));
+        if (d->geo != Geo::Auto) L.push_back(std::format("Shape: {}{}", kGeoNames[int(d->geo)], d->inner ? std::format(" (hole {})", d->inner) : ""));
+        if (d->sweet_pct > 0 && !(d->casts > 1 && d->stages[0].kind != SkillKind::None))
+            L.push_back(std::format("Sweet spot +{}% in {}", d->sweet_pct, zone_text(d->sweet_zone, d->sweet_size, fx_of(d->kind), d->geo)));
         if (d->casts > 1) L.push_back(std::format("{} casts within {} s", d->casts, sec1(d->recast_ms)));
+        for (std::size_t sI = 0; d->casts > 1 && sI < d->stages.size() && sI < std::size_t(d->casts); ++sI) {  // [U-456][U-461] each cast
+            const SkillDef::CastStage& st = d->stages[sI];
+            if (st.kind == SkillKind::None) continue;
+            const Geo g = st.geo != Geo::Auto ? st.geo : d->geo;
+            std::string ln = std::format("  cast {}: {}{}{}  {}% dmg", sI + 1, g != Geo::Auto ? kGeoNames[int(g)] : st.kind == SkillKind::Cone ? "cone" : "circle",
+                                         st.range ? std::format(" {}", st.range) : "", st.width ? std::format("×{}", st.width) : st.radius ? std::format(" r{}", st.radius) : "", st.dmg_pct);
+            const int sp = st.sweet_pct >= 0 ? st.sweet_pct : d->sweet_pct;
+            if (sp > 0) ln += std::format(", sweet +{}% in {}", sp, zone_text(st.sweet_zone != SweetZone::Auto ? st.sweet_zone : d->sweet_zone,
+                                                                             st.sweet_size ? st.sweet_size : d->sweet_size, fx_of(st.kind), g));
+            L.push_back(ln);
+        }
+        if (d->tether_ms) L.push_back(std::format("Chain {} s: still within {} then = pulled {} + hit again", sec1(d->tether_ms), d->tether_radius, d->pull));
+        if (d->kind == SkillKind::Transform)
+            L.push_back(std::format("Form: +{}% attack, +{}% healing, +{}% speed", d->buff_attack_pct, d->buff_heal_pct, cc_val));
+        for (const SkillDef::Learned& l : d->learned)  // [U-468]
+            if (l.key != StatKey::Count)
+                L.push_back(std::format("While learned: {} {:.1f}%", kStatKeyNames[int(l.key)], (l.base + l.per_rank * rk) / 100.0));
+        if (d->free_cast) L.push_back("Can be used during another cast");
+        if (d->pass_units || d->through_walls) L.push_back(d->pass_units && d->through_walls ? "Goes through units and over walls" : d->pass_units ? "Goes through units" : "Goes over walls");
+        if (d->aa_reset) L.push_back("Resets your autoattack");
         if (d->cast_ms > 0) L.push_back(move_name(d->move));
         L.push_back("hold Alt: formulas");
     } else {  // Alt: how every number is built
@@ -229,6 +279,21 @@ void GameView::draw_skill_tooltip(NetClient& net, int i, float x, float y, bool 
         if (d->width) L.push_back(std::format("Width = {} + items × sky size {}% = {}", d->width, me.size_pct, me.s_width[i]));
         if (d->radius) L.push_back(std::format("Radius = {} + items × sky size {}% = {}", d->radius, me.size_pct, me.s_radius[i]));
         if (d->cost) L.push_back(std::format("Cost = {}", d->cost));
+        // [U-470] every rank-scaled number: base + growth × (rank − 1) = now
+        for (auto [name, base, per, ms] : {std::tuple{cc_name(d->cc), d->cc_ms, d->cc_ms_rank, true}, {"CC strength", d->cc_val, d->cc_val_rank, false},
+                                           {"Duration", d->dur_ms, d->dur_ms_rank, true}, {"Knock back", d->knock, d->knock_rank, false}})
+            if ((base || per) && !(std::string_view(name).empty()))
+                L.push_back(ms ? std::format("{} = {} s{} = {} s", name, sec1(base), per ? std::format(" + {}×(rank−1)", sec1(per)) : "", sec1(base + per * rk))
+                               : std::format("{} = {}{} = {}", name, base, per ? std::format(" + {}×(rank−1)", per) : "", base + per * rk));
+        // [U-464] what multiplies the skill's damage by its kind
+        const bool martial = !d->arcane && d->sub == SubElement::Physical;
+        if (d->dmg && (me.skill_power || (d->arcane && me.arcane_power) || (martial && me.martial_power)))
+            L.push_back(std::format("   × (1 + skill power {}%{})", me.skill_power / 100,
+                                    d->arcane ? std::format(" + arcane {}%", me.arcane_power / 100) : martial ? std::format(" + martial {}%", me.martial_power / 100) : ""));
+        for (const SkillDef::Learned& l : d->learned)
+            if (l.key != StatKey::Count)
+                L.push_back(std::format("{} = {:.1f}%{} = {:.1f}%", kStatKeyNames[int(l.key)], l.base / 100.0,
+                                        l.per_rank ? std::format(" + {:.1f}%×(rank−1)", l.per_rank / 100.0) : "", (l.base + l.per_rank * rk) / 100.0));
     }
     float w = 0;
     for (const auto& l : L) w = std::max(w, text_w(l));
@@ -291,6 +356,16 @@ void GameView::draw_bottom_panel(NetClient& net, double now_s, Ui& ui) {
             for (std::string extra : {std::format("RNG  {}", me.attack_range), std::format("HST  {}", me.haste), std::format("TEN  {}%", me.tenacity),
                                       std::format("SIZE {}%", me.model_size), std::format("CAST {}", me.cast_speed / 100)})
                 stats.push_back(extra);
+        // [U-463][U-464] only what this champion can use: crits (champions that crit), the skill power of its kinds of skills
+        if (expand_stats_) {
+            if (me.uses & 1) stats.push_back(std::format("CRIT {}%", me.crit_chance / 100)), stats.push_back(std::format("CDMG {}%", me.crit_damage / 100));
+            if (expand_stats_) {
+                if (me.uses & 2) stats.push_back(std::format("ARC  +{}%", me.arcane_power / 100));
+                if (me.uses & 4) stats.push_back(std::format("MAR  +{}%", me.martial_power / 100));
+                if (me.skill_power) stats.push_back(std::format("SKP  +{}%", me.skill_power / 100));
+                if (me.vamp) stats.push_back(std::format("VAMP {}%", me.vamp / 100));
+            }
+        }
         for (std::size_t k = 0; k < stats.size(); ++k) text(r_, sx0 + float(k / 6) * 78, y0 + 10 + float(k % 6) * 12, stats[k], {205, 205, 215});
         if (!expand_stats_) text(r_, sx0 + 78, y0 + 10, tr("C = all"), {130, 130, 150});  // (beside the stats, not on them)
     } else {

@@ -11,6 +11,17 @@
 
 namespace em {
 
+// [U-462] The SHAPE of a skill's hitbox, separate from what the skill DOES (SkillKind = delivery: projectile, instant
+// at the caster, delayed at a point, a field that ticks …). Auto = the usual shape of the kind.
+//   Circle  radius around its point          Ring  radius, minus a hole of `inner` in the middle
+//   Line    from the caster: range × width   Rect  around its point: 2 × radius long (along the aim) × width
+//   Cone    from the caster, widening        Arc   a cone with a hole of `inner` at the caster
+enum class Geo : std::uint8_t { Auto, Circle, Ring, Line, Rect, Cone, Arc };
+// [U-461] Where the sweet spot is (+sweet_pct damage): Auto = by kind (blasts / fields: Centre 40, cones: Edge 25,
+// projectiles: Tip 20). Centre = the middle sweet_size % of the shape; Edge = its outer sweet_size %; Tip = the last
+// sweet_size % of a projectile's flight.
+enum class SweetZone : std::uint8_t { Auto, Centre, Edge, Tip };
+
 // What a skill does in the world. One behaviour = one code path in sim_skills.cpp.
 enum class SkillKind : std::uint8_t {
     None,
@@ -120,6 +131,10 @@ struct SkillDef {
     // [U-222] sweet spot: +this % damage in the best part of the hitbox (blast centre 40 % of the radius,
     // cone tip = outer 25 %, bolt = last 20 % of its flight). 0 = no sweet spot. NOT a crit [U-221].
     std::int16_t sweet_pct = 0;
+    Geo geo = Geo::Auto;                    // [U-462] the hitbox shape (see Geo)
+    std::int16_t inner = 0;                 // [U-462] Ring / Arc: the hole in the middle / at the caster
+    SweetZone sweet_zone = SweetZone::Auto; // [U-461]
+    std::int16_t sweet_size = 0;            // [U-461] % of the shape (0 = default of the zone: Centre 40, Edge 25, Tip 20)
     // ---- [U-225][U-227][U-229][U-244][U-249] more switches
     std::int8_t destroys_trees = -1;  // −1 = by element (fire family / lava yes), 0 no, 1 yes
     std::int8_t burns_ground = -1;    // −1 = by element (fire blasts / fields / cones yes), 0 no, 1 yes
@@ -168,6 +183,10 @@ struct SkillDef {
         std::int16_t range = 0, width = 0, radius = 0;  // 0 = the skill's own
         std::int16_t dmg_pct = 100;                      // of the skill's damage
         std::int16_t sweet_pct = -1;                     // −1 = the skill's own
+        Geo geo = Geo::Auto;                             // [U-462] Auto = the skill's own
+        std::int16_t inner = -1;                         // −1 = the skill's own
+        SweetZone sweet_zone = SweetZone::Auto;          // [U-461] Auto = the skill's own
+        std::int16_t sweet_size = 0;                     // 0 = the skill's own
     };
     std::array<CastStage, 3> stages{};
     // [U-456] a chain / tether: a hit unit that is STILL within tether_radius of the hit point after tether_ms is pulled
@@ -177,6 +196,15 @@ struct SkillDef {
     std::int32_t cc2_ms = 0;
     bool free_cast = false;        // [U-456] can be cast DURING another cast (it does not stop it), e.g. a dash inside a swing
     std::int16_t buff_attack_pct = 0, buff_heal_pct = 0;  // [U-456] Transform
+    // [U-470] every number can grow per rank (added for each rank above 1), like dmg_rank / cd_rank
+    std::int32_t cc_ms_rank = 0, cc_val_rank = 0, dur_ms_rank = 0, range_rank = 0, width_rank = 0, radius_rank = 0, knock_rank = 0,
+                 cost_rank = 0;
+    bool arcane = false;     // [U-464] non-elemental MAGIC (arcane power); physical sub = martial; else elemental
+    bool aa_reset = false;   // [U-465] using it resets the autoattack timer (rare)
+    bool pass_units = false; // [U-471] a dash goes through units (walls: through_walls — it jumps over them)
+    // [U-468] numbers the skill gives while it is learned (its own passive): stat + value at rank 1 + per rank
+    struct Learned { StatKey key = StatKey::Count; std::int32_t base = 0, per_rank = 0; };
+    std::array<Learned, 3> learned{};
     // [U-457] the programmable look, layered ON the exact hitbox shape (the same shape the game hits with):
     struct Visual {
         std::uint32_t colour = 0;   // 0xRRGGBB, 0 = the element's colour
@@ -257,13 +285,13 @@ struct AutoAttackDef {
         .cast_move = s.move,
         .damage = {.base = s.dmg, .per_rank = s.dmg_rank, .ep_pct = std::int16_t(s.ep), .ad_pct = std::int16_t(s.ad),
                    .bonus_ad_pct = std::int16_t(s.bonus_ad)},
-        .range = {.base = s.range},
-        .width = {.base = s.width},
-        .radius = {.base = s.radius},
+        .range = {.base = s.range, .per_rank = s.range_rank},  // [U-470]
+        .width = {.base = s.width, .per_rank = s.width_rank},
+        .radius = {.base = s.radius, .per_rank = s.radius_rank},
         .speed = {.base = s.speed},
         .cast_time_ms = {.base = s.cast_ms},
         .cooldown_ms = {.base = s.cd_ms, .per_rank = s.cd_rank},
-        .cost = {.base = s.cost},
+        .cost = {.base = s.cost, .per_rank = s.cost_rank},
         .light_radius = {.base = s.light},
         .light_ms = {.base = s.light_ms},
         .changes_water_state = s.sub == SubElement::Ice || s.sub == SubElement::Steam,  // [U-28]
@@ -290,6 +318,7 @@ struct ChampionDef {
     SkillDef w, e, r, t, y;                             // [U-70][U-289] y = the sixth skill (key Y)
     SkillDef p;                                         // [U-104]
     bool stance = false;                                // [U-72] Space = switch stance
+    bool crits = false;                                 // [U-463] its autoattacks can crit (crit stats shown)
     std::uint32_t colour = 0xffffff;
     Role role = Role::Mage;                             // [U-180]
     bool auto_projectile = true;                        // [U-186] ranged autos fly as projectiles (melee: never)

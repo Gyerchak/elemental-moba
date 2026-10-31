@@ -281,6 +281,7 @@ void World::step_units() {
                         }
                     }
         }
+        if (!u.st.has(StatusKind::Fear))  // [U-472] a feared unit only runs (below)
         switch (u.kind) {
             case UnitKind::Minion: step_minion(u); break;
             case UnitKind::Turret:
@@ -329,6 +330,7 @@ void World::step_units() {
             else if (now_ms >= u.cast_end_ms) finish_cast(u);
             if (d && d->move == CastMove::Rooted && u.casting) continue;  // [U-53]
         }
+        if (lol_fear_step(u)) continue;  // [U-472] feared: runs away (lol.cpp)
         if (!u.st.can_move()) {
             u.windup_end_ms = std::min<std::int64_t>(u.windup_end_ms, 0);
             continue;

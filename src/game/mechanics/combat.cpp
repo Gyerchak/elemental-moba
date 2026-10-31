@@ -194,13 +194,7 @@ void World::apply_hit(Unit* src, Unit& dst, std::int32_t hund, SubElement sub, b
     interrupt(dst, hund > 0 ? std::uint32_t(kIntDamageHp) : before_shield > 0 ? std::uint32_t(kIntDamageShield) : 0u);
     dst.hp -= hund;
     dst.last_hurt_ms = now_ms;
-    // [U-416] classic rule sets: lifesteal (autoattacks), omnivamp (everything), grievous wounds on hit
-    if (src && src != &dst && src->kind == UnitKind::Champion && classic_rules(cfg.ruleset) && hund > 0) {
-        const std::int64_t vamp = src->stats.omnivamp + (is_auto ? src->stats.lifesteal : 0);
-        if (vamp > 0) heal(*src, std::int32_t(std::int64_t(hund) * vamp / 10'000));
-        if (src->stats.grievous_on_hit > 0 && !dst.is_structure())
-            dst.st.add(StatusKind::Grievous, now_ms + 3'000, std::int16_t(src->stats.grievous_on_hit / 100), src->id);
-    }
+    lol_after_damage(src, dst, hund, is_auto);  // [U-416][U-473] vamp + grievous wounds (lol.cpp)
     if (dst.kind == UnitKind::Champion && dst.hp > 0) passive_proc(dst, src, 4);  // [U-416] low-HP passives
     // [U-268] rage fills by fighting
     if (dst.stats.resource == ResourceKind::Rage) dst.res = std::min(dst.res_max, dst.res + hund * kRageTakenPct / 100);
@@ -382,11 +376,14 @@ void World::fire_auto(Unit& u, Unit& target) {
         sub = SubElement(u.magic_sub);
         dmg = dmg * sky_boost(base_element(sub), sky).power_pm() / 1000;  // [U-370]
     }
+    const bool crit = lol_crit(u, dmg);  // [U-463] (lol.cpp)
     const bool ranged = u.stats.range == Range::Ranged || u.kind == UnitKind::Turret || u.kind == UnitKind::Nexus ||
                         (u.kind == UnitKind::Minion && u.mtype != MinionType::Melee && u.mtype != MinionType::Super);
     const bool projectile = ranged && (u.kind != UnitKind::Champion || champions()[std::size_t(u.champ)].auto_projectile);
     if (!projectile) {  // melee, or a ranged champion whose autos hit at once [U-186]
+        hit_flags_ = crit ? kHitCrit : 0;
         deal_damage(&u, *t, dmg, sub, sub == SubElement::Physical, true);
+        hit_flags_ = 0;
         auto_extras(u, *t, dmg, sub, sub == SubElement::Physical);
         if (u.kind == UnitKind::Champion && has_passive(u, PassiveId::Frostbite))
             apply_cc(u.stats, u.id, *t, StatusKind::Slow, 1'000, 15);
@@ -403,6 +400,7 @@ void World::fire_auto(Unit& u, Unit& target) {
     e.y = u.y;
     e.radius = e.kind == FxKind::TowerShot ? 26 : 14;
     e.damage = dmg;
+    e.crit = crit;
     e.physical = sub == SubElement::Physical;
     e.end_ms = now_ms + 3'000;
     e.src = u.stats;
@@ -438,6 +436,7 @@ void World::passive_proc(Unit& u, Unit* target, std::uint8_t trigger) {
 void World::auto_extras(Unit& u, Unit& primary, std::int32_t dmg, SubElement sub, bool physical) {
     if (u.kind != UnitKind::Champion) return;
     passive_proc(u, &primary, 1);  // [U-416] on-hit passives (empowered autoattack)
+    lol_on_hit(u, primary, physical);  // [U-473] on-hit damage (lol.cpp)
     if (u.jbuff == std::uint8_t(JungleBuff::Ember) && u.jbuff_until > now_ms && primary.alive) {  // [U-366]
         apply_cc(u.stats, u.id, primary, StatusKind::Burn, 2'000, primary.stats.health.total() / 200);  // per second: 1 % over 2 s
         apply_cc(u.stats, u.id, primary, StatusKind::Slow, 1'000, kEmberSlowPct);

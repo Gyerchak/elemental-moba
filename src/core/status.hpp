@@ -29,6 +29,7 @@ enum class StatusKind : std::uint8_t {
     Redirect,  // [U-185] lightning redirection window is open
     Wet,       // [U-241] soaked: lightning +25 %; fire or waterbending dries it
     Grievous,  // [U-416] healing reduced by `value` % (classic rule sets only)
+    Fear,      // [U-472] runs away from the one who scared it (slowly, by `value` % slow); cannot act
     Count
 };
 
@@ -36,7 +37,7 @@ enum class StatusKind : std::uint8_t {
     switch (k) {
         case StatusKind::Stun: case StatusKind::Root: case StatusKind::Slow: case StatusKind::Silence:
         case StatusKind::Mute: case StatusKind::Airborne: case StatusKind::Frozen: case StatusKind::Blind:
-        case StatusKind::Bloodbound:
+        case StatusKind::Bloodbound: case StatusKind::Fear:
             return true;
         default:
             return false;
@@ -100,7 +101,7 @@ public:
     }
     [[nodiscard]] constexpr bool hard_cc() const {
         return has(StatusKind::Stun) || has(StatusKind::Airborne) || has(StatusKind::Frozen) ||
-               has(StatusKind::Bloodbound);
+               has(StatusKind::Bloodbound) || has(StatusKind::Fear);
     }
     [[nodiscard]] constexpr bool can_move() const { return !hard_cc() && !has(StatusKind::Root); }
     [[nodiscard]] constexpr bool can_cast() const {
@@ -124,6 +125,11 @@ public:
                 dmg -= used;
             }
         return dmg;
+    }
+    [[nodiscard]] constexpr std::uint32_t source_of(StatusKind k) const {  // [U-472] who applied it (the latest)
+        for (int i = 0; i < n_; ++i)
+            if (s_[i].kind == k) return s_[i].source;
+        return 0;
     }
     [[nodiscard]] constexpr int size() const { return n_; }
     [[nodiscard]] constexpr const Status& operator[](int i) const { return s_[i]; }

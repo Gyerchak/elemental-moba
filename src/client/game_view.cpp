@@ -766,6 +766,9 @@ void GameView::frame(NetClient& net, double now_s, Ui& ui) {
         view_.cx = std::clamp(view_.cx, 0.f, float(kMapUnits));
         view_.cy = std::clamp(view_.cy, 0.f, float(kMapUnits));
     }
+    // [U-467] a broken camera (NaN / infinite from any source) would smear every layer over the screen: reset it
+    if (!std::isfinite(view_.cx) || !std::isfinite(view_.cy)) view_.cx = view_.cy = float(kMapUnits) / 2;
+    if (!std::isfinite(view_.zoom) || view_.zoom < 0.05f) view_.zoom = 0.85f;
     // [U-389] terrain changes are shown quickly, but at most 30× a second (fire / wall fights rebuilt every frame → hitches)
     if (now_s - last_fog_ > 0.1 || (net.grid_dirty && now_s - last_fog_ > 0.033)) {
         rebuild_textures(net, now_ms, last_fog_ < 0);
@@ -856,7 +859,7 @@ void GameView::draw_indicator(NetClient& net) {
                 return c.element == Element::Water || c.avatar;
             }();
             for (const auto& f : fx_draw_) {  // [U-453] every visible skill's hitbox: mine / allies' blue, enemies' red
-                const Shape fs = fx_shape(FxKind(f.kind), f.x, f.y, f.radius, f.width, f.length, Dir{f.dx, f.dy}, Flow(f.flow), f.seed, local_tick_);
+                const Shape fs = fx_shape(FxKind(f.kind), f.x, f.y, f.radius, f.width, f.length, Dir{f.dx, f.dy}, Flow(f.flow), f.seed, local_tick_, f.geo, f.inner);
                 if (!fs.empty()) outline_shape(r_, view_, fs, f.team == net.my_team ? Rgba{110, 190, 255, 200} : Rgba{255, 90, 80, 220}, 1.5f);
             }
             for (const DrawUnit& du : draw_) {
@@ -898,7 +901,22 @@ void GameView::draw_indicator(NetClient& net) {
     if (!d || !mine) return;
     const auto& me = net.cur.me;
     float range = float(me.s_range[pending_]);
-    const float width = float(me.s_width[pending_]), radius = float(me.s_radius[pending_]);
+    float width = float(me.s_width[pending_]), radius = float(me.s_radius[pending_]);
+    // [U-461][U-462] a multicast: preview the NEXT cast (its own kind / size / shape / sweet spot), sized like the server does
+    SkillDef staged = *d;
+    if (const int stg = me.recast[pending_]; d->casts > 1 && stg < int(d->stages.size()) && d->stages[std::size_t(stg)].kind != SkillKind::None) {
+        const SkillDef::CastStage& st = d->stages[std::size_t(stg)];
+        staged.kind = st.kind;
+        if (st.range) range = float(st.range) * range / float(std::max(1, d->range));
+        if (st.width) width = d->width ? float(st.width) * width / float(d->width) : float(st.width);
+        if (st.radius) radius = d->radius ? float(st.radius) * radius / float(d->radius) : float(st.radius);
+        if (st.sweet_pct >= 0) staged.sweet_pct = st.sweet_pct;
+        if (st.geo != Geo::Auto) staged.geo = st.geo;
+        if (st.inner >= 0) staged.inner = st.inner;
+        if (st.sweet_zone != SweetZone::Auto) staged.sweet_zone = st.sweet_zone;
+        if (st.sweet_size > 0) staged.sweet_size = st.sweet_size;
+    }
+    d = &staged;
     const float mx = view_.wx(ui_->mx), my = view_.wy(ui_->my);
     std::int32_t ux = std::int32_t(mine->x), uy = std::int32_t(mine->y);
     // [U-450] a picked source: the skill starts THERE with +25 % range (as the server casts it)
@@ -1018,9 +1036,37 @@ void GameView::draw_indicator(NetClient& net) {
         case SkillKind::Bloodbend: text(r_, ui_->mx + 12, ui_->my, "click an enemy", edge); break;
         default: break;
     }
+    // [U-462] a chosen shape rule replaces the kind's usual shape (from the caster or at the aimed point)
+    FxKind fk = d->kind == SkillKind::Cone ? FxKind::Cone : d->kind == SkillKind::Bolt || d->kind == SkillKind::Dash ? FxKind::Bolt
+              : d->kind == SkillKind::Wave ? FxKind::Wave : FxKind::Burst;
+    const bool caster = from_caster(fk, d->geo);
+    const std::int32_t ax = caster || range <= 0 ? ux : px, ay = caster || range <= 0 ? uy : py;
+    if (d->geo != Geo::Auto)
+        s = fx_shape(fk, ax, ay, std::int32_t(radius), std::int32_t(width), std::int32_t(range), dir, flow, 1, local_tick_, std::uint8_t(d->geo), d->inner);
     if (!s.empty()) {
         fill_shape(r_, view_, s, {255, 255, 255, 40});
         outline_shape(r_, view_, s, edge, 2);  // exact edges of the skill [U-131]
+        if (d->inner > 0) ground_ring(r_, view_, float(ax), float(ay), float(d->inner), {255, 255, 255, 160}, 40);
+    }
+    if (d->sweet_pct > 0 && !s.empty()) {  // [U-461] the sweet spot BEFORE the cast: magenta, + its bonus
+        const SweetZone z = sweet_zone_for(fk, d->geo, d->sweet_zone);
+        const int sz = sweet_size_for(z, d->sweet_size);
+        Shape sw;
+        float lx = float(ax), ly = float(ay);
+        if (z == SweetZone::Tip) {  // a projectile: the last part of its flight
+            const float from = range * float(100 - sz) / 100.f;
+            sw = fluid_line(ux + std::int32_t(float(dir.x) / kOne * from), uy + std::int32_t(float(dir.y) / kOne * from), dir,
+                            std::max(1, std::int32_t(range * float(sz) / 100.f)), std::max(16, std::int32_t(width)), Flow::Plain, 0, 0);
+            lx = float(ux) + float(dir.x) / kOne * (range - range * float(sz) / 200.f), ly = float(uy) + float(dir.y) / kOne * (range - range * float(sz) / 200.f);
+        } else {
+            sw = sweet_shape(fk, d->geo, z, sz, ax, ay, std::int32_t(std::max(radius, 48.f)), std::int32_t(width), std::int32_t(range), dir);
+            if (!sw.empty()) lx = float(sw.c[sw.n / 2].x), ly = float(sw.c[sw.n / 2].y);
+        }
+        if (!sw.empty()) {
+            fill_shape(r_, view_, sw, {255, 80, 220, 60});
+            outline_shape(r_, view_, sw, {255, 120, 230, 230}, 1.5f);
+            label(lx, ly, std::format("+{}%", d->sweet_pct), {255, 140, 235, 255});
+        }
     }
 }
 

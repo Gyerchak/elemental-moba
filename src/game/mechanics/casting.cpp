@@ -122,7 +122,10 @@ void World::cast_skill(Unit& u, Slot slot, std::int32_t tx, std::int32_t ty, std
     }
     // [U-264] sky events (planetary alignment) stretch durations; damage-over-time has its own %
     const bool dot_skill = d.kind == SkillKind::Field && d.dmg > 0;
-    const std::int32_t dur_ms = std::int32_t(std::int64_t(d.dur_ms) * (dot_skill ? r.dot_pct : r.dur_pct) / 100);
+    const std::int32_t rk = std::max<std::int32_t>(1, u.ab[std::size_t(slot)].rank) - 1;  // [U-470] ranks above 1
+    const std::int32_t cc_ms = d.cc_ms + d.cc_ms_rank * rk, cc_val = d.cc_val + d.cc_val_rank * rk;
+    const std::int32_t dur_ms = std::int32_t(std::int64_t(d.dur_ms + d.dur_ms_rank * rk) * (dot_skill ? r.dot_pct : r.dur_pct) / 100);
+    if (d.aa_reset) u.attack_ready_ms = std::min(u.attack_ready_ms, now_ms);  // [U-465]
     // [U-184] aim: at the cursor (normal) or where the champion faces
     if (d.aim == Aim::Facing) {
         const std::int64_t len = std::max<std::int64_t>(1, isqrt(dist2(tx, ty, ox, oy)));
@@ -146,8 +149,16 @@ void World::cast_skill(Unit& u, Slot slot, std::int32_t tx, std::int32_t ty, std
     e.team = u.team;
     e.owner = u.id;
     e.def = &d;
-    if (d.casts > 1 && u.cast_stage < d.stages.size() && d.stages[u.cast_stage].kind != SkillKind::None)
-        e.sweet = d.stages[u.cast_stage].sweet_pct;  // [U-456]
+    e.geo = std::uint8_t(d.geo), e.inner = d.inner;  // [U-461][U-462] the shape rule + the sweet spot
+    e.sweet_zone = std::uint8_t(d.sweet_zone), e.sweet_size = std::uint8_t(d.sweet_size);
+    if (d.casts > 1 && u.cast_stage < d.stages.size() && d.stages[u.cast_stage].kind != SkillKind::None) {
+        const SkillDef::CastStage& st = d.stages[u.cast_stage];
+        e.sweet = st.sweet_pct;  // [U-456]
+        if (st.geo != Geo::Auto) e.geo = std::uint8_t(st.geo);
+        if (st.inner >= 0) e.inner = st.inner;
+        if (st.sweet_zone != SweetZone::Auto) e.sweet_zone = std::uint8_t(st.sweet_zone);
+        if (st.sweet_size > 0) e.sweet_size = std::uint8_t(st.sweet_size);
+    }
     e.sub = skill_sub(u, d);  // [U-264]
     e.flow = flow_of(e.sub);
     e.x = starts_at_source ? ox * kSub : u.x;
@@ -166,9 +177,9 @@ void World::cast_skill(Unit& u, Slot slot, std::int32_t tx, std::int32_t ty, std
     }
     e.physical = e.sub == SubElement::Physical;
     e.cc = d.cc;
-    e.cc_ms = d.cc == StatusKind::Burn ? std::int32_t(std::int64_t(d.cc_ms) * r.dot_pct / 100) : d.cc_ms;  // [U-264]
-    e.cc_val = d.cc_val;
-    e.knock = d.knock;
+    e.cc_ms = d.cc == StatusKind::Burn ? std::int32_t(std::int64_t(cc_ms) * r.dot_pct / 100) : cc_ms;  // [U-264]
+    e.cc_val = cc_val;
+    e.knock = d.knock + d.knock_rank * rk;
     e.pierce = d.pierce;
     e.group = d.group;
     e.ally = d.ally;
@@ -335,7 +346,7 @@ void World::cast_skill(Unit& u, Slot slot, std::int32_t tx, std::int32_t ty, std
             }
             break;
         }
-        case SkillKind::Haste: u.st.add(StatusKind::Haste, now_ms + dur_ms, d.cc_val, u.id); break;
+        case SkillKind::Haste: u.st.add(StatusKind::Haste, now_ms + dur_ms, cc_val, u.id); break;
         case SkillKind::Blink: {
             if (!d.teleport) {  // [U-229] no dash teleports for now: a very fast dash instead
                 e.kind = FxKind::Bolt;
@@ -383,7 +394,7 @@ void World::cast_skill(Unit& u, Slot slot, std::int32_t tx, std::int32_t ty, std
             u.fly_height = d.reach_height > 0 ? std::int32_t(40 + (d.reach_height - 40) * std::min<std::int64_t>(dist, std::max(1, d.range)) /
                                                                   std::max(1, d.range))
                                               : 120;
-            u.st.add(StatusKind::Haste, now_ms + dur_ms, d.cc_val, u.id);
+            u.st.add(StatusKind::Haste, now_ms + dur_ms, cc_val, u.id);
             break;
         case SkillKind::MagicStance:  // [U-264]
             u.magic_until = now_ms + dur_ms;
@@ -394,7 +405,7 @@ void World::cast_skill(Unit& u, Slot slot, std::int32_t tx, std::int32_t ty, std
             u.st.add(StatusKind::Flying, now_ms + dur_ms, 0, u.id);
             u.lifted_by = kAirSelf;
             u.fly_height = 120;
-            u.st.add(StatusKind::Haste, now_ms + dur_ms, d.cc_val, u.id);
+            u.st.add(StatusKind::Haste, now_ms + dur_ms, cc_val, u.id);
             add_feed(std::format("{} enters the Avatar State!", u.name));
             break;
         case SkillKind::SelfFreeze:  // [U-143] frozen self: untouchable, no heat
@@ -404,7 +415,7 @@ void World::cast_skill(Unit& u, Slot slot, std::int32_t tx, std::int32_t ty, std
             break;
         case SkillKind::Bloodbend: {  // [U-78] targeted, full moon only
             Unit* t = find(target);
-            if (t && t->alive && t->team != u.team) apply_cc(u.stats, u.id, *t, StatusKind::Bloodbound, d.cc_ms, 0);
+            if (t && t->alive && t->team != u.team) apply_cc(u.stats, u.id, *t, StatusKind::Bloodbound, cc_ms, 0);
             break;
         }
         case SkillKind::Boulder: {  // [U-27] cast 1 = raise, cast 2 = push
@@ -451,7 +462,7 @@ void World::cast_skill(Unit& u, Slot slot, std::int32_t tx, std::int32_t ty, std
             }
             u.st.remove(StatusKind::Swimming);
             u.st.add(StatusKind::WaterRide, now_ms + dur_ms, 0, u.id);
-            u.st.add(StatusKind::Haste, now_ms + dur_ms, d.cc_val, u.id);
+            u.st.add(StatusKind::Haste, now_ms + dur_ms, cc_val, u.id);
             break;
         case SkillKind::StonePush: {  // [U-406] push a lifted stone: the chosen one, else the nearest within range
             Effect* rock = nullptr;
@@ -488,9 +499,14 @@ void World::cast_skill(Unit& u, Slot slot, std::int32_t tx, std::int32_t ty, std
             u.transform_until = now_ms + dur_ms;
             u.transform_attack_pct = d.buff_attack_pct;
             u.transform_heal_pct = d.buff_heal_pct;
-            if (d.cc_val > 0) u.st.add(StatusKind::Haste, now_ms + dur_ms, d.cc_val, u.id);
+            if (cc_val > 0) u.st.add(StatusKind::Haste, now_ms + dur_ms, cc_val, u.id);
             if (d.size_bonus > 0) u.tmp_size = d.size_bonus, u.tmp_size_until = now_ms + dur_ms;
             recompute_stats(u);
+            if (d.cc != StatusKind::Count && r.radius > 0)  // [U-472] the form's entrance: crowd control around (e.g. fear minions away)
+                for (Unit& o : units)
+                    if (o.alive && o.team != u.team && !o.is_structure() && (!d.hits || (d.hits & cat_bit(o.category()))) &&
+                        dist2(o.ux(), o.uy(), u.ux(), u.uy()) <= r.radius * r.radius)
+                        apply_cc(u.stats, u.id, o, d.cc, cc_ms, cc_val);
             break;
         case SkillKind::MoveWater: {  // [U-398] the water is MOVED: taken from the source, laid down at the target
             const std::int32_t rad = std::int32_t(std::max<std::int64_t>(48, r.radius));

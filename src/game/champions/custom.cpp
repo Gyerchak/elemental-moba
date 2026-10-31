@@ -28,10 +28,12 @@ std::string trim(std::string s) {
 constexpr std::string_view kKinds[] = {"None", "Bolt", "Wave", "Burst", "Field", "Cone", "Dash", "Wall", "Pillar", "Tornado", "Shield",
                                        "Heal", "Haste", "Blink", "Lantern", "WindSense", "Flight", "SelfFreeze", "Bloodbend", "Boulder",
                                        "Passive", "WaterSpout", "IcePath", "Redirect", "AvatarState", "MagicStance", "StonePush", "Transform", "MoveWater"};
+constexpr std::string_view kGeos[] = {"Auto", "Circle", "Ring", "Line", "Rect", "Cone", "Arc"};  // [U-462]
+constexpr std::string_view kZones[] = {"Auto", "Centre", "Edge", "Tip"};                       // [U-461]
 constexpr std::string_view kSubs[] = {"Water", "Ice", "Wood", "Blood", "Mud", "Steam", "Air", "Earth", "Lava", "Metal", "EarthArmor",
                                       "MetalArmor", "Fire", "BlueFire", "Lightning", "Combustion", "Physical"};
 constexpr std::string_view kStatuses[] = {"Stun", "Root", "Slow", "Silence", "Mute", "Airborne", "Frozen", "Blind", "Burn", "Shield",
-                                          "Haste", "Flying", "Bloodbound", "Channel", "Swimming", "WaterRide", "Redirect", "Wet", "Grievous", "None"};
+                                          "Haste", "Flying", "Bloodbound", "Channel", "Swimming", "WaterRide", "Redirect", "Wet", "Grievous", "Fear", "None"};
 constexpr std::string_view kElements[] = {"Water", "Earth", "Fire", "Air", "None"};
 constexpr std::string_view kResources[] = {"Water", "Fuel", "None", "Ammo", "Energy", "Rage"};
 constexpr std::string_view kRoles[] = {"Mage", "Marksman", "Fighter", "Tank", "Assassin", "Support"};
@@ -54,7 +56,69 @@ bool good_name(std::string_view n) {
     });
 }
 
+// [U-462] STANDARD SKILLS for building champions: `w = @circle_blast`, then change only the numbers (w.dmg = …).
+// Every one is just values of the core mechanics (SkillKind = what it does, Geo = its shape, SweetZone …).
+const std::vector<SkillDef>& skill_templates() {
+    static const std::vector<SkillDef> t = [] {
+        std::vector<SkillDef> v;
+        auto add = [&](std::string_view name, std::string_view desc, auto&& set) {
+            SkillDef s;
+            s.name = name, s.desc = desc, s.sub = SubElement::Physical, s.dmg = 80, s.dmg_rank = 40, s.ad = 60, s.cast_ms = 250,
+            s.cd_ms = 8'000, s.cost = 30;
+            set(s);
+            v.push_back(s);
+        };
+        add("@bolt", "A projectile that stops on the first enemy; the end of its flight hits harder",
+            [](SkillDef& s) { s.kind = SkillKind::Bolt, s.range = 1'000, s.width = 70, s.speed = 1'600, s.sweet_pct = 25; });
+        add("@line", "An instant straight cut from you", [](SkillDef& s) { s.kind = SkillKind::Cone, s.geo = Geo::Line, s.range = 600, s.width = 120, s.melee = true; });
+        add("@cone", "An instant fan in front of you; the tip hits harder",
+            [](SkillDef& s) { s.kind = SkillKind::Cone, s.range = 450, s.width = 350, s.sweet_pct = 30; });
+        add("@arc", "A fan that misses what is right next to you",
+            [](SkillDef& s) { s.kind = SkillKind::Cone, s.geo = Geo::Arc, s.range = 500, s.width = 400, s.inner = 150; });
+        add("@circle_blast", "A delayed blast at a point; the centre hits harder",
+            [](SkillDef& s) { s.kind = SkillKind::Burst, s.range = 800, s.radius = 200, s.delay_ms = 600, s.sweet_pct = 30; });
+        add("@ring_blast", "A delayed ring: the middle is safe, the outer edge hits harder", [](SkillDef& s) {
+            s.kind = SkillKind::Burst, s.geo = Geo::Ring, s.range = 800, s.radius = 320, s.inner = 160, s.delay_ms = 700, s.sweet_pct = 30,
+            s.sweet_zone = SweetZone::Edge;
+        });
+        add("@rect_slam", "A long slam at a point, along your aim", [](SkillDef& s) {
+            s.kind = SkillKind::Burst, s.geo = Geo::Rect, s.range = 400, s.radius = 260, s.width = 120, s.delay_ms = 300;
+        });
+        add("@field", "A zone that hurts every half second",
+            [](SkillDef& s) { s.kind = SkillKind::Field, s.range = 800, s.radius = 230, s.dmg = 20, s.dmg_rank = 10, s.dur_ms = 3'000, s.tick_ms = 500; });
+        add("@dash", "Rush to a point, hitting on the way", [](SkillDef& s) { s.kind = SkillKind::Dash, s.range = 400, s.width = 100, s.speed = 1'400, s.cast_ms = 0; });
+        add("@ghost_dash", "A dash through units and over walls", [](SkillDef& s) {
+            s.kind = SkillKind::Dash, s.dmg = 0, s.dmg_rank = 0, s.range = 350, s.width = 100, s.speed = 1'200, s.cast_ms = 0, s.pass_units = true,
+            s.through_walls = true, s.free_cast = true;
+        });
+        add("@blink", "Teleport a short distance", [](SkillDef& s) { s.kind = SkillKind::Blink, s.dmg = 0, s.dmg_rank = 0, s.range = 400, s.cast_ms = 0; });
+        add("@chain", "A projectile that chains its target: still close after 1.5 s = pulled back and hit again", [](SkillDef& s) {
+            s.kind = SkillKind::Bolt, s.range = 825, s.width = 120, s.speed = 1'800, s.tether_ms = 1'500, s.tether_radius = 400, s.pull = 400;
+        });
+        add("@shield", "A shield on yourself", [](SkillDef& s) { s.kind = SkillKind::Shield, s.dmg = 100, s.cast_ms = 0, s.dur_ms = 3'000, s.cd_ms = 14'000; });
+        add("@heal", "Heal yourself", [](SkillDef& s) { s.kind = SkillKind::Heal, s.dmg = 90, s.ad = 0, s.ep = 40, s.cd_ms = 14'000; });
+        add("@haste", "Run faster for a while", [](SkillDef& s) { s.kind = SkillKind::Haste, s.dmg = 0, s.cast_ms = 0, s.dur_ms = 3'000, s.cc_val = 35; });
+        add("@transform", "A stronger form: attack, healing, speed, size", [](SkillDef& s) {
+            s.kind = SkillKind::Transform, s.dmg = 0, s.dmg_rank = 0, s.cd_ms = 100'000, s.dur_ms = 10'000, s.cc_val = 40, s.size_bonus = 1'500,
+            s.buff_attack_pct = 20, s.buff_heal_pct = 30, s.ultimate = true;
+        });
+        add("@three_strikes", "Three casts in 4 s: a line, a fan, a slam (each its own shape)", [](SkillDef& s) {
+            s.kind = SkillKind::Cone, s.range = 600, s.width = 180, s.cast_ms = 500, s.casts = 3, s.recast_ms = 4'000, s.sweet_pct = 50, s.melee = true;
+            s.stages[0] = {.kind = SkillKind::Cone, .range = 600, .width = 160, .dmg_pct = 100, .geo = Geo::Line};
+            s.stages[1] = {.kind = SkillKind::Cone, .range = 450, .width = 340, .dmg_pct = 125, .geo = Geo::Cone};
+            s.stages[2] = {.kind = SkillKind::Burst, .range = 220, .radius = 200, .dmg_pct = 150, .geo = Geo::Circle, .sweet_zone = SweetZone::Centre};
+        });
+        return v;
+    }();
+    return t;
+}
+
 const SkillDef* find_skill(std::string_view name) {
+    if (name.starts_with("@")) {  // [U-462] a standard skill
+        for (const SkillDef& s : skill_templates())
+            if (s.name == name) return &s;
+        return nullptr;
+    }
     for (const ChampionDef& c : champions())
         for (const SkillDef* s : {&c.p, &c.w, &c.e, &c.r, &c.t, &c.y})
             if (s->name == name) return s;
@@ -132,6 +196,8 @@ std::string parse_text(const std::string& text, ChampionDef& out) {
             out.range = v == "Ranged" ? Range::Ranged : Range::Melee;
         } else if (k == "mage") {
             out.mage = v == "1" || v == "yes";
+        } else if (k == "crits") {  // [U-463] its autoattacks can crit (crit stats shown)
+            out.crits = v == "1" || v == "yes";
         } else if (k == "resource_max") ok = number(out.res_max, 100);
         else if (k == "resource_regen") ok = number(out.res_regen, 100);
         else if (k == "hp_per_level") ok = number(out.hp_lvl, 100);
@@ -235,8 +301,72 @@ std::string parse_text(const std::string& text, ChampionDef& out) {
                 else if (g == "radius") ok = num(st.radius, 0, 2'000);
                 else if (g == "dmg_pct") ok = num(st.dmg_pct, 0, 1'000);
                 else if (g == "sweet_pct") ok = num(st.sweet_pct, -1, 300);
+                else if (g == "geo" || g == "sweet_zone") {  // [U-461][U-462]
+                    const std::string_view* names = g == "geo" ? kGeos : kZones;
+                    const int cnt = g == "geo" ? int(std::size(kGeos)) : int(std::size(kZones));
+                    int e = -1;
+                    for (int i = 0; i < cnt; ++i)
+                        if (names[i] == v) e = i;
+                    if (e < 0) return std::format("line {}: unknown {} '{}'", n, g, v);
+                    if (g == "geo") st.geo = Geo(e);
+                    else st.sweet_zone = SweetZone(e);
+                }
+                else if (g == "inner") ok = num(st.inner, -1, 2'000);
+                else if (g == "sweet_size") ok = num(st.sweet_size, 0, 100);
                 else return std::format("line {}: unknown key '{}'", n, k);
             }
+            // [U-470] growth per rank of any number
+            else if (f == "cc_ms_rank") ok = num(sk.cc_ms_rank, -20'000, 20'000);
+            else if (f == "cc_val_rank") ok = num(sk.cc_val_rank, -100'000, 100'000);
+            else if (f == "dur_ms_rank") ok = num(sk.dur_ms_rank, -120'000, 120'000);
+            else if (f == "range_rank") ok = num(sk.range_rank, -5'000, 5'000);
+            else if (f == "width_rank") ok = num(sk.width_rank, -3'000, 3'000);
+            else if (f == "radius_rank") ok = num(sk.radius_rank, -2'000, 2'000);
+            else if (f == "knock_rank") ok = num(sk.knock_rank, -2'000, 2'000);
+            else if (f == "cost_rank") ok = num(sk.cost_rank, -10'000, 10'000);
+            // [U-468] while learned: e.learned.omnivamp = 1600, e.learned_rank.omnivamp = 200 (names: kStatKeyNames)
+            else if (f.starts_with("learned.") || f.starts_with("learned_rank.")) {
+                const bool per = f.starts_with("learned_rank.");
+                const std::string stat = f.substr(per ? 13 : 8);
+                int key = -1;
+                for (int i = 0; i < int(StatKey::Count); ++i)
+                    if (stat == kStatKeyNames[i]) key = i;
+                if (key < 0) return std::format("line {}: unknown stat '{}'", n, stat);
+                SkillDef::Learned* slot = nullptr;
+                for (auto& l : sk.learned)
+                    if (l.key == StatKey(key) || (!slot && l.key == StatKey::Count)) slot = l.key == StatKey(key) ? &l : slot ? slot : &l;
+                for (auto& l : sk.learned)
+                    if (l.key == StatKey(key)) slot = &l;
+                if (!slot) return std::format("line {}: max 3 learned stats per skill", n);
+                slot->key = StatKey(key);
+                ok = per ? num(slot->per_rank, -100'000, 100'000) : num(slot->base, -100'000, 100'000);
+            }
+            else if (f == "geo" || f == "sweet_zone") {  // [U-461][U-462] shape rule / where the sweet spot is
+                const std::string_view* names = f == "geo" ? kGeos : kZones;
+                const int cnt = f == "geo" ? int(std::size(kGeos)) : int(std::size(kZones));
+                int e = -1;
+                for (int i = 0; i < cnt; ++i)
+                    if (names[i] == v) e = i;
+                if (e < 0) return std::format("line {}: unknown {} '{}'", n, f, v);
+                if (f == "geo") sk.geo = Geo(e);
+                else sk.sweet_zone = SweetZone(e);
+            }
+            else if (f == "hits") {  // [U-311][U-472] which units it can hit: hits = Minion SiegeMinion SuperMinion (empty = all)
+                constexpr std::string_view kCats[] = {"Champion", "Minion", "SiegeMinion", "SuperMinion", "Monster", "EpicMonster", "Turret", "Inhibitor", "Shrine"};
+                sk.hits = 0;
+                std::string word;
+                std::istringstream ws(std::string{v});
+                while (ws >> word) {
+                    if (!word.empty() && word.back() == ',') word.pop_back();
+                    int e = -1;
+                    for (int i = 0; i < int(std::size(kCats)); ++i)
+                        if (kCats[i] == word) e = i;
+                    if (e < 0) return std::format("line {}: unknown unit kind '{}' (Champion Minion SiegeMinion SuperMinion Monster EpicMonster Turret Inhibitor Shrine)", n, word);
+                    sk.hits |= std::uint16_t(1u << e);
+                }
+            }
+            else if (f == "inner") ok = num(sk.inner, 0, 2'000);
+            else if (f == "sweet_size") ok = num(sk.sweet_size, 0, 100);
             else if (f == "tether_ms") ok = num(sk.tether_ms, 0, 10'000);  // [U-456] chains
             else if (f == "tether_radius") ok = num(sk.tether_radius, 0, 3'000);
             else if (f == "pull") ok = num(sk.pull, 0, 3'000);
@@ -284,9 +414,11 @@ std::string parse_text(const std::string& text, ChampionDef& out) {
             else if (f == "steer_turn") ok = num(sk.steer_turn, 0, 16'000);
             else if (f == "source_first") ok = num(sk.source_first, -1, 1);
             else if (f == "pierce" || f == "targeted" || f == "ally" || f == "group" || f == "melee" || f == "ground" || f == "through_walls" ||
-                     f == "turns_caster" || f == "teleport" || f == "env_bend" || f == "full_moon_only" || f == "lift_beside") {
+                     f == "turns_caster" || f == "teleport" || f == "env_bend" || f == "full_moon_only" || f == "lift_beside" ||
+                     f == "arcane" || f == "aa_reset" || f == "pass_units") {
                 if (!number(x, 1)) return std::format("line {}: '{}' must be 0 or 1", n, v);
-                bool& b = f == "pierce" ? sk.pierce : f == "targeted" ? sk.targeted : f == "ally" ? sk.ally : f == "group" ? sk.group
+                bool& b = f == "arcane" ? sk.arcane : f == "aa_reset" ? sk.aa_reset : f == "pass_units" ? sk.pass_units  // [U-464][U-465][U-471]
+                        : f == "pierce" ? sk.pierce : f == "targeted" ? sk.targeted : f == "ally" ? sk.ally : f == "group" ? sk.group
                         : f == "melee" ? sk.melee : f == "ground" ? sk.ground : f == "through_walls" ? sk.through_walls
                         : f == "turns_caster" ? sk.turns_caster : f == "teleport" ? sk.teleport : f == "env_bend" ? sk.env_bend
                         : f == "full_moon_only" ? sk.full_moon_only : sk.lift_beside;

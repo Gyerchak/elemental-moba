@@ -662,5 +662,21 @@ Additions outside the plan live in `ENGINE-EXTRAS.md`, never here.
 - [U-459] Skill visuals are tied to the exact code hitboxes for EVERYTHING, with programmable extra steps (colour, fill, glow, trail, start / impact flash, particles, ground mark) — universal, set per skill (vis.* keys).
 - [U-460] Own champions get models from their .champ file (model.body / height / weapon / extras / accent) — Aatrox: winged darkin with a greatsword.
 
+## 40. Round 18 (2026-10-31)
+
+- [U-461] Sweet spots must be VISIBLE: in the range preview before the cast (normal, not quick cast) and on the skill after the cast — for every skill, every cast stage (e.g. Darkin Blade cast 3 = sweet spot in the middle).
+- [U-462] Skill shapes are geometric rules that can be combined / configured (more shapes: line, ring, arc, rectangle …), with easy standard templates for building new champions. Champions only hold VALUES; every mechanic lives in the core engine (unified LoL + Dota + own mechanics).
+- [U-463] Crit stats: crit chance and crit damage (default 0 % and 175 % of attack), shown only for champions that can use them; the LoL / Dota copies use these defaults.
+- [U-464] More power stats: (b) non-elemental magic skills, (c) non-magic skills, (d) all skills — next to elemental power.
+- [U-465] Some skills (rarely) reset the autoattack timer when used.
+- [U-466] Hearing sense: a unit that does not move is never heard; range = 50 % of the full day vision.
+- [U-467] Whole-screen graphic glitches still happen sometimes.
+- [U-468] Aatrox Umbral Dash (game R): its passive omnivamp is missing — a general "while learned" passive stat on any skill.
+- [U-469] One massive lag froze the game / server — must never happen.
+- [U-470] Every rank-scaled value (e.g. the slow duration of Infernal Chains) can grow per rank, and the extended tooltip shows every scaled value as base + growth and what scaled it.
+- [U-471] Umbral Dash goes through minions and walls (a general dash setting).
+- [U-472] Aatrox's ultimate does not slow: it FEARS minions away. One single ultimate on T; Y gets a totally random skill. Fear is a League of Legends mechanic.
+- [U-473] Omnivamp, spellvamp, lifesteal, on-hit mechanics (and fear) all exist in the game code, in one League of Legends mechanics section.
+
 ---
 *Hubert continues editing the plan later — new ideas get the next free `[U-xx]` number.*

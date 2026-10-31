@@ -22,6 +22,7 @@ bool has_status(const net::NetUnit& u, StatusKind k) { return ((u.status >> int(
 
 // [U-223] damage text colour: physical orange, every element its own colour, sweet spot magenta [U-222]
 Rgba damage_colour(const net::NetHit& h) {
+    if (h.pad & 8) return {255, 60, 40};   // critical strike (kHitCrit) [U-463]
     if (h.pad & 1) return {255, 80, 220};  // sweet spot (kHitSweet)
     if (h.pad & 2) return {255, 150, 60};  // physical (kHitPhysical)
     switch (SubElement(h.sub)) {
@@ -93,6 +94,8 @@ void GameView::draw_segment(const net::NetWallSeg& s) {
     if (s.kind == std::uint8_t(Wall::Ice)) side = {150, 205, 235, 190}, top = {205, 238, 252, 210};
     if (s.kind == std::uint8_t(Wall::Metal)) side = {110, 116, 128, 255}, top = {185, 191, 205, 255};
     auto quad = [&](SDL_FPoint a, SDL_FPoint b, SDL_FPoint c, SDL_FPoint d, Rgba col) {
+        for (const SDL_FPoint& q : {a, b, c, d})  // [U-467] no screen-wide smear from a bad corner
+            if (!std::isfinite(q.x) || !std::isfinite(q.y) || std::abs(q.x) > 60'000.f || std::abs(q.y) > 60'000.f) return;
         const SDL_FColor fc{col.r / 255.f, col.g / 255.f, col.b / 255.f, col.a / 255.f};
         const SDL_Vertex v[4] = {{a, fc, {}}, {b, fc, {}}, {c, fc, {}}, {d, fc, {}}};
         const int idx[6] = {0, 1, 2, 0, 2, 3};
@@ -898,7 +901,12 @@ void GameView::draw_hits(NetClient& net, double now_s) {
         const bool dot = (lh.h.pad & 4) != 0;  // [U-254] damage over time (burn): small, drifts right, no bounce
         const float scale = dot ? (mine || on_me ? 1.4f : 1.1f) : (big ? 3.f : mine || on_me ? 2.f : 1.5f) * (t < 0.08f ? 1.3f : 1.f);
         const float side = dot ? 26.f + 30.f * t : float(int(lh.h.dst + lh.h.amount) % 9 - 4) * 4 * t * 10;
-        const std::string s = sweet ? std::format("{}!", lh.h.amount) : std::format("{}", lh.h.amount);
+        const bool crit = (lh.h.pad & 8) != 0;  // [U-463] crits: bigger, "!!"
+        const std::string s = crit ? std::format("{}!!", lh.h.amount) : sweet ? std::format("{}!", lh.h.amount) : std::format("{}", lh.h.amount);
+        if (crit) {
+            outlined(r_, dx - text_w(s, scale * 1.3f) / 2 + side, dy - 30 - 60 * t + 40 * t * t, s, with_alpha(c, al), scale * 1.3f);
+            continue;
+        }
         outlined(r_, dx - text_w(s, scale) / 2 + side, dy - 30 - 60 * t + 40 * t * t, s, with_alpha(c, al), scale);
     }
 }
@@ -985,6 +993,7 @@ void GameView::draw_world(NetClient& net, double now_s) {
     const SDL_FRect d{dx0, dy0, std::abs(view_.sx(wx1) - view_.sx(wx0)), std::abs(view_.sy(wy1) - view_.sy(wy0))};
     auto draw_layer = [&](SDL_Texture* t, float px_per_cell) {
         if (src.w <= 0 || src.h <= 0) return;
+        if (!std::isfinite(d.x) || !std::isfinite(d.y) || !std::isfinite(d.w) || !std::isfinite(d.h)) return;  // [U-467]
         const SDL_FRect s{src.x * px_per_cell, src.y * px_per_cell, src.w * px_per_cell, src.h * px_per_cell};
         if (view_.flip) SDL_RenderTextureRotated(r_, t, &s, &d, 180.0, nullptr, SDL_FLIP_NONE);  // [U-174]
         else SDL_RenderTexture(r_, t, &s, &d);
@@ -1006,7 +1015,7 @@ void GameView::draw_world(NetClient& net, double now_s) {
     draw_fx_marks(now_s);  // [U-459] scorch marks / impact rings of skills that ended
     // skills [U-131]: fluid body + exact edge
     for (const auto& f : fx_draw_) {
-        const Shape s = fx_shape(FxKind(f.kind), f.x, f.y, f.radius, f.width, f.length, {f.dx, f.dy}, Flow(f.flow), f.seed, local_tick_);
+        const Shape s = fx_shape(FxKind(f.kind), f.x, f.y, f.radius, f.width, f.length, {f.dx, f.dy}, Flow(f.flow), f.seed, local_tick_, f.geo, f.inner);
         const SubElement sub = SubElement(f.sub);
         Rgba col = hex(element_colour(base_element(sub)));
         if (sub == SubElement::Lightning) col = hex(0xfff070);
@@ -1019,14 +1028,25 @@ void GameView::draw_world(NetClient& net, double now_s) {
         const FxKind k = FxKind(f.kind);
         if (k == FxKind::Steam) continue;
         if (f.vcol) col = hex(f.vcol);  // [U-459] the skill's own colour
-        if (k == FxKind::Burst && !f.armed) {  // telegraph: exact edge only
+        if (k == FxKind::Burst && !f.armed) {  // telegraph: exact edge only (+ where the sweet spot will be [U-461])
             outline_shape(r_, view_, s, with_alpha(col, 230), 2);
+            if (f.spct > 0)
+                if (const Shape sw = sweet_shape(k, Geo(f.geo), SweetZone(f.szone), f.ssize, f.x, f.y, f.radius, f.width, f.length, {f.dx, f.dy}); !sw.empty())
+                    outline_shape(r_, view_, sw, {255, 120, 230, 220}, 1.5f);
             continue;
         }
         const std::uint8_t a = f.vfill ? f.vfill : k == FxKind::Field ? 70 : k == FxKind::Tornado ? 90 : k == FxKind::Heal ? 80 : 150;
         draw_fx_look(f, s, std::uint32_t(col.r) << 16 | std::uint32_t(col.g) << 8 | col.b, now_s);  // [U-459] glow / trail / sparks: under the body
         fill_shape(r_, view_, s, with_alpha(col, a));
         outline_shape(r_, view_, s, mixc(col, {255, 255, 255, 255}, 40), 1.5f);
+        if (f.inner > 0) ground_ring(r_, view_, float(f.x), float(f.y), float(f.inner), {0, 0, 0, 120}, 40);  // [U-462] the hole
+        if (f.spct > 0) {  // [U-461] the sweet spot of this skill, on its real hitbox
+            const Shape sw = sweet_shape(k, Geo(f.geo), SweetZone(f.szone), f.ssize, f.x, f.y, f.radius, f.width, f.length, {f.dx, f.dy});
+            if (!sw.empty()) {
+                fill_shape(r_, view_, sw, {255, 80, 220, 70});
+                outline_shape(r_, view_, sw, {255, 120, 230, 220}, 1.5f);
+            }
+        }
         if (f.feeds) text(r_, view_.sx(float(f.x)) - 12, view_.sy(float(f.y)) - 4, std::format("x{}", f.feeds + 1), {255, 255, 255}, 2);
         if (k == FxKind::Lantern) fill_circle(r_, view_.sx(float(f.x)), view_.sy_h(float(f.y), 140), 10 * z + 3, {255, 220, 120, 255});
         if (view_.hz > 0 && (k == FxKind::Bolt || k == FxKind::Auto || k == FxKind::TowerShot || k == FxKind::Boulder)) {

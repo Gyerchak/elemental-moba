@@ -195,6 +195,7 @@ struct Unit {
     std::int32_t tmp_size = 0;
     std::int64_t tmp_size_until = 0;
     std::uint8_t cast_stage = 0;        // [U-456] which cast of a multicast is being cast (0 = the first)
+    std::int64_t ghost_until = 0;       // [U-471] a dash through units: no unit collision until then
     std::int64_t transform_until = 0;   // [U-456] a Transform skill is active …
     std::int16_t transform_attack_pct = 0, transform_heal_pct = 0;  // … with these
     std::int64_t lotus_until = 0;
@@ -293,6 +294,9 @@ struct Effect {
     std::uint32_t owner = 0;
     std::uint32_t target = 0;  // homing (autos, tower shots)
     const SkillDef* def = nullptr;
+    bool crit = false;        // [U-463] a critical autoattack on its way
+    std::uint8_t geo = 0, sweet_zone = 0, sweet_size = 0;  // [U-461][U-462] Geo / SweetZone of this cast (0 = Auto)
+    std::int32_t inner = 0;   // [U-462] Ring / Arc hole
     std::int16_t sweet = -1;  // [U-456] this cast stage's own sweet spot (-1 = the skill's)
     SubElement sub = SubElement::Physical;
     Flow flow = Flow::Plain;
@@ -409,7 +413,7 @@ struct HitEvent {
     std::uint8_t is_auto = 0, sub = 0;
     std::uint8_t flags = 0;  // kHitSweet, kHitPhysical, kHitDot [U-222][U-223][U-254]
 };
-inline constexpr std::uint8_t kHitSweet = 1, kHitPhysical = 2, kHitDot = 4;
+inline constexpr std::uint8_t kHitSweet = 1, kHitPhysical = 2, kHitDot = 4, kHitCrit = 8;  // [U-463]
 // [U-159][X-109] gold / XP gained on a kill, shown as small text where it died
 struct RewardEvent {
     std::uint32_t to = 0;
@@ -685,6 +689,11 @@ public:
     void passive_proc(Unit& u, Unit* target, std::uint8_t trigger);  // [U-416] the champion passive's proc (with its cooldown)
     void fire_auto(Unit& u, Unit& target);
     void auto_extras(Unit& u, Unit& primary, std::int32_t dmg, SubElement sub, bool physical);
+    // ---- [U-473] League of Legends mechanics (game/mechanics/lol.cpp): vamp, crits, on-hit, fear
+    void lol_after_damage(Unit* src, Unit& dst, std::int32_t hund, bool is_auto);
+    bool lol_crit(const Unit& u, std::int32_t& dmg);
+    void lol_on_hit(Unit& u, Unit& target, bool physical);
+    bool lol_fear_step(Unit& u);
     void attack_on_the_move(Unit& u);
     void start_cast(Unit& u, const Order& o);
     void finish_cast(Unit& u);
@@ -764,7 +773,15 @@ void flood_water(const Grid& g, int sx, int sy, std::vector<std::uint8_t>& mark,
 // Shared by server and client: the exact fluid shape of an effect at a tick [U-131] — the client
 // draws precisely what the server tests [U-132].
 [[nodiscard]] Shape fx_shape(FxKind kind, std::int32_t ux, std::int32_t uy, std::int32_t radius, std::int32_t width,
-                             std::int32_t length, Dir dir, Flow flow, std::uint32_t seed, std::uint32_t tick);
+                             std::int32_t length, Dir dir, Flow flow, std::uint32_t seed, std::uint32_t tick,
+                             std::uint8_t geo = 0, std::int32_t inner = 0);  // [U-462]
+// [U-461] the sweet spot rules, shared by the server (damage) and the client (drawing)
+[[nodiscard]] SweetZone sweet_zone_for(FxKind kind, Geo geo, SweetZone z);
+[[nodiscard]] int sweet_size_for(SweetZone z, int size);
+[[nodiscard]] bool from_caster(FxKind kind, Geo geo);  // Line / Cone / Arc start at the caster
+// the sweet part of a shape as circles (empty for Tip: that is a moment of the flight, drawn by the preview)
+[[nodiscard]] Shape sweet_shape(FxKind kind, Geo geo, SweetZone z, int size, std::int32_t x, std::int32_t y, std::int32_t radius,
+                                std::int32_t width, std::int32_t length, Dir dir);
 // Body table for the network (index ↔ BodyDef).
 [[nodiscard]] const BodyDef& body_by_index(int i);
 [[nodiscard]] int body_index(const BodyDef* b);
