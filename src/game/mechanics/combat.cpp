@@ -355,6 +355,7 @@ void World::update_attack_wall(Unit& u) {
 // One autoattack leaves now: damage, then melee hit at once or a projectile [U-41][U-55][U-56][U-186].
 void World::fire_auto(Unit& u, Unit& target) {
     Unit* t = &target;
+    reveal(u);  // [U-478] attacking ends invisibility
     const bool elemental = u.kind == UnitKind::Champion && champions()[std::size_t(u.champ)].element != Element::None;
     // damage: physical attack, or elemental auto [U-56]
     std::int32_t dmg = (elemental ? elemental_auto_damage(u.stats) : u.stats.attack.total()) / 100;
@@ -659,6 +660,7 @@ void World::on_kill(Unit* killer, Unit& dead) {
                 reward(*c, dead, c == kc || !kc ? gold : gold / 2,
                        c == kc ? rules::jungle_killer_xp(xp, n) : kc ? rules::jungle_helper_xp(xp, n) : xp / std::max(1, n));
             if (k && k->kind == UnitKind::Champion) ++k->cs;
+            if (kc) dota_neutral_drop(*kc, dead);  // [U-478]
             dead.respawn_ms = now_ms + (md ? md->respawn_ms : boss ? 300'000 : 120'000);
             ++dead.deaths;  // [U-365] the next one grows
             if (boss) announce(AnnounceKind::BossSlain, kc ? kc->id : 0, dead.id, kt);  // [U-263] objective taken

@@ -236,3 +236,8 @@ clang 22 and GCC 16 (`README.md` → Build / Play).
 - [x] LoL mechanics module (vamp kinds, on-hit, crits, fear); Aatrox: one ult on T (fears minions), random Y, dash omnivamp [U-468][U-472][U-473].
 - [x] Hearing only from moving units, 600 range [U-466]; glitch guards [U-467]; freeze: watchdog logs + no fast-forward [U-469].
 - [ ] The freeze itself: not reproduced in headless runs — read logs/slow_*.txt after the next one.
+
+## M23 — Rounds 19–20: crowd control kinds, LoL / Dota sections, features, mods, pack order (2026-10-31)
+- [x] Silence → LoL; own Chi Block / Disarm / Subdue [U-474]. LoL AP + magic pen [U-475]. Dota 2 module [U-476].
+- [x] Switchable Dota features, off by default [U-478]; LoL items only in versions/lol-mod with its own pack [U-478].
+- [x] Resource packs in order, first wins [U-479]. GitHub updated [U-477].

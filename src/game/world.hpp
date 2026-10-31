@@ -41,6 +41,9 @@ enum class CmdKind : std::uint8_t {
     Steer,          // [U-402] slot = skill, x / y = cursor (sent while the key is held)
     DrawPoint,      // [U-402] slot = skill, x / y = a point of the drawn path; item = 1 → the first point (clears)
     AttackWall,     // [U-393] x / y = a wall cell to hit with autoattacks (champions whose autos have hits_walls)
+    Buyback,        // [U-478] dead: pay to come back now (feature Buyback)
+    Glyph,          // [U-478] my team's structures invulnerable for 5 s (feature Glyph)
+    Talent,         // [U-478] slot = tier × 2 + side (0 left, 1 right) (feature Talents)
 };
 
 // [U-407] travel companions (see struct Companion)
@@ -196,6 +199,13 @@ struct Unit {
     std::int64_t tmp_size_until = 0;
     std::uint8_t cast_stage = 0;        // [U-456] which cast of a multicast is being cast (0 = the first)
     std::int64_t ghost_until = 0;       // [U-471] a dash through units: no unit collision until then
+    // [U-478] switchable Dota features
+    std::int64_t buyback_ready_ms = 0;  // Buyback: its cooldown
+    struct Delivery { std::int16_t item = -1; std::int64_t at_ms = 0; };
+    std::vector<Delivery> courier;      // Courier: items on their way
+    std::int8_t neutral = -1;           // Neutral items: index in kNeutralItems
+    bool scepter = false;               // Scepter upgrades: carries a scepter item
+    std::array<std::uint8_t, 4> talents{};  // Talents at 10 / 15 / 20 / 25: 0 none, 1 left, 2 right
     std::int64_t transform_until = 0;   // [U-456] a Transform skill is active …
     std::int16_t transform_attack_pct = 0, transform_heal_pct = 0;  // … with these
     std::int64_t lotus_until = 0;
@@ -463,7 +473,21 @@ struct MatchConfig {
     std::uint8_t ruleset = 0;                    // RuleSet
     std::uint8_t mode = 0;                       // [U-454] GameMode (how champions are picked) — a different thing
     std::uint8_t map = 0;                        // [U-420] index in maps() (game/match/maps.hpp)
+    std::uint16_t features = 0;                  // [U-478] Feature bits switched on (map default, the lobby owner changes them)
 };
+// [U-478] Dota 2 features that a map / game mode can switch on — all OFF by default (dota.cpp)
+enum Feature : std::uint16_t {
+    kFeatBuyback = 1, kFeatCourier = 2, kFeatNeutralItems = 4, kFeatScepter = 8, kFeatTalents = 16, kFeatInvisibility = 32, kFeatGlyph = 64,
+};
+inline constexpr int kFeatureCount = 7;
+// [U-478] an item can be bought in this match: its feature is on, its version mod is active, its rule set allows it.
+// features = 0xFFFF in menus (show everything the version has).
+[[nodiscard]] bool item_available(const ItemDef& d, std::uint16_t features, std::uint8_t ruleset);
+inline constexpr const char* kFeatureNames[] = {"Buyback", "Courier", "Neutral items", "Scepter upgrades", "Talents", "Invisibility", "Glyph"};
+inline constexpr const char* kFeatureDescs[] = {
+    "dead: pay gold to come back at once", "buy anywhere: a courier brings the item", "jungle monsters drop neutral items",
+    "a scepter item upgrades your ultimate", "levels 10 / 15 / 20 / 25: pick one of two bonuses",
+    "invisibility + true sight (turrets, wards)", "make your team's structures invulnerable for 5 s"};
 enum class RuleSet : std::uint8_t { AllSystems, LeagueLike, DotaLike, Count };
 inline constexpr const char* kRuleSetNames[] = {"All systems", "LoL-like only", "Dota-like only"};
 [[nodiscard]] constexpr bool classic_rules(std::uint8_t) { return true; }  // [U-454] vamp + healing reduction: always on
@@ -707,6 +731,17 @@ public:
     [[nodiscard]] std::int64_t dota_block(const Unit& dst, std::int64_t dmg);
     void dota_on_hit(Unit& u, Unit& target);
     void dota_dispel(Unit& u, bool strong, bool debuffs);
+    // ---- [U-478] switchable Dota features (dota.cpp)
+    [[nodiscard]] bool feature(std::uint16_t f) const { return (cfg.features & f) != 0; }
+    std::array<std::int64_t, 2> glyph_until{}, glyph_ready{};
+    [[nodiscard]] std::int32_t buyback_cost(const Unit& u) const;
+    void dota_buyback(Unit& u);
+    void dota_glyph(Unit& u);
+    void dota_talent(Unit& u, int tier, int side);
+    void dota_courier_step(Unit& u);
+    void dota_neutral_drop(Unit& killer, const Unit& monster);
+    [[nodiscard]] bool true_sighted(Team t, const Unit& u) const;
+    void reveal(Unit& u) { u.st.remove(StatusKind::Invisible); }
     void attack_on_the_move(Unit& u);
     void start_cast(Unit& u, const Order& o);
     void finish_cast(Unit& u);

@@ -1249,6 +1249,7 @@ void GameView::draw_hud(NetClient& net, double now_s, Ui& ui) {
         for (int i = 0; i < kItemSlots; ++i) bag[std::size_t(i)] = me.items[i];
         shop_.bag = &bag;
         shop_.classic = classic_rules(net.ruleset);  // [U-416]
+        shop_.features = net.features;               // [U-478]
         const int bought = shop_.draw(r_, ui, shop_x_, shop_y_, sw, sh, me.can_shop ? tr("Buy") : tr("Stand in the shop ring to buy"),
                                       [&](int it2) { return me.can_shop && me.gold >= plan_buy(bag, it2).price; }, me.gold);
         shop_.bag = nullptr;
@@ -1294,6 +1295,12 @@ void GameView::draw_hud(NetClient& net, double now_s, Ui& ui) {
         fill_rect(r_, 0, 0, W, H, {40, 40, 40, 90});
         const std::string rs = std::format("{} {:.0f} s", tr("Respawn in"), std::max(0.0, me.respawn_ms / 1000.0 - since));
         text(r_, (W - text_w(rs, 3)) / 2, H * 0.3f - 60, rs, {255, 255, 255}, 3);  // [U-430] higher
+        if (net.features & kFeatBuyback) {  // [U-478] pay to come back now
+            const bool ready = me.buyback_left_ms == 0 && me.gold >= me.buyback_cost;
+            const std::string bl = me.buyback_left_ms > 0 ? std::format("{} {} s", tr("Buyback in"), (me.buyback_left_ms + 999) / 1000)
+                                                           : std::format("{}  {} g", tr("BUYBACK"), me.buyback_cost);
+            if (button(r_, ui, W / 2 - 110, H * 0.3f - 10, 220, 30, bl, false, ready)) net.send_cmd({.kind = CmdKind::Buyback});
+        }
         draw_death_recap(net, now_s);  // [U-262]
     } else {
         show_recap_ = false;

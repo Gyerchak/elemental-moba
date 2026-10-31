@@ -3,6 +3,7 @@
 #include <format>
 #include "game/match/layout.hpp"
 #include "game/world.hpp"
+#include "game/versions.hpp"
 
 namespace em {
 
@@ -49,11 +50,18 @@ void World::level_up(Unit& u, Slot s) {
     --u.skill_points;
 }
 
+bool item_available(const ItemDef& d, std::uint16_t features, std::uint8_t ruleset) {
+    if (d.classic_only && !classic_rules(ruleset)) return false;
+    if ((d.feature & features) != d.feature) return false;
+    return d.mod.empty() || mod_enabled(d.mod);
+}
+
 void World::buy(Unit& u, int item) {
     if (item < 0 || item >= int(kItems.size())) return;
-    if (!in_base(u) && u.alive) return refuse(u, "stand inside the shop ring at your fountain");  // [X-100]
+    const bool by_courier = !in_base(u) && u.alive && feature(kFeatCourier);  // [U-478]
+    if (!in_base(u) && u.alive && !by_courier) return refuse(u, "stand inside the shop ring at your fountain");  // [X-100]
     const ItemDef& d = kItems[std::size_t(item)];
-    if (d.classic_only && !classic_rules(cfg.ruleset)) return refuse(u, "this item is switched off on this server");  // [U-416]
+    if (!item_available(d, cfg.features, cfg.ruleset)) return refuse(u, "this item is switched off in this match / version");  // [U-416][U-478]
     // [U-261] parts I carry are used up; I pay only the rest
     const BuyPlan plan = plan_buy(u.items, item);
     if (u.gold < plan.price) return refuse(u, "not enough gold");
@@ -64,6 +72,16 @@ void World::buy(Unit& u, int item) {
         if ((d.unique || d.limit == BuyLimit::One) && it == item) return refuse(u, "you can carry only one of this item");
         if (d.limit == BuyLimit::OnePerGroup && kItems[std::size_t(it)].group == d.group)
             return refuse(u, "you can carry only one item of this kind (e.g. one pair of boots)");
+    }
+    if (by_courier) {  // [U-478] paid now; the parts go with the courier; the item arrives after its trip
+        for (std::size_t s = 0; s < u.items.size(); ++s)
+            if (plan.used[s]) u.items[s] = -1, u.item_impact[s] = 0;
+        const auto [fx_, fy_] = fountain(u.team);
+        const std::int64_t trip = isqrt(dist2(fx_, fy_, u.ux(), u.uy())) * 1'000 / 600 + 1'500;  // 600 units / s
+        u.courier.push_back({std::int16_t(item), now_ms + trip});
+        u.gold -= plan.price;
+        recompute_stats(u);
+        return;
     }
     // [U-322] where it goes: boots → the boots slot, special items → the special slot, the rest → slots 1…8
     auto open_slot = [&](std::size_t s) { return u.items[s] < 0 || plan.used[s]; };
@@ -111,6 +129,11 @@ void World::use_item(Unit& u, int slot, std::int32_t target_x, std::int32_t targ
             ++u.item_impact[std::size_t(slot)];
             break;
         }
+        case ItemActive::Shadow:  // [U-478] invisible for 10 s, +20 % speed (feature Invisibility)
+            if (!feature(kFeatInvisibility)) return;
+            u.st.add(StatusKind::Invisible, now_ms + 10'000, 0, u.id);
+            u.st.add(StatusKind::Haste, now_ms + 10'000, 20, u.id);
+            break;
         case ItemActive::None: return;
     }
     u.item_cd_ms[std::size_t(slot)] = now_ms + d.active_cd_ms;

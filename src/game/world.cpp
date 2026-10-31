@@ -206,6 +206,7 @@ bool World::targetable(const Unit& u) const { return u.alive && u.untargetable_u
 
 bool World::vulnerable(const Unit& u) const {
     if (!u.is_structure()) return true;
+    if (u.team != Team::Neutral && glyph_until[std::size_t(u.team) & 1] > now_ms) return false;  // [U-478] glyph
     auto dead_struct = [&](UnitKind k, int lane, int tier) {
         for (const Unit& o : units)
             if (o.team == u.team && o.kind == k && (lane < 0 || o.lane == lane) && (tier < 0 || o.tier == tier) &&
@@ -231,6 +232,7 @@ std::int64_t World::edge_gap(const Unit& a, const Unit& b) const { return em::ed
 bool World::visible_to(Team t, const Unit& u) const {
     if (u.team == t || u.is_structure()) return true;
     if (!u.alive || t == Team::Neutral) return false;
+    if (u.st.has(StatusKind::Invisible) && !true_sighted(t, u)) return false;  // [U-478]
     const VisionMap& v = vision[std::size_t(t)];
     // [U-140] one sample point of the hitbox on a seen cell = seen
     const Shape s = hitbox(u);
@@ -262,6 +264,11 @@ ResolvedAbility World::resolved(const Unit& u, Slot s) const {
     }
     if (u.team != Team::Neutral) b.power_pct += lion_stacks[std::size_t(u.team) & 1] * kLionTurtlePctPerStack;  // [U-364]
     if (u.jbuff == std::uint8_t(JungleBuff::Wisdom) && u.jbuff_until > now_ms) b.cd_pct = b.cd_pct * kWisdomCdPct / 100;  // [U-366]
+    if (u.scepter && d->ultimate) {  // [U-478] scepter upgrade of the ultimate
+        b.power_pct += d->scepter_dmg_pct ? d->scepter_dmg_pct : 30;
+        b.cd_pct = b.cd_pct * (100 - (d->scepter_cd_pct ? d->scepter_cd_pct : 20)) / 100;
+        b.size_pct += 15, b.radius_pct += 15;
+    }
     const int extra = has_passive(u, PassiveId::MistForm) ? 10 : 0;
     // [U-464] skill power for every skill + the power of its kind (arcane / martial); elemental = elemental power
     b.power_pct += (u.stats.skill_power + (d->arcane ? u.stats.arcane_power : skill_sub(u, *d) == SubElement::Physical ? u.stats.martial_power : 0)) / 100;
@@ -491,6 +498,17 @@ void World::recompute_stats(Unit& u) {
                 if (l.key != StatKey::Count) add_stat(s, l.key, l.base + l.per_rank * (std::max<std::int32_t>(1, u.ab[sl].rank) - 1));
     apply_loadout(s, u.loadout);                                   // [U-177] runes + specialisation
     dota_attributes(s, u, d);                                      // [U-476] Strength / Agility / Intelligence
+    // [U-478] switchable features: talents, the neutral item, a scepter
+    if (feature(kFeatTalents))
+        for (int t = 0; t < 4; ++t)
+            if (u.talents[std::size_t(t)]) {
+                const SkillDef::Learned& l = talent_of(d, t, u.talents[std::size_t(t)] - 1);
+                add_stat(s, l.key, l.base);
+            }
+    if (feature(kFeatNeutralItems) && u.neutral >= 0) add_item(s, kNeutralItems[std::size_t(u.neutral)].item);
+    u.scepter = false;
+    for (std::int16_t it : u.items)
+        if (it >= 0 && kItems[std::size_t(it)].scepter && feature(kFeatScepter)) u.scepter = true;
     if (u.lotus_until > now_ms) s.cast_speed += kLotusCastSpeed;  // [X-46][U-114]
     if (u.tmp_size_until > now_ms) s.model_size += u.tmp_size;     // [U-129]
     if (u.transform_until > now_ms) s.attack.bonus += s.attack.base * u.transform_attack_pct / 100;  // [U-456]
@@ -582,6 +600,9 @@ void World::command(std::uint32_t id, const Cmd& c) {
     // [X-24] the server validates everything; bad input is ignored
     switch (c.kind) {
         case CmdKind::Buy: buy(u, c.item); return;
+        case CmdKind::Buyback: dota_buyback(u); return;  // [U-478]
+        case CmdKind::Glyph: dota_glyph(u); return;
+        case CmdKind::Talent: dota_talent(u, c.slot / 2, c.slot % 2); return;
         case CmdKind::Sell:
             if (c.slot < kItemSlots && u.items[c.slot] >= 0 && (in_base(u) || !u.alive)) {
                 u.gold += kItems[std::size_t(u.items[c.slot])].cost * 70 / 100;

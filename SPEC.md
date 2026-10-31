@@ -681,6 +681,8 @@ Additions outside the plan live in `ENGINE-EXTRAS.md`, never here.
 - [U-475] Ability power, magic penetration and % magic penetration in the engine, under the League of Legends section.
 - [U-476] A Dota 2 section: the stats, resources and mechanics of Dota 2 that the engine did not have yet.
 - [U-477] Update the GitHub repo after all is done.
+- [U-478] Buyback, courier, neutral items, Aghanim (scepter) upgrades, talents, invisibility + true sight, glyph: map / game-mode features, turned OFF by default. The 3 LoL items exist only in a modified game version, with their assets tied to the version file and its resource pack.
+- [U-479] Resource packs can be mixed like in Minecraft: an ordered list; for the same file the first pack in the order wins.
 
 ---
 *Hubert continues editing the plan later — new ideas get the next free `[U-xx]` number.*

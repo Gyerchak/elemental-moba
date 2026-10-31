@@ -193,10 +193,11 @@ void NetClient::send_own_emote(std::uint8_t idx, const std::vector<std::uint8_t>
     send_raw(w, true);
 }
 
-void NetClient::send_lobby_config(int map_index, int rules, int game_mode) {
+void NetClient::send_lobby_config(int map_index, int rules, int game_mode, int feats) {
     Writer w;
     w.put(Msg::LobbyConfig);
     w.put(std::uint8_t(map_index)), w.put(std::uint8_t(rules)), w.put(std::uint8_t(game_mode));
+    w.put<std::uint16_t>(std::uint16_t(feats < 0 ? features : feats));  // [U-478]
     send_raw(w, true);
 }
 void NetClient::send_transfer_owner(std::uint8_t slot_id) {
@@ -299,6 +300,7 @@ void NetClient::handle(const std::uint8_t* data, std::size_t n, double now_s) {
                 ruleset = r.get<std::uint8_t>();
                 queue_mode = r.get<std::uint8_t>() != 0;
                 mode = r.get<std::uint8_t>();  // [U-454]
+                features = r.get<std::uint16_t>();  // [U-478]
                 if (!r.bad() && state != State::Match && maps()[std::min<std::size_t>(m, maps().size() - 1)].id != map) use_map(m);
             }
             if (state == State::Match && !lobby_in_match && winner >= 0) back_in_lobby = true;

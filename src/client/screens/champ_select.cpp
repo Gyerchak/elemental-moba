@@ -445,8 +445,23 @@ void App::champ_select() {
             // [U-454] the game mode (how champions are chosen) and — separately — which systems are on
             if (button(ren_, ui_, bx, H - 248, 250, 26, std::format("{}: {}", tr("Mode"), tr(kGameModeNames[std::min<int>(net_.mode, 2)])), false, i_own))
                 net_.send_lobby_config(map_index(md.id), net_.ruleset, (net_.mode + 1) % int(GameMode::Count));
-            if (button(ren_, ui_, bx, H - 218, 250, 26, std::format("{}: {}", tr("Systems"), tr(kRuleSetNames[std::min<int>(net_.ruleset, 2)])), false, i_own))
+            if (button(ren_, ui_, bx, H - 218, 160, 26, std::format("{}: {}", tr("Systems"), tr(kRuleSetNames[std::min<int>(net_.ruleset, 2)])), false, i_own))
                 net_.send_lobby_config(map_index(md.id), (net_.ruleset + 1) % int(RuleSet::Count), net_.mode);
+            // [U-478] switchable features (all off by default; a map may switch some on): the owner toggles them
+            int on = 0;
+            for (int f = 0; f < kFeatureCount; ++f) on += (net_.features >> f) & 1;
+            if (button(ren_, ui_, bx + 164, H - 218, 86, 26, std::format("{} {}", tr("Features"), on), features_open_))
+                features_open_ = !features_open_;
+            if (features_open_) {
+                const float fx = bx, fy = H - 222 - float(kFeatureCount) * 30 - 8;
+                fill_rect(ren_, fx - 4, fy - 4, 520, float(kFeatureCount) * 30 + 8, {10, 10, 18, 235});
+                for (int f = 0; f < kFeatureCount; ++f) {
+                    const bool is_on = (net_.features >> f) & 1;
+                    if (button(ren_, ui_, fx, fy + float(f) * 30, 170, 26, std::format("{} {}", is_on ? "[x]" : "[ ]", tr(kFeatureNames[f])), is_on, i_own))
+                        net_.send_lobby_config(map_index(md.id), net_.ruleset, net_.mode, net_.features ^ (1 << f));
+                    text(ren_, fx + 178, fy + float(f) * 30 + 8, tr(kFeatureDescs[f]), {170, 175, 195});
+                }
+            }
         }
         text(ren_, bx, H - 314, fit_text(std::string(md.desc), 250), {150, 160, 180});
         text(ren_, bx, H - 300, fit_text(tr(kGameModeDescs[std::min<int>(net_.queue_mode ? queue_rules_ : net_.mode, 2)]), 250), {150, 160, 180});

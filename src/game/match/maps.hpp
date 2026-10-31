@@ -37,6 +37,7 @@ struct MapDef {
     std::vector<EpicSpot> epics;             // one each (not mirrored)
     bool epic_islands = false;               // epics stand on sea islands with a ford (the elemental world)
     MinionWaves minions;
+    std::uint16_t features = 0;  // [U-478] Feature bits this map switches on by default (all off unless set)
 };
 
 [[nodiscard]] std::span<const MapDef> maps();

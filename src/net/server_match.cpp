@@ -47,6 +47,7 @@ void Server::start_match() {
     mc.start_ms = cfg_.start_ms;
     mc.first_wave_ms = cfg_.first_wave_ms;
     mc.ruleset = cfg_.ruleset;  // [U-416]
+    mc.features = cfg_.features;  // [U-478]
     mc.map = std::uint8_t(cfg_.map);  // [U-420]
     mc.mode = cfg_.mode;              // [U-454]
     mc.seed = std::uint32_t(std::chrono::steady_clock::now().time_since_epoch().count() | 1);
@@ -540,6 +541,20 @@ void Server::send_snapshot(Player& p) {
     m.ap = me->stats.ability_power, m.mpen = me->stats.magic_pen, m.mpen_pct = me->stats.magic_pen_pct;  // [U-475][U-476]
     m.str = me->stats.strength, m.agi = me->stats.agility, m.intel = me->stats.intelligence;
     m.mres = me->stats.magic_resist, m.eva = me->stats.evasion, m.hp_regen = me->stats.hp_regen;
+    {  // [U-478]
+        const std::size_t tm = std::size_t(me->team) & 1;
+        m.buyback_cost = W.buyback_cost(*me);
+        m.buyback_left_ms = std::int32_t(std::max<std::int64_t>(0, me->buyback_ready_ms - W.now_ms));
+        m.glyph_left_ms = std::int32_t(std::max<std::int64_t>(0, W.glyph_ready[tm] - W.now_ms));
+        m.glyph_active_ms = std::int32_t(std::max<std::int64_t>(0, W.glyph_until[tm] - W.now_ms));
+        m.courier_n = std::uint8_t(std::min<std::size_t>(me->courier.size(), 255));
+        std::int64_t next = 0;
+        for (const Unit::Delivery& dv : me->courier) next = next == 0 ? dv.at_ms : std::min(next, dv.at_ms);
+        m.courier_left_ms = next ? std::int32_t(std::max<std::int64_t>(0, next - W.now_ms)) : 0;
+        for (int t = 0; t < 4; ++t) m.talents[t] = me->talents[std::size_t(t)];
+        m.level = std::uint8_t(std::min(me->level, 255));
+        m.neutral = me->neutral;
+    }
     m.uses = champions()[std::size_t(me->champ)].crits ? 1 : 0;
     for (const SkillDef* k : me->skill)
         if (k) m.uses |= std::uint8_t((k->arcane ? 2 : k->sub == SubElement::Physical && k->dmg > 0 ? 4 : 0) | (k->ap ? 8 : 0));  // 8 = AP skills

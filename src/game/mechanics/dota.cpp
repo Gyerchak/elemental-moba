@@ -4,6 +4,8 @@
 // Champions / items / skills only hold the NUMBERS (Stats fields, StatKey names, ChampionDef::attr, SkillDef::dispel).
 // Units: attribute points in hundredths (1 point = 100); % stats 100 = 1 %.
 #include <algorithm>
+#include <format>
+#include <vector>
 
 #include "game/content.hpp"
 #include "game/world.hpp"
@@ -72,6 +74,93 @@ void World::dota_dispel(Unit& u, bool strong, bool debuffs) {
     if (strong)
         for (StatusKind k : {StatusKind::Stun, StatusKind::Airborne, StatusKind::Frozen, StatusKind::Fear, StatusKind::Subdue, StatusKind::Hex})
             u.st.remove(k);
+}
+
+}  // namespace em
+
+// ================================================================ [U-478] switchable features (all OFF by default;
+// a map / the lobby owner switches them on: MatchConfig::features)
+namespace em {
+
+std::int32_t World::buyback_cost(const Unit& u) const { return 200 + 40 * u.level; }
+
+// Buyback: dead → pay and come back at once at the fountain; 5 min cooldown.
+void World::dota_buyback(Unit& u) {
+    if (!feature(kFeatBuyback)) return refuse(u, "buyback is off in this match");
+    if (u.alive) return refuse(u, "you are alive");
+    if (now_ms < u.buyback_ready_ms) return refuse(u, std::format("buyback ready in {} s", (u.buyback_ready_ms - now_ms + 999) / 1000));
+    const std::int32_t cost = buyback_cost(u);
+    if (u.gold < cost) return refuse(u, std::format("buyback costs {} gold", cost));
+    u.gold -= cost;
+    u.buyback_ready_ms = now_ms + 300'000;
+    u.respawn_ms = now_ms;  // (the respawn happens this tick)
+}
+
+// Glyph: the team's structures cannot be damaged for 5 s; 5 min cooldown (shared by the team).
+void World::dota_glyph(Unit& u) {
+    if (!feature(kFeatGlyph)) return refuse(u, "the glyph is off in this match");
+    const std::size_t t = std::size_t(u.team) & 1;
+    if (now_ms < glyph_ready[t]) return refuse(u, std::format("glyph ready in {} s", (glyph_ready[t] - now_ms + 999) / 1000));
+    glyph_until[t] = now_ms + 5'000;
+    glyph_ready[t] = now_ms + 300'000;
+}
+
+// Talents: one of two bonuses at levels 10 / 15 / 20 / 25 (kDefaultTalents or the champion's own).
+void World::dota_talent(Unit& u, int tier, int side) {
+    if (!feature(kFeatTalents) || tier < 0 || tier > 3 || side < 0 || side > 1) return;
+    if (u.level < 10 + 5 * tier) return refuse(u, std::format("talent at level {}", 10 + 5 * tier));
+    if (u.talents[std::size_t(tier)]) return;
+    u.talents[std::size_t(tier)] = std::uint8_t(side + 1);
+    recompute_stats(u);
+}
+
+// Courier: bought away from the shop → it arrives after the courier's trip (it waits while the bag is full).
+void World::dota_courier_step(Unit& u) {
+    for (std::size_t i = 0; i < u.courier.size();) {
+        Unit::Delivery& dv = u.courier[i];
+        if (dv.at_ms > now_ms || !u.alive) {
+            ++i;
+            continue;
+        }
+        const ItemDef& d = kItems[std::size_t(dv.item)];
+        int slot = -1;
+        if (d.group == ItemGroup::Boots) slot = u.items[kBootsSlot] < 0 ? kBootsSlot : -1;
+        else if (d.group == ItemGroup::Special) slot = u.items[kSpecialSlot] < 0 ? kSpecialSlot : -1;
+        else
+            for (std::size_t s = 1; s <= 8 && slot < 0; ++s)
+                if (u.items[s] < 0) slot = int(s);
+        if (slot < 0) {  // full: try again in a second
+            dv.at_ms = now_ms + 1'000;
+            ++i;
+            continue;
+        }
+        u.items[std::size_t(slot)] = dv.item;
+        u.courier.erase(u.courier.begin() + std::ptrdiff_t(i));
+        recompute_stats(u);
+    }
+}
+
+// Neutral items: a jungle monster may drop one for its killer (tier by match time; a better tier replaces).
+void World::dota_neutral_drop(Unit& killer, const Unit&) {
+    if (!feature(kFeatNeutralItems) || killer.kind != UnitKind::Champion || random() % 100 >= 25) return;
+    const int tier = int(std::min<std::int64_t>(4, 1 + now_ms / 600'000));
+    std::vector<int> pick;
+    for (std::size_t i = 0; i < kNeutralItems.size(); ++i)
+        if (kNeutralItems[i].tier == tier) pick.push_back(int(i));
+    if (pick.empty()) return;
+    if (killer.neutral >= 0 && kNeutralItems[std::size_t(killer.neutral)].tier >= tier) return;
+    killer.neutral = std::int8_t(pick[random() % pick.size()]);
+    recompute_stats(killer);
+}
+
+// True sight: turrets (700) and units with true sight (wards / lanterns) of team t see invisible enemies near them.
+bool World::true_sighted(Team t, const Unit& u) const {
+    for (const Unit& o : units) {
+        if (!o.alive || o.team != t) continue;
+        const std::int64_t r = o.kind == UnitKind::Turret ? 700 : o.stats.true_sight;
+        if (r > 0 && dist2(o.ux(), o.uy(), u.ux(), u.uy()) <= r * r) return true;
+    }
+    return false;
 }
 
 }  // namespace em

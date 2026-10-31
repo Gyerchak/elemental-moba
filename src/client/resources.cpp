@@ -9,6 +9,7 @@
 #include <iterator>
 
 #include "game/content.hpp"
+#include "game/versions.hpp"
 
 namespace em {
 
@@ -19,9 +20,42 @@ Resources::~Resources() {
         if (t) SDL_DestroyTexture(t);
 }
 
-void Resources::init(SDL_Renderer* r, std::string pack) {
+void Resources::init(SDL_Renderer* r, std::string packs) {
     r_ = r;
-    pack_ = std::move(pack);
+    order_ = split_packs(packs);
+}
+
+std::vector<std::string> Resources::split_packs(const std::string& packs) {
+    std::vector<std::string> out;
+    std::string w;
+    for (char c : packs + ",") {
+        if (c == ',') {
+            while (!w.empty() && w.back() == ' ') w.pop_back();
+            if (!w.empty() && w != "default" && std::ranges::find(out, w) == out.end()) out.push_back(w);
+            w.clear();
+        } else if (!(c == ' ' && w.empty())) {
+            w += c;
+        }
+    }
+    return out;
+}
+
+// [U-478] where files are searched, strongest first: my packs in my order → the game version's own pack
+// (versions/<name>/pack) → the pack the version links → the map's pack [U-420] → default
+std::vector<std::string> Resources::search_dirs() const {
+    std::vector<std::string> d;
+    for (const std::string& p : order_) d.push_back((fs::path("resourcepacks") / p).string());
+    if (const std::string v = version_pack_dir(); !v.empty()) d.push_back(v);
+    if (!version_linked_pack().empty()) d.push_back((fs::path("resourcepacks") / version_linked_pack()).string());
+    d.push_back((fs::path("resourcepacks") / std::string(cur_map().pack)).string());
+    d.push_back((fs::path("resourcepacks") / "default").string());
+    return d;
+}
+
+std::string Resources::pack() const {
+    std::string k;
+    for (const std::string& d : search_dirs()) k += d + ";";
+    return k;
 }
 
 std::string Resources::champion_id(int champ) {
@@ -33,9 +67,8 @@ std::string Resources::champion_id(int champ) {
 }
 
 std::string Resources::find(const std::string& relative) const {
-    // my chosen pack → the map's own pack [U-420] → the default pack
-    for (const std::string& p : {pack_, std::string(cur_map().pack), std::string("default")}) {
-        const fs::path f = fs::path("resourcepacks") / p / relative;
+    for (const std::string& p : search_dirs()) {  // [U-478] the first pack that has the file wins
+        const fs::path f = fs::path(p) / relative;
         std::error_code ec;
         if (fs::exists(f, ec)) return f.string();
     }
@@ -53,9 +86,9 @@ std::vector<std::string> Resources::packs() const {
 
 std::vector<std::string> Resources::skins_of(int champ) const {
     std::vector<std::string> out;
-    for (const std::string& p : {pack_, std::string("default")}) {
+    for (const std::string& p : search_dirs()) {
         std::error_code ec;
-        for (const auto& e : fs::directory_iterator(fs::path("resourcepacks") / p / "champions" / champion_id(champ) / "skins", ec))
+        for (const auto& e : fs::directory_iterator(fs::path(p) / "champions" / champion_id(champ) / "skins", ec))
             if (e.is_directory() && std::ranges::find(out, e.path().filename().string()) == out.end())
                 out.push_back(e.path().filename().string());
     }
@@ -79,9 +112,9 @@ SDL_Texture* Resources::load_texture(const std::string& path) {
 // [U-257] an image may be .png (preferred, smaller) or .bmp — whatever the name asks for, both are tried
 std::string Resources::find_image(const std::string& relative) const {
     const std::string stem = relative.ends_with(".bmp") || relative.ends_with(".png") ? relative.substr(0, relative.size() - 4) : relative;
-    for (const std::string& p : {pack_, std::string(cur_map().pack), std::string("default")})  // [U-420] + the map's pack
+    for (const std::string& p : search_dirs())  // [U-420][U-478] in pack order
         for (const char* ext : {".png", ".bmp"}) {
-            const fs::path f = fs::path("resourcepacks") / p / (stem + ext);
+            const fs::path f = fs::path(p) / (stem + ext);
             std::error_code ec;
             if (fs::exists(f, ec)) return f.string();
         }

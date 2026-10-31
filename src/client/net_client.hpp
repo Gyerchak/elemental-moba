@@ -149,8 +149,9 @@ public:
     bool queue_mode = false;                // [U-423] the server matches players by queue (map + mode)
     std::string address;                    // [U-422] the server address I joined (for invites)
     std::uint16_t port = 0;
-    void send_lobby_config(int map_index, int rules, int game_mode);  // [U-422][U-454] owner only
+    void send_lobby_config(int map_index, int rules, int game_mode, int feats = -1);  // feats −1 = keep  // [U-422][U-454] owner only
     std::uint8_t mode = 0;                  // [U-454] the lobby's game mode
+    std::uint16_t features = 0;             // [U-478] the lobby's switched-on Feature bits
     void send_transfer_owner(std::uint8_t slot_id);
     void send_queue(bool on, int map_index, int rules);  // [U-423]
     void use_map(int index);

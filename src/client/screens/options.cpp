@@ -83,19 +83,37 @@ void App::options(bool in_game) {
             toggle(tr("Path lines (mine and allies')"), set_.show_paths);
             toggle(tr("Tree and bush models"), set_.tree_models);
             toggle(tr("Colourblind team colours"), set_.colourblind);
-            // resource packs [U-97][U-197]
-            text(ren_, x, y + 6, tr("Resource pack:"), {200, 200, 210});
-            float px = x + 160;
-            for (const std::string& p : res_.packs())
-                if (button(ren_, ui_, px, y, 150, 26, p, set_.resource_pack == p)) {
-                    set_.resource_pack = p;
-                    res_.init(ren_, p);
-                    changed = true;
-                    px += 156;
-                } else {
-                    px += 156;
+            // resource packs [U-97][U-197][U-478]: switch packs on, put them in order — like Minecraft, a file in a pack
+            // higher in the list wins; "default" (and the game version's / map's packs) are always under them
+            text(ren_, x, y + 6, tr("Resource packs (first = wins):"), {200, 200, 210});
+            y += 28;
+            {
+                std::vector<std::string> order = Resources::split_packs(set_.resource_pack);
+                bool edit = false;
+                for (std::size_t i = 0; i < order.size(); ++i) {  // the active packs, in order
+                    text(ren_, x + 10, y + 6, std::format("{}. {}", i + 1, order[i]), {230, 230, 160});
+                    if (i > 0 && button(ren_, ui_, x + 300, y, 30, 24, "^")) std::swap(order[i], order[i - 1]), edit = true;
+                    if (i + 1 < order.size() && button(ren_, ui_, x + 334, y, 30, 24, "v")) std::swap(order[i], order[i + 1]), edit = true;
+                    if (button(ren_, ui_, x + 368, y, 70, 24, tr("off"))) order.erase(order.begin() + std::ptrdiff_t(i)), edit = true;
+                    y += 28;
+                    if (edit) break;
                 }
-            y += 32;
+                float px = x + 10;
+                for (const std::string& p : res_.packs())  // the others: click to add (at the top)
+                    if (p != "default" && std::ranges::find(order, p) == order.end()) {
+                        if (!edit && button(ren_, ui_, px, y, 150, 24, "+ " + p)) order.insert(order.begin(), p), edit = true;
+                        px += 156;
+                    }
+                text(ren_, px + 4, y + 5, tr("then: version pack, map pack, default"), {140, 140, 160});
+                y += 30;
+                if (edit) {
+                    std::string s;
+                    for (const std::string& p : order) s += (s.empty() ? "" : ",") + p;
+                    set_.resource_pack = s.empty() ? "default" : s;
+                    res_.init(ren_, set_.resource_pack);
+                    changed = true;
+                }
+            }
             break;
         }
         case 3: {  // sound [U-201]

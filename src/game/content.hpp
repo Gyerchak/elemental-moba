@@ -202,6 +202,7 @@ struct SkillDef {
     bool arcane = false;     // [U-464] non-elemental MAGIC (arcane power); physical sub = martial; else elemental
     bool aa_reset = false;   // [U-465] using it resets the autoattack timer (rare)
     std::int16_t ap = 0;     // [U-475] damage + this % of ability power (LoL)
+    std::int16_t scepter_dmg_pct = 0, scepter_cd_pct = 0;  // [U-478] a scepter on an ultimate: +damage %, −cooldown % (0 = 30 / 20)
     std::uint8_t dispel = 0; // [U-476] Dota: 1 = basic dispel (soft debuffs off the caster, buffs off enemies hit), 2 = strong (stuns too)
     bool pass_units = false; // [U-471] a dash goes through units (walls: through_walls — it jumps over them)
     // [U-468] numbers the skill gives while it is learned (its own passive): stat + value at rank 1 + per rank
@@ -325,6 +326,8 @@ struct ChampionDef {
     // points at level 1 and gain per level, hundredths of a point (Dota numbers 1:1, e.g. 2.8 per level = 280)
     std::uint8_t attr = 0;
     std::int32_t str = 0, agi = 0, intel = 0, str_lvl = 0, agi_lvl = 0, int_lvl = 0;
+    // [U-478] own talents (feature Talents) at levels 10 / 15 / 20 / 25, left / right; key Count = the default one
+    std::array<std::array<SkillDef::Learned, 2>, 4> talents{};
     std::uint32_t colour = 0xffffff;
     Role role = Role::Mage;                             // [U-180]
     bool auto_projectile = true;                        // [U-186] ranged autos fly as projectiles (melee: never)
@@ -339,6 +342,18 @@ struct ChampionDef {
     Element awaken_element = Element::None;
     std::array<std::string_view, 4> awaken_skills{};           // [U-270] this champion's Q options (names); empty = every Q of its element
 };
+
+// [U-478] feature Talents: the default choice at levels 10 / 15 / 20 / 25 (left / right), Claude ideas
+inline constexpr std::array<std::array<SkillDef::Learned, 2>, 4> kDefaultTalents = {{
+    {{{StatKey::Attack, 2'000, 0}, {StatKey::ElementalPower, 3'000, 0}}},
+    {{{StatKey::SkillPower, 800, 0}, {StatKey::Tenacity, 1'500, 0}}},
+    {{{StatKey::Health, 25'000, 0}, {StatKey::MoveSpeed, 2'500, 0}}},
+    {{{StatKey::AttackSpeed, 3'500, 0}, {StatKey::ElementalHaste, 2'500, 0}}},
+}};
+[[nodiscard]] inline const SkillDef::Learned& talent_of(const ChampionDef& c, int tier, int side) {
+    const SkillDef::Learned& t = c.talents[std::size_t(tier)][std::size_t(side)];
+    return t.key != StatKey::Count ? t : kDefaultTalents[std::size_t(tier)][std::size_t(side)];
+}
 
 [[nodiscard]] std::span<const ChampionDef> champions();
 

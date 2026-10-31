@@ -16,7 +16,7 @@
 
 namespace em::net {
 
-inline constexpr std::uint16_t kProtocol = 15;  // 15: LoL AP / magic pen, Dota attributes + statuses [U-474..U-476]  // 14: crits, skill powers, sweet spots + shapes [U-461..U-471]  // 13: cast stages, chains, skill visuals, proc + recast timers [U-456..U-459]  // 12: maps, lobby owner / queue, charges [U-420..U-433]  // 11: rule sets, own emotes [U-414][U-416]  // 7: ten item slots [U-322]; 8: cast sources [U-340]; 9: camps, jungle buffs [U-364..U-366]; 10: bounties, companions [U-407][U-413]
+inline constexpr std::uint16_t kProtocol = 16;  // 16: switchable Dota features, version mods [U-478]  // 15: LoL AP / magic pen, Dota attributes + statuses [U-474..U-476]  // 14: crits, skill powers, sweet spots + shapes [U-461..U-471]  // 13: cast stages, chains, skill visuals, proc + recast timers [U-456..U-459]  // 12: maps, lobby owner / queue, charges [U-420..U-433]  // 11: rule sets, own emotes [U-414][U-416]  // 7: ten item slots [U-322]; 8: cast sources [U-340]; 9: camps, jungle buffs [U-364..U-366]; 10: bounties, companions [U-407][U-413]
 inline constexpr std::string_view kVersion = "official-0.1";  // [U-95][X-14]
 inline constexpr std::uint16_t kDefaultPort = 7777;
 inline constexpr int kMaxPlayers = 32;  // [U-09]
@@ -371,6 +371,11 @@ struct NetMe {
     std::uint8_t uses, pad6[3];
     // [U-475][U-476] LoL ability power / magic pen; Dota attributes, magic resistance, evasion, HP regen
     std::int32_t ap, mpen, mpen_pct, str, agi, intel, mres, eva, hp_regen;
+    // [U-478] switchable features: buyback, glyph (my team), courier, neutral item, talents
+    std::int32_t buyback_cost, buyback_left_ms, glyph_left_ms, glyph_active_ms, courier_left_ms;
+    std::uint8_t courier_n, talents[4], level;
+    std::int8_t neutral;
+    std::uint8_t pad8;
 };
 
 // [U-407] a travel companion on its way (or carrying its rider home)

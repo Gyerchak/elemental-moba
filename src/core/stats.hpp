@@ -77,6 +77,7 @@ struct Stats {
     std::int32_t hp_regen = 0, mana_regen = 0, magic_resist = 0, evasion = 0;
     std::int32_t bash_chance = 0, bash_ms = 0, bash_dmg = 0, damage_block = 0, block_chance = 0, true_strike = 0, mana_break = 0;
     std::int32_t heal_amp = 0;
+    std::int32_t true_sight = 0;  // [U-478] sees invisible enemies within this radius (units)
     // [U-463] critical strikes (autoattacks of champions that can crit: ChampionDef::crits), 100 = 1 %
     std::int32_t crit_chance = 0, crit_damage = 17'500;  // 0 % / 175 % of the hit
     // [U-464] skill power by kind of skill, % more skill damage (100 = 1 %), on top of elemental power:

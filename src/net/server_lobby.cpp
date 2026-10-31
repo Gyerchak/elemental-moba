@@ -26,13 +26,19 @@ void Server::receive(int pid, Reader& r) {
         case Msg::EmoteUpload: on_emote(p, r); break;  // [U-414]
         case Msg::LobbyConfig: {  // [U-422] the owner chooses the map + rule set (before the match; not in queue mode)
             const std::uint8_t m = r.get<std::uint8_t>(), rs = r.get<std::uint8_t>(), md = r.get<std::uint8_t>();
+            const std::uint16_t ft = r.get<std::uint16_t>();  // [U-478]
             if (r.bad() || world_ || cfg_.queue_mode || pid != owner_) break;
+            const bool new_map = std::clamp<int>(m, 0, int(maps().size()) - 1) != cfg_.map;
             cfg_.map = std::clamp<int>(m, 0, int(maps().size()) - 1);
             cfg_.ruleset = std::uint8_t(std::min<int>(rs, 2));
             cfg_.mode = std::uint8_t(std::min<int>(md, int(GameMode::Count) - 1));  // [U-454]
             set_map(cfg_.map);
-            send_chat(Chat::System, "server", std::format("Map: {} — mode: {} — systems: {}", cur_map().name, kGameModeNames[cfg_.mode],
-                                                          kRuleSetNames[cfg_.ruleset]), nullptr, nullptr);
+            cfg_.features = new_map ? cur_map().features : std::uint16_t(ft & ((1u << kFeatureCount) - 1));  // a new map: its defaults
+            std::string fs;
+            for (int f = 0; f < kFeatureCount; ++f)
+                if (cfg_.features & (1u << f)) fs += (fs.empty() ? "" : ", ") + std::string(kFeatureNames[f]);
+            send_chat(Chat::System, "server", std::format("Map: {} — mode: {} — systems: {} — features: {}", cur_map().name, kGameModeNames[cfg_.mode],
+                                                          kRuleSetNames[cfg_.ruleset], fs.empty() ? "none" : fs), nullptr, nullptr);
             send_lobby();
             break;
         }
@@ -346,6 +352,7 @@ void Server::try_pop_queue() {
         cfg_.map = a.slot.q_map;
         cfg_.mode = std::uint8_t(std::min<int>(a.slot.q_rules, int(GameMode::Count) - 1));  // [U-454] the queue is map + game mode
         set_map(cfg_.map);
+        cfg_.features = cur_map().features;  // [U-478] a queue match: the map's default features
         std::shuffle(same.begin(), same.end(), std::mt19937{std::random_device{}()});  // random teams
         for (Player& p : players_) p.slot.plays = false;
         for (std::size_t i = 0; i < same.size(); ++i) {
@@ -399,6 +406,7 @@ void Server::send_lobby() {
         w.put<std::uint16_t>(std::uint16_t(lobby_deadline_ms_ < 0 ? 0 : std::max<std::int64_t>(1, (lobby_deadline_ms_ - wall_ms()) / 1000)));  // [U-276]
         w.put<std::uint8_t>(std::uint8_t(cfg_.map)), w.put(cfg_.ruleset), w.put<std::uint8_t>(cfg_.queue_mode);  // [U-420][U-422][U-423]
         w.put(cfg_.mode);  // [U-454]
+        w.put<std::uint16_t>(cfg_.features);  // [U-478]
         return w;
     };
     if (!blind) {

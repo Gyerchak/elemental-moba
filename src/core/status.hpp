@@ -36,6 +36,7 @@ enum class StatusKind : std::uint8_t {
     Hex,       // [U-476] Dota 2: turned into a critter — no skills, no autoattacks, very slow (can still walk)
     Break,     // [U-476] Dota 2: passives off (champion passives, procs, skills' own passives)
     DebuffImmune,  // [U-476] Dota 2 (debuff immunity): no new crowd control / debuffs land
+    Invisible,     // [U-478] feature Invisibility: enemies do not see it, except with true sight; attacking / casting ends it
     Count
 };
 

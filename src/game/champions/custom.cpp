@@ -34,7 +34,7 @@ constexpr std::string_view kZones[] = {"Auto", "Centre", "Edge", "Tip"};        
 constexpr std::string_view kSubs[] = {"Water", "Ice", "Wood", "Blood", "Mud", "Steam", "Air", "Earth", "Lava", "Metal", "EarthArmor",
                                       "MetalArmor", "Fire", "BlueFire", "Lightning", "Combustion", "Physical"};
 constexpr std::string_view kStatuses[] = {"Stun", "Root", "Slow", "Silence", "Mute", "Airborne", "Frozen", "Blind", "Burn", "Shield",
-                                          "Haste", "Flying", "Bloodbound", "Channel", "Swimming", "WaterRide", "Redirect", "Wet", "Grievous", "Fear", "Disarm", "Subdue", "Hex", "Break", "DebuffImmune", "None"};
+                                          "Haste", "Flying", "Bloodbound", "Channel", "Swimming", "WaterRide", "Redirect", "Wet", "Grievous", "Fear", "Disarm", "Subdue", "Hex", "Break", "DebuffImmune", "Invisible", "None"};
 // [U-474] "ChiBlock" = the chi block status (its wire / enum name is Mute)
 int status_index(std::string_view v);
 constexpr std::string_view kElements[] = {"Water", "Earth", "Fire", "Air", "None"};
@@ -207,6 +207,19 @@ std::string parse_text(const std::string& text, ChampionDef& out) {
             out.range = v == "Ranged" ? Range::Ranged : Range::Melee;
         } else if (k == "mage") {
             out.mage = v == "1" || v == "yes";
+        } else if (k.starts_with("talent") && k.size() > 8) {  // [U-478] talent1.left.attack = 25 (tiers 1-4 = levels 10/15/20/25)
+            const int tier = k[6] - '1';
+            const std::string rest = k.substr(8);
+            const bool left = rest.starts_with("left."), right = rest.starts_with("right.");
+            if (tier < 0 || tier > 3 || k[7] != '.' || (!left && !right)) return std::format("line {}: write talent<1-4>.<left|right>.<stat> = value", n);
+            const std::string stat = rest.substr(left ? 5 : 6);
+            int key = -1;
+            for (int i = 0; i < int(StatKey::Count); ++i)
+                if (stat == kStatKeyNames[i]) key = i;
+            if (key < 0) return std::format("line {}: unknown stat '{}'", n, stat);
+            SkillDef::Learned& t = out.talents[std::size_t(tier)][left ? 0 : 1];
+            t.key = StatKey(key);
+            ok = number(t.base, 1);
         } else if (k == "attr") {  // [U-476] Dota 2 primary attribute
             constexpr std::string_view kAttrs[] = {"None", "Strength", "Agility", "Intelligence", "Universal"};
             const int e = enum_of(kAttrs, v);
@@ -389,6 +402,8 @@ std::string parse_text(const std::string& text, ChampionDef& out) {
             }
             else if (f == "inner") ok = num(sk.inner, 0, 2'000);
             else if (f == "ap") ok = num(sk.ap, 0, 1'000);        // [U-475] % of ability power
+            else if (f == "scepter_dmg_pct") ok = num(sk.scepter_dmg_pct, 0, 500);  // [U-478]
+            else if (f == "scepter_cd_pct") ok = num(sk.scepter_cd_pct, 0, 90);
             else if (f == "dispel") ok = num(sk.dispel, 0, 2);   // [U-476] 1 basic, 2 strong
             else if (f == "sweet_size") ok = num(sk.sweet_size, 0, 100);
             else if (f == "tether_ms") ok = num(sk.tether_ms, 0, 10'000);  // [U-456] chains

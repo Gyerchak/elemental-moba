@@ -1,0 +1,8 @@
+# [U-478] Own game version: official-0.1 + the League of Legends content mod.
+# Pick it in Menu → Version. Practice / hosting then run it; joining players with this folder switch to it.
+# Its assets come WITH it: versions/lol-mod/pack/ is a resource pack used only while this version is active
+# (icons/items/arcane_codex.png …). Your own resource packs still come first (Options → Graphics).
+description = LoL mod: ability power + magic penetration items (Arcane Codex, Hollow Wand, Void Lens)
+base = official-0.1
+
+mods = lol                 # items with .mod = "lol" exist only here

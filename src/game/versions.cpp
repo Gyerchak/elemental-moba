@@ -15,6 +15,8 @@ namespace fs = std::filesystem;
 
 namespace {
 std::string g_current = kOfficialVersion;
+std::vector<std::string> g_mods;  // [U-478]
+std::string g_linked_pack;
 
 std::string trim(std::string s) {
     while (!s.empty() && (s.back() == ' ' || s.back() == '\t' || s.back() == '\r')) s.pop_back();
@@ -64,6 +66,14 @@ bool set_skill(SkillDef& s, const std::string& key, std::int32_t v) {
 }  // namespace
 
 const std::string& current_version() { return g_current; }
+bool mod_enabled(std::string_view mod) { return std::ranges::find(g_mods, mod) != g_mods.end(); }
+std::string version_pack_dir() {
+    if (g_current == kOfficialVersion) return {};
+    const fs::path p = fs::path("versions") / g_current / "pack";
+    std::error_code ec;
+    return fs::is_directory(p, ec) ? p.string() : std::string{};
+}
+const std::string& version_linked_pack() { return g_linked_pack; }
 
 std::vector<std::string> list_versions() {
     std::vector<std::string> out{kOfficialVersion};
@@ -92,6 +102,7 @@ std::string version_description(const std::string& name) {
 std::string apply_version(const std::string& name, int* changes) {
     restore_official_numbers();
     g_current = kOfficialVersion;
+    g_mods.clear(), g_linked_pack.clear();  // [U-478]
     if (changes) *changes = 0;
     if (name == kOfficialVersion) return {};
     std::ifstream in(fs::path("versions") / name / "version.txt");
@@ -110,6 +121,22 @@ std::string apply_version(const std::string& name, int* changes) {
         }
         const std::string k = trim(line.substr(0, eq)), v = trim(line.substr(eq + 1));
         if (k == "description" || k == "base") continue;
+        if (k == "mods") {  // [U-478] mods = lol, other
+            std::string w;
+            for (char ch : v + " ") {
+                if (ch == ' ' || ch == ',') {
+                    if (!w.empty()) g_mods.push_back(w), ++n;
+                    w.clear();
+                } else {
+                    w += ch;
+                }
+            }
+            continue;
+        }
+        if (k == "resource_pack") {
+            g_linked_pack = v;
+            continue;
+        }
         // "champion.<name>.<key>" / "skill.<name>.<key>" (names may contain spaces, not dots)
         const auto d1 = k.find('.'), d2 = k.rfind('.');
         if (d1 == std::string::npos || d1 == d2) {
@@ -144,6 +171,7 @@ std::string apply_version(const std::string& name, int* changes) {
     }
     if (!error.empty()) {
         restore_official_numbers();
+        g_mods.clear(), g_linked_pack.clear();
         return error;
     }
     g_current = name;

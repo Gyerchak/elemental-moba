@@ -95,6 +95,7 @@ private:
     void custom_champions();
     void interactions();  // [U-397]
     int queue_map_ = 0, queue_rules_ = 0;  // [U-423] my queue choice
+    bool features_open_ = false;           // [U-478] the lobby's feature list is shown
     float info_scroll_ = 0;
     std::string setup_champ_search_;  // [U-432]
     SavedSetup match_setup_;           // [U-432] champion select: the loadout being tweaked for this match only

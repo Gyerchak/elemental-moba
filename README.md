@@ -25,7 +25,8 @@ Search everything outside the plan: `grep -rn "\[X-" .`
 | `ENGINE-EXTRAS.md`       | Everything added outside the plan `[X-xx]`.           |
 | `OPEN-QUESTIONS.md`      | Unclear points `[?-xx]` + the assumption used.        |
 | `PLAN.md`                | Milestones M0…M22, every task tagged U / X.           |
-| `docs/champion-file.md`  | Build own champions: keys, shapes, sweet spots, standard skills, stats, LoL / Dota 2 / own mechanics. |
+| `docs/champion-file.md`  | Build own champions: keys, shapes, sweet spots, standard skills, stats, LoL / Dota 2 / own mechanics, switchable features, version mods, resource pack order. |
+| `versions/`              | Game versions (balance changes, mods + their own assets): `balance-test`, `lol-mod`. |
 | `docs/INTERACTIONS.md`   | Every element / terrain interaction (generated).      |
 | `docs/map-layout.md`     | Default map: zones, coordinates, symmetry.            |
 | `docs/time-and-sky.md`   | Day/night, moon, eclipses, comet — exact timings.     |

@@ -33,7 +33,10 @@ struct Sound {
 class Resources {
 public:
     ~Resources();
-    void init(SDL_Renderer* r, std::string pack);
+    // [U-478] packs in ORDER, comma-separated ("my_pack,hubert-test"): like Minecraft, a file in an earlier pack wins;
+    // then the game version's own pack, then the map's pack, then "default".
+    void init(SDL_Renderer* r, std::string packs);
+    [[nodiscard]] static std::vector<std::string> split_packs(const std::string& packs);
     [[nodiscard]] std::vector<std::string> packs() const;          // folders in resourcepacks/
     [[nodiscard]] std::vector<std::string> skins_of(int champ) const;  // skin folders of a champion
     SDL_Texture* champion_icon(int champ, const std::string& skin);
@@ -49,7 +52,7 @@ public:
     const Sound* sound(const std::string& name);  // "sounds/<name>.wav"
     const Sound* music(const std::string& name);  // "music/<name>.wav"
     [[nodiscard]] static std::string champion_id(int champ);
-    [[nodiscard]] const std::string& pack() const { return pack_; }
+    [[nodiscard]] std::string pack() const;  // the whole search order as one key (sprite cache)
 
 private:
     [[nodiscard]] std::string find(const std::string& relative) const;  // pack first, then default
@@ -57,7 +60,8 @@ private:
     SDL_Texture* load_texture(const std::string& path);
     const Sound* load_sound(const std::string& path);
     SDL_Renderer* r_ = nullptr;
-    std::string pack_ = "default";
+    std::vector<std::string> order_;  // [U-478] the chosen packs, first = strongest
+    [[nodiscard]] std::vector<std::string> search_dirs() const;  // full paths, in order
     std::map<std::string, SDL_Texture*> textures_;
     std::map<std::string, std::unique_ptr<Sound>> sounds_;
 };

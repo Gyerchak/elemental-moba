@@ -125,6 +125,7 @@ void World::cast_skill(Unit& u, Slot slot, std::int32_t tx, std::int32_t ty, std
     const std::int32_t rk = std::max<std::int32_t>(1, u.ab[std::size_t(slot)].rank) - 1;  // [U-470] ranks above 1
     const std::int32_t cc_ms = d.cc_ms + d.cc_ms_rank * rk, cc_val = d.cc_val + d.cc_val_rank * rk;
     const std::int32_t dur_ms = std::int32_t(std::int64_t(d.dur_ms + d.dur_ms_rank * rk) * (dot_skill ? r.dot_pct : r.dur_pct) / 100);
+    reveal(u);  // [U-478] casting ends invisibility
     if (d.aa_reset) u.attack_ready_ms = std::min(u.attack_ready_ms, now_ms);  // [U-465]
     if (d.dispel) dota_dispel(u, d.dispel >= 2, true);  // [U-476] the caster is cleaned
     // [U-184] aim: at the cursor (normal) or where the champion faces

@@ -53,6 +53,7 @@ struct ServerConfig {
     bool force_server_textures = false;   // [U-102]
     bool allow_custom_champions = true;   // [U-210][U-277] own champions; their files are sent to every player who joins
     bool players_are_bots = false;        // test / autoplay: bots drive the human slots too
+    std::uint16_t features = 0;           // [U-478] switched-on Feature bits (the map's default; the lobby owner changes them)
     std::uint8_t ruleset = 0;             // [U-416][U-454] RuleSet: 0 all systems, 1 only LoL-like, 2 only Dota-like
     std::uint8_t mode = 0;                // [U-454] GameMode: 0 Classic, 1 Blind Pick, 2 All Random
     int map = 0;                          // [U-420] index in maps(); the lobby owner may change it before the match

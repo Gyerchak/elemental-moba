@@ -572,6 +572,36 @@ void GameView::draw_bottom_panel(NetClient& net, double now_s, Ui& ui) {
     if (icon_button(ui, bx + 42, y0 + 86, 38, set_.quick_cast_all ? "QC on" : "QC off", key_name(Action::QuickCastAll), set_.quick_cast_all))  // [U-447]
         on_action(Action::QuickCastAll, false, net);
 
+    // [U-478] switchable features (only when this match has them)
+    if (net.features & kFeatGlyph) {
+        const std::string gl = me.glyph_active_ms > 0 ? std::format("{:.0f}s", me.glyph_active_ms / 1000.0)
+                             : me.glyph_left_ms > 0  ? std::format("{}s", (me.glyph_left_ms + 999) / 1000) : "";
+        if (icon_button(ui, bx + 84, y0 + 6, 38, "GLYPH", gl, me.glyph_active_ms > 0) && me.glyph_left_ms == 0) net.send_cmd({.kind = CmdKind::Glyph});
+    }
+    {
+        float ly = above - 16;
+        if ((net.features & kFeatCourier) && me.courier_n > 0)
+            text(r_, ix, ly, std::format("{}: {} {}, {} {} s", tr("Courier"), me.courier_n, tr("items"), tr("next in"), (me.courier_left_ms + 999) / 1000), {200, 230, 255}), ly -= 14;
+        if ((net.features & kFeatNeutralItems) && me.neutral >= 0 && me.neutral < int(kNeutralItems.size()))
+            text(r_, ix, ly, std::format("{}: {} (T{})", tr("Neutral"), kNeutralItems[std::size_t(me.neutral)].item.name, kNeutralItems[std::size_t(me.neutral)].tier), {190, 230, 160});
+    }
+    if ((net.features & kFeatTalents)) {  // a talent to choose: two buttons above the skills
+        const auto rit = net.roster.find(net.my_unit);
+        if (rit != net.roster.end())
+            for (int t = 0; t < 4; ++t)
+                if (me.level >= 10 + 5 * t && me.talents[t] == 0) {
+                    const ChampionDef& cdef = champions()[std::size_t(rit->second.champ)];
+                    const float tx = kx, ty = above - 92;
+                    fill_rect(r_, tx - 4, ty - 18, 420, 46, {10, 10, 18, 220});
+                    text(r_, tx, ty - 14, std::format("{} {}:", tr("Talent at level"), 10 + 5 * t), {255, 220, 120});
+                    for (int side = 0; side < 2; ++side) {
+                        const SkillDef::Learned& l = talent_of(cdef, t, side);
+                        const std::string lab = std::format("+{} {}", l.base / 100, kStatKeyNames[int(l.key)]);
+                        if (button(r_, ui, tx + float(side) * 206, ty, 200, 24, lab)) net.send_cmd({.kind = CmdKind::Talent, .slot = std::uint8_t(t * 2 + side)});
+                    }
+                    break;  // one at a time
+                }
+    }
     if (hover_slot >= 0) draw_skill_tooltip(net, hover_slot, kx + float(hover_slot) * sp, above - 54, alt, hover_plus);  // [U-238]
 }
 

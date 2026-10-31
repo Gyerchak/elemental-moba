@@ -130,4 +130,25 @@ level 1) and `strength_per_level agility_per_level intelligence_per_level` (deci
 Already in the engine before (shared by both games): denies, lifesteal / spellvamp (Dota "spell lifesteal"),
 tenacity (Dota "status resistance"), skill power (Dota "spell amplification"), skill range (cast range), haste
 (cooldown reduction), splash autoattacks (cleave), crits, turn rate, day / night vision.
-Not yet: buyback, courier, neutral items, Aghanim upgrades, talents, invisibility + true sight, glyph.
+### Switchable features (all OFF by default — a map's `features`, or the lobby owner: Lobby → Features)
+
+| Feature | Rule |
+|---|---|
+| Buyback | dead: pay 200 + 40 × level gold to come back at once; 5 min cooldown |
+| Courier | buy anywhere: the item arrives after the courier's trip from the fountain (600 units / s) |
+| Neutral items | jungle monsters may drop one (25 %), tier = 1 + minutes / 10 (max 4); one neutral slot |
+| Scepter upgrades | item Sage Scepter upgrades the ultimate: +30 % damage, −20 % cooldown, +15 % size (`scepter_dmg_pct`, `scepter_cd_pct`) |
+| Talents | levels 10 / 15 / 20 / 25: pick one of two bonuses (own: `talent1.left.attack = 25` … `talent4.right.<stat>`) |
+| Invisibility | item Shade Blade: invisible 10 s (attacking / casting ends it); true sight: turrets (700), Sentry Lantern (900) |
+| Glyph | the team's structures cannot be damaged for 5 s; 5 min cooldown |
+
+## 8. Game versions with mods (`versions/<name>/version.txt`)
+
+`mods = lol` switches on content that exists only in that version (items with `.mod = "lol"`: Arcane Codex,
+Hollow Wand, Void Lens → version `lol-mod`). The version's own assets live in `versions/<name>/pack/` (a resource
+pack used only while the version is active); `resource_pack = <name>` links a pack from `resourcepacks/` too.
+
+## 9. Resource packs in order (Options → Graphics)
+
+Switch packs on and order them (^ / v). Like Minecraft: for the same file, the pack HIGHER in the list wins. After
+your packs come the game version's pack, the map's pack and `default`.
