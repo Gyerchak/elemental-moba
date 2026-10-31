@@ -86,6 +86,29 @@ std::vector<std::string> item_lines(const ItemDef& d) {
     if (d.active == ItemActive::LotusTile) L.push_back(tr("Active: +40 cast speed for 5 s. Cooldown 60 s."));
     if (d.active == ItemActive::SpiritFlask)
         L.push_back(tr("Active: 60 s strong healing + you cannot die; if you would, 3 s down, then 5 × 5 % max HP. Cooldown 6 min."));
+    // [U-416..U-482] the newer numbers: vamp, crits, powers, on-hit, ANY stat by name (flat or +%)
+    add(d.lifesteal, "lifesteal", "", true);
+    add(d.omnivamp, "omnivamp", "", true);
+    add(d.spellvamp, "spellvamp", "", true);
+    add(d.grievous_on_hit, "grievous wounds on hit (less healing)", "", true);
+    add(d.crit_chance, "crit chance (champions that crit)", "", true);
+    add(d.crit_damage, "crit damage", "", true);
+    add(d.arcane_power, "arcane skill damage", "", true);
+    add(d.martial_power, "martial skill damage", "", true);
+    add(d.skill_amp, "skill damage (all)", "", true);
+    add(d.on_hit_dmg, "on-hit damage", "");
+    add(d.on_hit_max_hp, "on-hit % of the target's max HP", "", true);
+    for (const ItemDef::More& m : d.more) {
+        if (m.key == StatKey::Count) continue;
+        std::string nm(kStatKeyNames[int(m.key)]);
+        std::ranges::replace(nm, '_', ' ');
+        L.push_back(m.pct ? std::format("+{:g}% {}", m.value / 100.0, nm) : std::format("{:+g} {}", m.value / 100.0, nm));
+    }
+    if (d.scepter) L.push_back(tr("Upgrades your ultimate: +30% damage, -20% cooldown, +15% size."));
+    if (d.true_sight) L.push_back(std::format("{} {}", tr("True sight: sees invisible enemies within"), d.true_sight));
+    if (d.active == ItemActive::Shadow) L.push_back(tr("Active: invisible for 10 s, +20% speed (attacking or casting ends it). Cooldown 25 s."));
+    if (d.feature) L.push_back(tr("Only in matches with its feature switched on."));
+    if (!d.mod.empty()) L.push_back(std::format("{} '{}'", tr("Mod item: only in game versions with the mod"), d.mod));
     if (d.limit == BuyLimit::One || d.unique) L.push_back(tr("Limit: only one."));
     if (d.limit == BuyLimit::OnePerGroup) L.push_back(tr("Limit: one item of this kind (e.g. one pair of boots)."));
     return L;

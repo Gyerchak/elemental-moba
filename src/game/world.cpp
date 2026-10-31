@@ -271,7 +271,7 @@ ResolvedAbility World::resolved(const Unit& u, Slot s) const {
     }
     const int extra = has_passive(u, PassiveId::MistForm) ? 10 : 0;
     // [U-464] skill power for every skill + the power of its kind (arcane / martial); elemental = elemental power
-    b.power_pct += (u.stats.skill_power + (d->arcane ? u.stats.arcane_power : skill_sub(u, *d) == SubElement::Physical ? u.stats.martial_power : 0)) / 100;
+    b.power_pct += (u.stats.skill_amp + (d->arcane ? u.stats.arcane_power : skill_sub(u, *d) == SubElement::Physical ? u.stats.martial_power : 0)) / 100;
     const std::uint32_t rank = std::max<std::uint32_t>(1, u.ab[std::size_t(s)].rank);
     return resolve(to_ability(*d, s), ScaleCtx{.stats = u.stats, .rank = rank, .level = std::uint32_t(u.level),
                                                .power_pct = b.power_pct, .size_pct = b.size_pct + extra,
@@ -495,15 +495,28 @@ void World::recompute_stats(Unit& u) {
     for (std::size_t sl = 0; sl < u.skill.size() && !u.st.has(StatusKind::Break); ++sl)  // [U-468] learned skills' own passives ([U-476] not under Break)
         if (const SkillDef* k = u.skill[sl]; k && (sl == 0 || u.ab[sl].rank > 0))
             for (const SkillDef::Learned& l : k->learned)
-                if (l.key != StatKey::Count) add_stat(s, l.key, l.base + l.per_rank * (std::max<std::int32_t>(1, u.ab[sl].rank) - 1));
+                if (l.key != StatKey::Count && !l.pct) add_stat(s, l.key, l.base + l.per_rank * (std::max<std::int32_t>(1, u.ab[sl].rank) - 1));
     apply_loadout(s, u.loadout);                                   // [U-177] runes + specialisation
     dota_attributes(s, u, d);                                      // [U-476] Strength / Agility / Intelligence
+    lol_modified_power(s, d);                                      // [U-482] skill power (non-mages) / magic power (mages)
+    // [U-482] "+x %" bonuses LAST (of the stat after every flat bonus): items, the neutral item, learned skills, talents
+    for (std::int16_t it : u.items)
+        if (it >= 0) item_pct_bonuses(s, kItems[std::size_t(it)]);
+    if (feature(kFeatNeutralItems) && u.neutral >= 0) item_pct_bonuses(s, kNeutralItems[std::size_t(u.neutral)].item);
+    for (std::size_t sl = 0; sl < u.skill.size() && !u.st.has(StatusKind::Break); ++sl)
+        if (const SkillDef* k = u.skill[sl]; k && (sl == 0 || u.ab[sl].rank > 0))
+            for (const SkillDef::Learned& l : k->learned)
+                if (l.key != StatKey::Count && l.pct) add_stat_pct(s, l.key, l.base + l.per_rank * (std::max<std::int32_t>(1, u.ab[sl].rank) - 1));
+    if (feature(kFeatTalents))
+        for (int t = 0; t < 4; ++t)
+            if (u.talents[std::size_t(t)])
+                if (const SkillDef::Learned& l = talent_of(d, t, u.talents[std::size_t(t)] - 1); l.pct) add_stat_pct(s, l.key, l.base);
     // [U-478] switchable features: talents, the neutral item, a scepter
     if (feature(kFeatTalents))
         for (int t = 0; t < 4; ++t)
             if (u.talents[std::size_t(t)]) {
                 const SkillDef::Learned& l = talent_of(d, t, u.talents[std::size_t(t)] - 1);
-                add_stat(s, l.key, l.base);
+                if (!l.pct) add_stat(s, l.key, l.base);
             }
     if (feature(kFeatNeutralItems) && u.neutral >= 0) add_item(s, kNeutralItems[std::size_t(u.neutral)].item);
     u.scepter = false;

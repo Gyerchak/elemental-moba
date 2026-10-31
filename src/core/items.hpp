@@ -22,6 +22,7 @@ inline constexpr int kSpecialSlot = 0, kBootsSlot = 9;
 using Bag = std::array<std::int16_t, kItemSlots>;
 
 // (kNeutralItems: see the end of this file)
+// [U-482] items can give "+30 % of a stat" (ItemDef::More{key, 3000, true}) — any stat, by name
 // [U-478] the Feature bits items may need (same values as game/world.hpp Feature)
 inline constexpr std::uint16_t kFeatScepterBit = 8, kFeatInvisBit = 32;
 
@@ -51,10 +52,10 @@ struct ItemDef {
     std::int32_t lifesteal = 0, omnivamp = 0, grievous_on_hit = 0;
     bool classic_only = false;
     std::int32_t crit_chance = 0, crit_damage = 0;                     // [U-463]
-    std::int32_t arcane_power = 0, martial_power = 0, skill_power = 0;  // [U-464] % more skill damage by kind
+    std::int32_t arcane_power = 0, martial_power = 0, skill_amp = 0;  // [U-464] % more skill damage by kind
     std::int32_t spellvamp = 0, on_hit_dmg = 0, on_hit_max_hp = 0;     // [U-473]
     // [U-476] ANY stat by name (StatKey) — new stats need no new item fields
-    struct More { StatKey key = StatKey::Count; std::int32_t value = 0; };
+    struct More { StatKey key = StatKey::Count; std::int32_t value = 0; bool pct = false; };  // [U-482] pct: value 100 = +1 % of the stat
     std::array<More, 4> more{};
     // [U-478] only when switched on: `feature` = Feature bits the match must have; `mod` = a game-version mod
     // (versions/<name>/version.txt: mods = lol) — e.g. the LoL items exist only in that modified version
@@ -152,13 +153,16 @@ inline constexpr std::array kItems = {
             .crit_chance = 2'500, .crit_damage = 4'000},
     ItemDef{.name = "Rune Focus", .cost = 1'100, .health = 6'000, .arcane_power = 1'200},
     ItemDef{.name = "War Manual", .cost = 1'100, .attack = 800, .martial_power = 1'200},
-    ItemDef{.name = "Prism Core", .cost = 2'400, .elemental_power = 2'500, .limit = BuyLimit::One, .skill_power = 800},
+    ItemDef{.name = "Prism Core", .cost = 2'400, .elemental_power = 2'500, .limit = BuyLimit::One, .skill_amp = 800},
     // [U-473] spellvamp and on-hit (Claude ideas)
     ItemDef{.name = "Siphon Tome", .cost = 1'200, .elemental_power = 2'000, .classic_only = true, .spellvamp = 1'000},
     ItemDef{.name = "Venom Edge", .cost = 1'500, .attack_speed = 2'000, .on_hit_dmg = 1'500, .on_hit_max_hp = 200},
     // [U-475][U-478] LoL ability power + magic penetration (Claude ideas) — only in the version with `mods = lol`
     ItemDef{.name = "Arcane Codex", .cost = 1'250, .more = {{{StatKey::AbilityPower, 4'000}}}, .mod = "lol"},
     ItemDef{.name = "Hollow Wand", .cost = 1'600, .more = {{{StatKey::AbilityPower, 3'000}, {StatKey::MagicPen, 1'500}}}, .mod = "lol"},
+    // [U-482] LoL-modified: power for one kind of champion only
+    ItemDef{.name = "Warrior's Focus", .cost = 1'400, .attack = 1'000, .more = {{{StatKey::SkillPower, 3'500}}}, .mod = "lol"},
+    ItemDef{.name = "Mage's Focus", .cost = 1'400, .elemental_power = 1'000, .more = {{{StatKey::MagicPower, 3'500}}}, .mod = "lol"},
     ItemDef{.name = "Void Lens", .cost = 3'000, .limit = BuyLimit::One, .more = {{{StatKey::AbilityPower, 7'000}, {StatKey::MagicPenPct, 3'500}}}, .mod = "lol"},
     // [U-476] Dota 2 stats (Claude ideas)
     ItemDef{.name = "Ogre Band", .cost = 450, .more = {{{StatKey::Strength, 600}}}},
@@ -173,6 +177,10 @@ inline constexpr std::array kItems = {
     ItemDef{.name = "Hunter's Sight", .cost = 2'600, .attack = 3'500, .limit = BuyLimit::One, .more = {{{StatKey::TrueStrike, 1}}}},
     ItemDef{.name = "Mana Leech Blade", .cost = 1'300, .attack = 1'000, .more = {{{StatKey::ManaBreak, 3'000}}}},
     ItemDef{.name = "Mana Spring", .cost = 900, .more = {{{StatKey::ManaRegen, 150}, {StatKey::Intelligence, 300}}}},
+    // [U-482] "+x %" items (Claude ideas)
+    ItemDef{.name = "Colossus Girdle", .cost = 2'600, .health = 10'000, .limit = BuyLimit::One, .more = {{{StatKey::Health, 1'200, true}}}},
+    ItemDef{.name = "Battle Hymn", .cost = 2'800, .attack = 1'500, .limit = BuyLimit::One, .more = {{{StatKey::Attack, 1'000, true}}}},
+    ItemDef{.name = "Sage's Lantern", .cost = 2'800, .elemental_power = 2'000, .limit = BuyLimit::One, .more = {{{StatKey::ElementalPower, 1'200, true}}}},
     // [U-478] items of the switchable features (Claude ideas)
     ItemDef{.name = "Sage Scepter", .cost = 4'200, .health = 17'500, .elemental_power = 3'000, .limit = BuyLimit::One,
             .more = {{{StatKey::Intelligence, 1'000}}}, .feature = kFeatScepterBit, .scepter = true},
@@ -262,10 +270,10 @@ inline constexpr std::array kNeutralItems = {
     NeutralItem{ItemDef{.name = "Spirit Bell", .elemental_power = 2'500, .tenacity = 1'000}, 2},
     NeutralItem{ItemDef{.name = "Bark Shield", .health = 12'000, .defence = 1'000}, 2},
     NeutralItem{ItemDef{.name = "Storm Feather", .attack_speed = 3'000, .more = {{{StatKey::BashChance, 800}, {StatKey::BashMs, 600}}}}, 3},
-    NeutralItem{ItemDef{.name = "Moon Shard", .elemental_power = 4'000, .more = {{{StatKey::SkillPower, 600}}}}, 3},
+    NeutralItem{ItemDef{.name = "Moon Shard", .elemental_power = 4'000, .more = {{{StatKey::SkillAmp, 600}}}}, 3},
     NeutralItem{ItemDef{.name = "Titan Knuckle", .health = 10'000, .attack = 2'500}, 3},
     NeutralItem{ItemDef{.name = "Ancient Crown", .health = 20'000, .attack = 2'000, .elemental_power = 3'000}, 4},
-    NeutralItem{ItemDef{.name = "Eclipse Shard", .more = {{{StatKey::SkillPower, 1'500}, {StatKey::MagicResist, 1'500}}}}, 4},
+    NeutralItem{ItemDef{.name = "Eclipse Shard", .more = {{{StatKey::SkillAmp, 1'500}, {StatKey::MagicResist, 1'500}}}}, 4},
 };
 
 constexpr void add_item(Stats& s, const ItemDef& i) {
@@ -295,9 +303,10 @@ constexpr void add_item(Stats& s, const ItemDef& i) {
     s.lifesteal += i.lifesteal;  // [U-416]
     s.omnivamp += i.omnivamp;
     s.crit_chance += i.crit_chance, s.crit_damage += i.crit_damage;  // [U-463]
-    s.arcane_power += i.arcane_power, s.martial_power += i.martial_power, s.skill_power += i.skill_power;  // [U-464]
+    s.arcane_power += i.arcane_power, s.martial_power += i.martial_power, s.skill_amp += i.skill_amp;  // [U-464]
     s.spellvamp += i.spellvamp, s.on_hit_dmg += i.on_hit_dmg, s.on_hit_max_hp += i.on_hit_max_hp;        // [U-473]
-    for (const ItemDef::More& m : i.more) add_stat(s, m.key, m.value);                                   // [U-476]
+    for (const ItemDef::More& m : i.more)                                                                // [U-476]
+        if (!m.pct) add_stat(s, m.key, m.value);  // ([U-482] % bonuses: item_pct_bonuses, after every flat bonus)
     s.true_sight = std::max(s.true_sight, i.true_sight);                                                 // [U-478]
     s.grievous_on_hit = std::max(s.grievous_on_hit, i.grievous_on_hit);
     s.wall_damage += i.wall_damage;  // [U-288]
@@ -330,5 +339,11 @@ static_assert([] {
            after_element_resist(1'000, Element::Water, s) == 1'000;
 }());
 static_assert(kItems[13].resist_fire == 2'500 && kItems[22].unique);
+
+// [U-482] the % bonuses of an item (after all flat bonuses are in)
+constexpr void item_pct_bonuses(Stats& s, const ItemDef& i) {
+    for (const ItemDef::More& m : i.more)
+        if (m.pct) add_stat_pct(s, m.key, m.value);
+}
 
 }  // namespace em

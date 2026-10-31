@@ -536,7 +536,7 @@ void Server::send_snapshot(Player& p) {
     m.tenacity = me->stats.tenacity / 100;
     m.model_size = W.size_pct(*me);
     m.crit_chance = me->stats.crit_chance, m.crit_damage = me->stats.crit_damage;  // [U-463][U-464][U-468]
-    m.arcane_power = me->stats.arcane_power, m.martial_power = me->stats.martial_power, m.skill_power = me->stats.skill_power;
+    m.arcane_power = me->stats.arcane_power, m.martial_power = me->stats.martial_power, m.skill_amp = me->stats.skill_amp;
     m.vamp = me->stats.omnivamp + me->stats.champion_vamp + me->stats.spellvamp + me->stats.lifesteal;
     m.ap = me->stats.ability_power, m.mpen = me->stats.magic_pen, m.mpen_pct = me->stats.magic_pen_pct;  // [U-475][U-476]
     m.str = me->stats.strength, m.agi = me->stats.agility, m.intel = me->stats.intelligence;

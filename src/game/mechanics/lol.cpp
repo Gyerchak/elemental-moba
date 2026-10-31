@@ -67,6 +67,11 @@ std::int64_t World::lol_healing(const Unit& u, std::int64_t hundredths) const {
     return hundredths;
 }
 
+// ---------------------------------------------------------------- [U-482] LoL-MODIFIED (this game's own LoL-style rules)
+// Skill power = ability power that only NON-mages use; magic power = ability power that only MAGES use. Items can give
+// one of them so they help only one kind of champion. They join ability_power (what `ap` skill ratios scale with).
+void World::lol_modified_power(Stats& s, const ChampionDef& c) { s.ability_power += c.mage ? s.magic_power : s.skill_power; }
+
 // Silence: no abilities at all (bending or not); autoattacks still work.
 bool World::lol_silenced(const Unit& u) const { return u.st.has(StatusKind::Silence); }
 

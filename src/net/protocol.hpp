@@ -367,7 +367,7 @@ struct NetMe {
     std::int32_t charge_left_ms[kSkillSlots], charge_total_ms[kSkillSlots];  // [U-444] the next charge: time left / full
     std::int32_t recast_left_ms[kSkillSlots], recast_total_ms[kSkillSlots];  // [U-458] a multicast's open window: time left / full
     // [U-463][U-464][U-468] 100 = 1 %; uses bit 1 = can crit, 2 = has arcane skills, 4 = has martial (physical) skills
-    std::int32_t crit_chance, crit_damage, arcane_power, martial_power, skill_power, vamp;
+    std::int32_t crit_chance, crit_damage, arcane_power, martial_power, skill_amp, vamp;
     std::uint8_t uses, pad6[3];
     // [U-475][U-476] LoL ability power / magic pen; Dota attributes, magic resistance, evasion, HP regen
     std::int32_t ap, mpen, mpen_pct, str, agi, intel, mres, eva, hp_regen;

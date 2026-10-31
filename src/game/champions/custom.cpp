@@ -6,6 +6,8 @@
 #include <cctype>
 #include <type_traits>
 #include <charconv>
+#include <optional>
+#include "core/numbers.hpp"
 #include <cmath>
 #include <deque>
 #include <format>
@@ -149,20 +151,15 @@ std::string parse_text(const std::string& text, ChampionDef& out) {
         const auto eq = line.find('=');
         if (eq == std::string::npos) return std::format("line {}: no '='", n);
         const std::string k = trim(line.substr(0, eq)), v = trim(line.substr(eq + 1));
+        // [U-482] every number: 570 / 2.8 / +40 / -20% / +30% / 150% / *1.5 — relative to the value BEFORE this line
+        // (the base champion's, the copied skill's)
         auto number = [&](std::int32_t& dst, std::int32_t scale) -> bool {
-            long long x = 0;
-            const auto [p, ec] = std::from_chars(v.data(), v.data() + v.size(), x);
-            if (ec != std::errc{} || p != v.data() + v.size()) return false;  // whole numbers only (no 580.5)
-            dst = std::int32_t(std::clamp<long long>(x * scale, -1'000'000'000LL, 1'000'000'000LL));
+            const std::optional<NumExpr> e = parse_num_expr(v);
+            if (!e) return false;
+            dst = std::int32_t(std::clamp<std::int64_t>(apply_num_expr(*e, dst, scale), -1'000'000'000LL, 1'000'000'000LL));
             return true;
         };
-        auto decimal = [&](std::int32_t& dst) -> bool {  // [U-476] 2.8 → 280 (hundredths), for Dota-style gains
-            double x = 0;
-            const auto [p, ec] = std::from_chars(v.data(), v.data() + v.size(), x);
-            if (ec != std::errc{} || p != v.data() + v.size() || !(x > -1e6 && x < 1e6)) return false;
-            dst = std::int32_t(std::llround(x * 100));
-            return true;
-        };
+        auto decimal = [&](std::int32_t& dst) -> bool { return number(dst, 100); };  // [U-476] 2.8 → 280 (hundredths)
         bool ok = true;
         if (k == "base") {
             const auto it = std::ranges::find_if(champions(), [&](const ChampionDef& c) { return c.name == v; });
@@ -219,7 +216,13 @@ std::string parse_text(const std::string& text, ChampionDef& out) {
             if (key < 0) return std::format("line {}: unknown stat '{}'", n, stat);
             SkillDef::Learned& t = out.talents[std::size_t(tier)][left ? 0 : 1];
             t.key = StatKey(key);
-            ok = number(t.base, 1);
+            if (!v.empty() && v.back() == '%') {  // [U-482] talent3.left.health = +10%
+                const std::optional<NumExpr> e = parse_num_expr(v.substr(0, v.size() - 1));
+                if (!e) return std::format("line {}: '{}' is not a percentage", n, v);
+                t.pct = true, t.base = std::int32_t(std::llround(std::clamp(e->v, -1000.0, 1000.0) * 100));
+            } else {
+                ok = number(t.base, 1);
+            }
         } else if (k == "attr") {  // [U-476] Dota 2 primary attribute
             constexpr std::string_view kAttrs[] = {"None", "Strength", "Agility", "Intelligence", "Universal"};
             const int e = enum_of(kAttrs, v);
@@ -265,9 +268,10 @@ std::string parse_text(const std::string& text, ChampionDef& out) {
             SkillDef& sk = k[0] == 'p' ? out.p : k[0] == 'w' ? out.w : k[0] == 'e' ? out.e : k[0] == 'r' ? out.r : k[0] == 't' ? out.t : out.y;
             const std::string f = k.substr(2);
             std::int32_t x = 0;
-            auto num = [&](auto& field, long long lo, long long hi) {
-                if (!number(x, 1)) return false;
-                field = static_cast<std::remove_reference_t<decltype(field)>>(std::clamp<long long>(x, lo, hi));
+            auto num = [&](auto& field, long long lo, long long hi) {  // [U-482] relative to the field's current value
+                const std::optional<NumExpr> e = parse_num_expr(v);
+                if (!e) return false;
+                field = static_cast<std::remove_reference_t<decltype(field)>>(std::clamp<long long>(apply_num_expr(*e, std::int64_t(field), 1), lo, hi));
                 return true;
             };
             if (f == "name") {
@@ -374,7 +378,14 @@ std::string parse_text(const std::string& text, ChampionDef& out) {
                     if (l.key == StatKey(key)) slot = &l;
                 if (!slot) return std::format("line {}: max 3 learned stats per skill", n);
                 slot->key = StatKey(key);
-                ok = per ? num(slot->per_rank, -100'000, 100'000) : num(slot->base, -100'000, 100'000);
+                if (!v.empty() && v.back() == '%') {  // [U-482] "+30%" = 30 % more of that stat (not of this line's old value)
+                    const std::optional<NumExpr> e = parse_num_expr(v.substr(0, v.size() - 1));
+                    if (!e) return std::format("line {}: '{}' is not a percentage", n, v);
+                    slot->pct = true;
+                    (per ? slot->per_rank : slot->base) = std::int32_t(std::llround(std::clamp(e->v, -1000.0, 1000.0) * 100));
+                } else {
+                    ok = per ? num(slot->per_rank, -100'000, 100'000) : num(slot->base, -100'000, 100'000);
+                }
             }
             else if (f == "geo" || f == "sweet_zone") {  // [U-461][U-462] shape rule / where the sweet spot is
                 const std::string_view* names = f == "geo" ? kGeos : kZones;
@@ -496,9 +507,9 @@ std::string parse_text(const std::string& text, ChampionDef& out) {
         for (auto [slot, sk] : {std::pair{"p", &out.p}, {"w", &out.w}, {"e", &out.e}, {"r", &out.r}, {"t", &out.t}, {"y", &out.y}}) {
             targeted += sk->targeted;
             const bool deals = sk->dmg || sk->dmg_rank || sk->ep || sk->ad || sk->bonus_ad || sk->ap;
-            if (!out.mage && deals && !sk->ad && !sk->bonus_ad)
-                return std::format("{} = {}: a non-mage's damaging skill must scale with attack (add {}.ad = … or {}.bonus_ad = …, or mage = 1)",
-                                   slot, sk->name, slot, slot);
+            if (!out.mage && deals && !sk->ad && !sk->bonus_ad && !sk->ap)
+                return std::format("{} = {}: a non-mage's damaging skill must scale with attack or ability power (add {}.ad / {}.bonus_ad / {}.ap = …, or mage = 1)",
+                                   slot, sk->name, slot, slot, slot);
         }
         if (targeted > kMaxTargetedPerKit) return std::format("at most {} click-targeted skills per kit", kMaxTargetedPerKit);
     }

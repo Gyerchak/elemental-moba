@@ -3,6 +3,7 @@
 //
 //   versions/<name>/version.txt
 //       description = A small balance test
+//       (any number: 570, +40, -20%, +30%, *1.5 — relative to the official value [U-482])
 //       champion.Ember Monk.hp = 570              # champion stat (same keys as own champions: hp, attack, ep_per_level,
 //                                                 #   defence, elemental_defence, move_speed, attack_range, attack_speed)
 //       skill.Fire Bolt.damage = 90               # skill number: damage, damage_per_rank, ep, ad, range, width, speed,

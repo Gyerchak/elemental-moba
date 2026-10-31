@@ -7,6 +7,19 @@ Put the file in `custom_champions/<name>.champ`. Check it without starting the g
 
 With ANY problem (unknown key, bad number) the game ignores the file — the checker prints the reason.
 
+## 0. Writing numbers (everywhere: champion files, game versions)
+
+| Written | Means |
+|---|---|
+| `570` / `2.8` / `=570` | set it (decimals are scaled to the key's unit) |
+| `+40` / `-40` | add / subtract |
+| `+30%` / `-20%` | 30 % more / 20 % less than the value before this line (the base champion's, the copied skill's, the official one) |
+| `150%` | 150 % of the value before |
+| `*1.5` | multiply |
+
+Stat BONUSES (`learned.*`, `talentN.*`, item `more`) are different: `learned.attack = +30%` = **+30 % of that stat**
+(added after every flat bonus); `learned.attack = 30` = +30 flat.
+
 ## 1. The champion
 
     base = Ember Monk        # copy everything from a champion first (required)
@@ -72,7 +85,7 @@ Any existing skill works too: `w = Fire Whip`.
 
 `health attack elemental_power defence elemental_defence attack_speed move_speed move_speed_pct elemental_haste
 non_elemental_haste cast_speed tenacity lifesteal omnivamp champion_vamp spellvamp crit_chance crit_damage arcane_power
-martial_power skill_power skill_range skill_radius on_hit_damage on_hit_max_hp ability_power magic_pen magic_pen_pct
+martial_power skill_amp skill_range skill_radius on_hit_damage on_hit_max_hp ability_power magic_pen magic_pen_pct
 strength agility intelligence hp_regen mana_regen magic_resist evasion bash_chance bash_ms bash_damage damage_block
 block_chance true_strike mana_break heal_amp` — 100 = 1 % for percentages. Items can carry any of them (`ItemDef::more`).
 
@@ -90,8 +103,17 @@ block_chance true_strike mana_break heal_amp` — 100 = 1 % for percentages. Ite
 | Fear | cannot act, runs straight away from the one who scared it |
 | Silence | no abilities at all (bending or not); autoattacks still work |
 | Ability power | skills deal + `ap` % of it |
+| Silence-free kit rule | non-mages: every damaging skill scales with attack, bonus attack or ability power (`ad` / `bonus_ad` / `ap`) |
 | Healing received | EVERY heal (skills, passives, vamp, items, HP regen, fountain) × (1 + `heal_amp`); a Transform's `buff_heal_pct` adds to it; then grievous wounds |
 | Magic penetration | flat / % — lower the target's elemental defence against non-physical damage (with the elemental pens) |
+
+## 5b. LoL-modified (this game's own LoL-style stats, `lol.cpp`)
+
+| Stat | Rule |
+|---|---|
+| Skill power (`skill_power`) | ability power that only NON-mages use |
+| Magic power (`magic_power`) | ability power that only MAGES use |
+| Skill amp (`skill_amp`) | % more damage for every skill (was called "skill power" before) |
 
 ## 6. This game's own mechanics (engine: `src/game/mechanics/bending_cc.cpp`)
 

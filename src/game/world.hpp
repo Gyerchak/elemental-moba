@@ -719,6 +719,7 @@ public:
     void lol_on_hit(Unit& u, Unit& target, bool physical);
     bool lol_fear_step(Unit& u);
     [[nodiscard]] bool lol_silenced(const Unit& u) const;
+    static void lol_modified_power(Stats& s, const ChampionDef& c);  // [U-482] skill / magic power → ability power
     [[nodiscard]] std::int64_t lol_healing(const Unit& u, std::int64_t hundredths) const;  // [U-481] any healing → what lands
     // ---- [U-474] own mechanics (game/mechanics/bending_cc.cpp): chi block, disarm, subdue
     [[nodiscard]] bool chi_blocked(const Unit& u, Element el) const;

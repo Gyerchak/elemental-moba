@@ -206,7 +206,7 @@ struct SkillDef {
     std::uint8_t dispel = 0; // [U-476] Dota: 1 = basic dispel (soft debuffs off the caster, buffs off enemies hit), 2 = strong (stuns too)
     bool pass_units = false; // [U-471] a dash goes through units (walls: through_walls — it jumps over them)
     // [U-468] numbers the skill gives while it is learned (its own passive): stat + value at rank 1 + per rank
-    struct Learned { StatKey key = StatKey::Count; std::int32_t base = 0, per_rank = 0; };
+    struct Learned { StatKey key = StatKey::Count; std::int32_t base = 0, per_rank = 0; bool pct = false; };  // [U-482] pct: 100 = +1 % of the stat
     std::array<Learned, 3> learned{};
     // [U-457] the programmable look, layered ON the exact hitbox shape (the same shape the game hits with):
     struct Visual {
@@ -346,7 +346,7 @@ struct ChampionDef {
 // [U-478] feature Talents: the default choice at levels 10 / 15 / 20 / 25 (left / right), Claude ideas
 inline constexpr std::array<std::array<SkillDef::Learned, 2>, 4> kDefaultTalents = {{
     {{{StatKey::Attack, 2'000, 0}, {StatKey::ElementalPower, 3'000, 0}}},
-    {{{StatKey::SkillPower, 800, 0}, {StatKey::Tenacity, 1'500, 0}}},
+    {{{StatKey::SkillAmp, 800, 0}, {StatKey::Tenacity, 1'500, 0}}},
     {{{StatKey::Health, 25'000, 0}, {StatKey::MoveSpeed, 2'500, 0}}},
     {{{StatKey::AttackSpeed, 3'500, 0}, {StatKey::ElementalHaste, 2'500, 0}}},
 }};

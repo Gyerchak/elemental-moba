@@ -287,8 +287,8 @@ void GameView::draw_skill_tooltip(NetClient& net, int i, float x, float y, bool 
                                : std::format("{} = {}{} = {}", name, base, per ? std::format(" + {}×(rank−1)", per) : "", base + per * rk));
         // [U-464] what multiplies the skill's damage by its kind
         const bool martial = !d->arcane && d->sub == SubElement::Physical;
-        if (d->dmg && (me.skill_power || (d->arcane && me.arcane_power) || (martial && me.martial_power)))
-            L.push_back(std::format("   × (1 + skill power {}%{})", me.skill_power / 100,
+        if (d->dmg && (me.skill_amp || (d->arcane && me.arcane_power) || (martial && me.martial_power)))
+            L.push_back(std::format("   × (1 + skill amp {}%{})", me.skill_amp / 100,
                                     d->arcane ? std::format(" + arcane {}%", me.arcane_power / 100) : martial ? std::format(" + martial {}%", me.martial_power / 100) : ""));
         for (const SkillDef::Learned& l : d->learned)
             if (l.key != StatKey::Count)
@@ -362,7 +362,7 @@ void GameView::draw_bottom_panel(NetClient& net, double now_s, Ui& ui) {
             if (expand_stats_) {
                 if (me.uses & 2) stats.push_back(std::format("ARC  +{}%", me.arcane_power / 100));
                 if (me.uses & 4) stats.push_back(std::format("MAR  +{}%", me.martial_power / 100));
-                if (me.skill_power) stats.push_back(std::format("SKP  +{}%", me.skill_power / 100));
+                if (me.skill_amp) stats.push_back(std::format("AMP  +{}%", me.skill_amp / 100));
                 if (me.vamp) stats.push_back(std::format("VAMP {}%", me.vamp / 100));
                 if (me.heal_amp) stats.push_back(std::format("HEAL {:+}%", me.heal_amp / 100));  // [U-481] healing received
                 // [U-475] LoL: ability power / magic pen — only when this champion has AP skills or the stats

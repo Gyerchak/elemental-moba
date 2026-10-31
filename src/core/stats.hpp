@@ -70,6 +70,9 @@ struct Stats {
     // [U-475] League of Legends: ability power (skills scale with SkillDef::ap), magic penetration flat / % — the
     // magic damage of this game is the non-physical damage (vs elemental defence), so they add to the elemental pens
     std::int32_t ability_power = 0, magic_pen = 0, magic_pen_pct = 0;
+    // [U-482] LoL-MODIFIED (this game's own LoL-style stats): ability power that only one kind of champion uses —
+    //   skill power = ability power for NON-mages only, magic power = ability power for MAGES only (hundredths)
+    std::int32_t skill_power = 0, magic_power = 0;
     // [U-476] Dota 2 (dota.cpp): attributes (hundredths of a point), regen per second (hundredths), magic resistance
     // and evasion (100 = 1 %), bash (chance / stun ms / damage), damage block (flat hundredths, chance), true strike,
     // mana break (mana burned per hit, hundredths), heal amplification
@@ -82,7 +85,7 @@ struct Stats {
     std::int32_t crit_chance = 0, crit_damage = 17'500;  // 0 % / 175 % of the hit
     // [U-464] skill power by kind of skill, % more skill damage (100 = 1 %), on top of elemental power:
     //   arcane = non-elemental magic skills, martial = non-magic (physical) skills, skill = every skill
-    std::int32_t arcane_power = 0, martial_power = 0, skill_power = 0;
+    std::int32_t arcane_power = 0, martial_power = 0, skill_amp = 0;
     Range range = Range::Melee;
     ResourceKind resource = ResourceKind::None;
 };
@@ -92,18 +95,20 @@ struct Stats {
 enum class StatKey : std::uint8_t {
     Health, Attack, ElementalPower, Defence, ElementalDefence, AttackSpeed, MoveSpeed, MoveSpeedPct, ElementalHaste,
     NonElementalHaste, CastSpeed, Tenacity, Lifesteal, Omnivamp, ChampionVamp, CritChance, CritDamage, ArcanePower,
-    MartialPower, SkillPower, SkillRange, SkillRadius, Spellvamp, OnHitDamage, OnHitMaxHp,
+    MartialPower, SkillAmp, SkillRange, SkillRadius, Spellvamp, OnHitDamage, OnHitMaxHp,
     AbilityPower, MagicPen, MagicPenPct,                                                   // [U-475] LoL
     Strength, Agility, Intelligence, HpRegen, ManaRegen, MagicResist, Evasion, BashChance,  // [U-476] Dota 2
-    BashMs, BashDamage, DamageBlock, BlockChance, TrueStrike, ManaBreak, HealAmp, Count
+    BashMs, BashDamage, DamageBlock, BlockChance, TrueStrike, ManaBreak, HealAmp,
+    SkillPower, MagicPower,                                                                 // [U-482] LoL-modified
+    Count
 };
 inline constexpr const char* kStatKeyNames[] = {
     "health", "attack", "elemental_power", "defence", "elemental_defence", "attack_speed", "move_speed", "move_speed_pct",
     "elemental_haste", "non_elemental_haste", "cast_speed", "tenacity", "lifesteal", "omnivamp", "champion_vamp", "crit_chance",
-    "crit_damage", "arcane_power", "martial_power", "skill_power", "skill_range", "skill_radius", "spellvamp", "on_hit_damage",
+    "crit_damage", "arcane_power", "martial_power", "skill_amp", "skill_range", "skill_radius", "spellvamp", "on_hit_damage",
     "on_hit_max_hp", "ability_power", "magic_pen", "magic_pen_pct", "strength", "agility", "intelligence", "hp_regen",
     "mana_regen", "magic_resist", "evasion", "bash_chance", "bash_ms", "bash_damage", "damage_block", "block_chance",
-    "true_strike", "mana_break", "heal_amp"};
+    "true_strike", "mana_break", "heal_amp", "skill_power", "magic_power"};
 static_assert(std::size(kStatKeyNames) == std::size_t(StatKey::Count));
 constexpr void add_stat(Stats& s, StatKey k, std::int32_t v) {
     switch (k) {
@@ -126,7 +131,7 @@ constexpr void add_stat(Stats& s, StatKey k, std::int32_t v) {
         case StatKey::CritDamage: s.crit_damage += v; break;
         case StatKey::ArcanePower: s.arcane_power += v; break;
         case StatKey::MartialPower: s.martial_power += v; break;
-        case StatKey::SkillPower: s.skill_power += v; break;
+        case StatKey::SkillAmp: s.skill_amp += v; break;
         case StatKey::SkillRange: s.skill_range += v; break;
         case StatKey::SkillRadius: s.skill_radius += v; break;
         case StatKey::Spellvamp: s.spellvamp += v; break;
@@ -150,8 +155,67 @@ constexpr void add_stat(Stats& s, StatKey k, std::int32_t v) {
         case StatKey::TrueStrike: s.true_strike += v; break;
         case StatKey::ManaBreak: s.mana_break += v; break;
         case StatKey::HealAmp: s.heal_amp += v; break;
+        case StatKey::SkillPower: s.skill_power += v; break;
+        case StatKey::MagicPower: s.magic_power += v; break;
         case StatKey::Count: break;
     }
+}
+
+// [U-482] the current value of a stat (total for base + bonus stats) — the base of "+30 %" modifiers
+constexpr std::int64_t stat_value(const Stats& s, StatKey k) {
+    switch (k) {
+        case StatKey::Health: return s.health.total();
+        case StatKey::Attack: return s.attack.total();
+        case StatKey::ElementalPower: return s.elemental_power.total();
+        case StatKey::Defence: return s.defence.total();
+        case StatKey::ElementalDefence: return s.elemental_defence.total();
+        case StatKey::AttackSpeed: return s.attack_speed.total();
+        case StatKey::MoveSpeed: return s.move_speed.total();
+        case StatKey::MoveSpeedPct: return s.move_speed_pct;
+        case StatKey::ElementalHaste: return s.elemental_haste;
+        case StatKey::NonElementalHaste: return s.non_elemental_haste;
+        case StatKey::CastSpeed: return s.cast_speed;
+        case StatKey::Tenacity: return s.tenacity;
+        case StatKey::Lifesteal: return s.lifesteal;
+        case StatKey::Omnivamp: return s.omnivamp;
+        case StatKey::ChampionVamp: return s.champion_vamp;
+        case StatKey::CritChance: return s.crit_chance;
+        case StatKey::CritDamage: return s.crit_damage;
+        case StatKey::ArcanePower: return s.arcane_power;
+        case StatKey::MartialPower: return s.martial_power;
+        case StatKey::SkillAmp: return s.skill_amp;
+        case StatKey::SkillRange: return s.skill_range;
+        case StatKey::SkillRadius: return s.skill_radius;
+        case StatKey::Spellvamp: return s.spellvamp;
+        case StatKey::OnHitDamage: return s.on_hit_dmg;
+        case StatKey::OnHitMaxHp: return s.on_hit_max_hp;
+        case StatKey::AbilityPower: return s.ability_power;
+        case StatKey::MagicPen: return s.magic_pen;
+        case StatKey::MagicPenPct: return s.magic_pen_pct;
+        case StatKey::Strength: return s.strength;
+        case StatKey::Agility: return s.agility;
+        case StatKey::Intelligence: return s.intelligence;
+        case StatKey::HpRegen: return s.hp_regen;
+        case StatKey::ManaRegen: return s.mana_regen;
+        case StatKey::MagicResist: return s.magic_resist;
+        case StatKey::Evasion: return s.evasion;
+        case StatKey::BashChance: return s.bash_chance;
+        case StatKey::BashMs: return s.bash_ms;
+        case StatKey::BashDamage: return s.bash_dmg;
+        case StatKey::DamageBlock: return s.damage_block;
+        case StatKey::BlockChance: return s.block_chance;
+        case StatKey::TrueStrike: return s.true_strike;
+        case StatKey::ManaBreak: return s.mana_break;
+        case StatKey::HealAmp: return s.heal_amp;
+        case StatKey::SkillPower: return s.skill_power;
+        case StatKey::MagicPower: return s.magic_power;
+        case StatKey::Count: return 0;
+    }
+    return 0;
+}
+// "+30 %" of a stat (pct: 100 = 1 %); applied after every flat bonus
+constexpr void add_stat_pct(Stats& s, StatKey k, std::int32_t pct) {
+    add_stat(s, k, std::int32_t(std::clamp<std::int64_t>(stat_value(s, k) * pct / 10'000, -1'000'000'000, 1'000'000'000)));
 }
 
 // [U-54] Radius-only skills get width/length stats at 1/3 value.

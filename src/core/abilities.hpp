@@ -165,8 +165,8 @@ inline constexpr int kMaxTargetedPerKit = 1;
         targeted += a.delivery == Delivery::PointClick;
         const bool deals_damage = a.damage.base != 0 || a.damage.per_rank != 0 || a.damage.ep_pct != 0 ||
                                   a.damage.ad_pct != 0 || a.damage.bonus_ad_pct != 0 || a.damage.ap_pct != 0;
-        // [U-110] non-mages: damage ALWAYS scales with attack or bonus attack.
-        if (!is_mage && deals_damage && a.damage.ad_pct == 0 && a.damage.bonus_ad_pct == 0) return false;
+        // [U-110] non-mages: damage ALWAYS scales with attack or bonus attack — [U-482] or ability power
+        if (!is_mage && deals_damage && a.damage.ad_pct == 0 && a.damage.bonus_ad_pct == 0 && a.damage.ap_pct == 0) return false;
     }
     return targeted <= kMaxTargetedPerKit;
 }
