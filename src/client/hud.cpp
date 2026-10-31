@@ -365,6 +365,9 @@ void GameView::draw_bottom_panel(NetClient& net, double now_s, Ui& ui) {
                 if (me.skill_amp) stats.push_back(std::format("AMP  +{}%", me.skill_amp / 100));
                 if (me.vamp) stats.push_back(std::format("VAMP {}%", me.vamp / 100));
                 if (me.heal_amp) stats.push_back(std::format("HEAL {:+}%", me.heal_amp / 100));  // [U-481] healing received
+                if (me.self_heal) stats.push_back(std::format("SELF {:+}%", me.self_heal / 100));  // [U-484] self-healing
+                if (me.heal_shield_power) stats.push_back(std::format("H&SP {:+}%", me.heal_shield_power / 100));
+                if (me.buff_power) stats.push_back(std::format("BUFF {:+}%", me.buff_power / 100));
                 // [U-475] LoL: ability power / magic pen — only when this champion has AP skills or the stats
                 if ((me.uses & 8) || me.ap) stats.push_back(std::format("AP   {}", me.ap / 100));
                 if (me.mpen || me.mpen_pct) stats.push_back(std::format("MPEN {}|{}%", me.mpen / 100, me.mpen_pct / 100));

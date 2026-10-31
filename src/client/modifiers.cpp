@@ -46,6 +46,7 @@ constexpr Look kStatus[] = {
     {"HEX", "Hexed", "a harmless critter: no skills, no autoattacks, very slow", {120, 200, 120}, true},  // [U-476]
     {"BRK", "Break", "passives switched off", {150, 110, 90}, true},
     {"IMM", "Debuff immune", "no new crowd control or debuffs", {255, 210, 90}, false},
+    {"PLY", "Polymorph", "a harmless critter: no autoattacks, no skills, −60 move speed", {230, 150, 230}, true},  // [U-484]
     {"INV", "Invisible", "enemies cannot see it (true sight can); attacking or casting ends it", {170, 170, 230}, false},  // [U-478]
 };
 static_assert(std::size(kStatus) == std::size_t(StatusKind::Count));

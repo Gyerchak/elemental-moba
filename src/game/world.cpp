@@ -263,7 +263,8 @@ ResolvedAbility World::resolved(const Unit& u, Slot s) const {
         b.size_pct += 25, b.width_pct += 25, b.radius_pct += 25;
     }
     if (u.team != Team::Neutral) b.power_pct += lion_stacks[std::size_t(u.team) & 1] * kLionTurtlePctPerStack;  // [U-364]
-    if (u.jbuff == std::uint8_t(JungleBuff::Wisdom) && u.jbuff_until > now_ms) b.cd_pct = b.cd_pct * kWisdomCdPct / 100;  // [U-366]
+    if (u.jbuff == std::uint8_t(JungleBuff::Wisdom) && u.jbuff_until > now_ms)  // [U-366] ([U-484] buff power makes it stronger)
+        b.cd_pct = b.cd_pct * std::max(10, 100 - lol_buff(&u, 100 - kWisdomCdPct)) / 100;
     if (u.scepter && d->ultimate) {  // [U-478] scepter upgrade of the ultimate
         b.power_pct += d->scepter_dmg_pct ? d->scepter_dmg_pct : 30;
         b.cd_pct = b.cd_pct * (100 - (d->scepter_cd_pct ? d->scepter_cd_pct : 20)) / 100;
@@ -522,7 +523,7 @@ void World::recompute_stats(Unit& u) {
     u.scepter = false;
     for (std::int16_t it : u.items)
         if (it >= 0 && kItems[std::size_t(it)].scepter && feature(kFeatScepter)) u.scepter = true;
-    if (u.lotus_until > now_ms) s.cast_speed += kLotusCastSpeed;  // [X-46][U-114]
+    if (u.lotus_until > now_ms) s.cast_speed += kLotusCastSpeed * std::max(0, 10'000 + s.buff_power) / 10'000;  // [X-46][U-114] ([U-484] buff power)
     if (u.tmp_size_until > now_ms) s.model_size += u.tmp_size;     // [U-129]
     if (u.transform_until > now_ms) {  // [U-456] the form: + attack %, + healing received % [U-481] (every source)
         s.attack.bonus += s.attack.base * u.transform_attack_pct / 100;

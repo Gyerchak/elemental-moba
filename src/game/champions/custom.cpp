@@ -36,7 +36,7 @@ constexpr std::string_view kZones[] = {"Auto", "Centre", "Edge", "Tip"};        
 constexpr std::string_view kSubs[] = {"Water", "Ice", "Wood", "Blood", "Mud", "Steam", "Air", "Earth", "Lava", "Metal", "EarthArmor",
                                       "MetalArmor", "Fire", "BlueFire", "Lightning", "Combustion", "Physical"};
 constexpr std::string_view kStatuses[] = {"Stun", "Root", "Slow", "Silence", "Mute", "Airborne", "Frozen", "Blind", "Burn", "Shield",
-                                          "Haste", "Flying", "Bloodbound", "Channel", "Swimming", "WaterRide", "Redirect", "Wet", "Grievous", "Fear", "Disarm", "Subdue", "Hex", "Break", "DebuffImmune", "Invisible", "None"};
+                                          "Haste", "Flying", "Bloodbound", "Channel", "Swimming", "WaterRide", "Redirect", "Wet", "Grievous", "Fear", "Disarm", "Subdue", "Hex", "Break", "DebuffImmune", "Polymorph", "Invisible", "None"};
 // [U-474] "ChiBlock" = the chi block status (its wire / enum name is Mute)
 int status_index(std::string_view v);
 constexpr std::string_view kElements[] = {"Water", "Earth", "Fire", "Air", "None"};

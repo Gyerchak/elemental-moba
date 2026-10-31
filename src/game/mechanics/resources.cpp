@@ -29,7 +29,7 @@ void World::regen(Unit& u) {
     if (!u.st.has(StatusKind::Frozen) || u.untargetable_until <= now_ms) u.hp = std::min<std::int64_t>(max_hp, u.hp + lol_healing(u, per_tick(hp_rate, tick, cfg.tick_hz)));  // [U-481] regen is healing too
     // [U-81] revive: 5 × 5 % max HP, one per second
     if (u.flask_revive > 0 && now_ms >= u.flask_next_ms) {
-        heal(u, max_hp * 5 / 100);
+        heal(u, max_hp * 5 / 100, &u);  // (the flask's revive: my item heals me)
         --u.flask_revive;
         u.flask_next_ms = now_ms + 1'000;
     }
@@ -44,7 +44,7 @@ void World::regen(Unit& u) {
     }
     // resources
     std::int64_t r = u.res_regen;
-    if (u.jbuff == std::uint8_t(JungleBuff::Wisdom) && u.jbuff_until > now_ms) r = r * kWisdomRegenPct / 100;  // [U-366]
+    if (u.jbuff == std::uint8_t(JungleBuff::Wisdom) && u.jbuff_until > now_ms) r = r * (100 + lol_buff(&u, kWisdomRegenPct - 100)) / 100;  // [U-366][U-484]
     switch (u.stats.resource) {
         case ResourceKind::Fuel:
             if (unlimited_fuel(sky)) {  // [U-138]

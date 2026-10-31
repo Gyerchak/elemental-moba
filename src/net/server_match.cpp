@@ -555,6 +555,7 @@ void Server::send_snapshot(Player& p) {
         m.level = std::uint8_t(std::min(me->level, 255));
         m.neutral = me->neutral;
         m.heal_amp = me->stats.heal_amp;  // [U-481]
+        m.self_heal = me->stats.self_heal, m.heal_shield_power = me->stats.heal_shield_power, m.buff_power = me->stats.buff_power;  // [U-484]
     }
     m.uses = champions()[std::size_t(me->champ)].crits ? 1 : 0;
     for (const SkillDef* k : me->skill)

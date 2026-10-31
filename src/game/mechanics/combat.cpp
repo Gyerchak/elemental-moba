@@ -9,9 +9,10 @@
 
 namespace em {
 
-void World::heal(Unit& u, std::int32_t hundredths) {
+void World::heal(Unit& u, std::int32_t hundredths, const Unit* from) {
     if (!u.alive) return;
-    u.hp = std::min<std::int64_t>(u.stats.health.total(), u.hp + lol_healing(u, hundredths));  // [U-481] healing received (lol.cpp)
+    // [U-484] the giver's heal power first, then [U-481] what the receiver gets (lol.cpp)
+    u.hp = std::int32_t(std::min<std::int64_t>(u.stats.health.total(), u.hp + lol_healing(u, lol_given_heal(from, u, hundredths))));
 }
 
 void World::apply_cc(const Stats& src_stats, std::uint32_t src_id, Unit& dst, StatusKind k, std::int32_t ms,
@@ -227,7 +228,7 @@ void World::apply_hit(Unit* src, Unit& dst, std::int32_t hund, SubElement sub, b
     if (dst.kind == UnitKind::Champion && dst.hp > 0 && has_keystone(dst.loadout, KeystoneId::Stoneheart) &&
         now_ms >= dst.stoneheart_ready_ms && dst.hp * 100 < dst.stats.health.total() * 35) {
         const std::int32_t shield = (80 + 10 * dst.level) * 100;
-        dst.st.add(StatusKind::Shield, now_ms + 3'000, shield, dst.id);
+        dst.st.add(StatusKind::Shield, now_ms + 3'000, lol_given_shield(&dst, shield), dst.id);  // [U-484]
         dst.shield_sub = std::uint8_t(SubElement::EarthArmor);
         dst.stoneheart_ready_ms = now_ms + 60'000;
         dst.stat_keystone += shield / 100;
@@ -431,8 +432,8 @@ void World::passive_proc(Unit& u, Unit* target, std::uint8_t trigger) {
         if (target->alive && p->proc_cc != StatusKind::Count) apply_cc(u.stats, u.id, *target, p->proc_cc, p->proc_cc_ms, p->cc_val, p->sub);
     }
     const std::int64_t h = dealt * p->proc_heal_pct / 100 + std::int64_t(u.stats.health.total()) * p->proc_heal_max_hp / 10'000;
-    if (h > 0) heal(u, std::int32_t(h));
-    if (p->proc_shield > 0) u.st.add(StatusKind::Shield, now_ms + 3'000, std::int16_t(std::min(p->proc_shield, 30'000)), u.id);
+    if (h > 0) heal(u, std::int32_t(h), &u);  // [U-484] a self-heal
+    if (p->proc_shield > 0) u.st.add(StatusKind::Shield, now_ms + 3'000, lol_given_shield(&u, std::min(p->proc_shield, 30'000)), u.id);  // [U-484]
 }
 
 void World::auto_extras(Unit& u, Unit& primary, std::int32_t dmg, SubElement sub, bool physical) {
@@ -441,8 +442,8 @@ void World::auto_extras(Unit& u, Unit& primary, std::int32_t dmg, SubElement sub
     lol_on_hit(u, primary, physical);  // [U-473] on-hit damage (lol.cpp)
     dota_on_hit(u, primary);           // [U-476] bash, mana break (dota.cpp)
     if (u.jbuff == std::uint8_t(JungleBuff::Ember) && u.jbuff_until > now_ms && primary.alive) {  // [U-366]
-        apply_cc(u.stats, u.id, primary, StatusKind::Burn, 2'000, primary.stats.health.total() / 200);  // per second: 1 % over 2 s
-        apply_cc(u.stats, u.id, primary, StatusKind::Slow, 1'000, kEmberSlowPct);
+        apply_cc(u.stats, u.id, primary, StatusKind::Burn, 2'000, lol_buff(&u, primary.stats.health.total() / 200));  // 1 %/s over 2 s ([U-484] buff power)
+        apply_cc(u.stats, u.id, primary, StatusKind::Slow, 1'000, lol_buff(&u, kEmberSlowPct));
     }
     const AutoAttackDef& a = champions()[std::size_t(u.champ)].autos;
     switch (a.shape) {

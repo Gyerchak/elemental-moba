@@ -687,6 +687,8 @@ Additions outside the plan live in `ENGINE-EXTRAS.md`, never here.
 - [U-481] Aatrox's World Ender increases ALL healing (also the omnivamp of Umbral Dash): in the LoL section, "healing received" raises healing from any source.
 - [U-482] Non-mages may scale with ability power too (Aatrox scales with nothing magic). LoL-modified stats: skill power (ability power for non-mages only) and magic power (for mages only). Every number can be written as a formula (+30 %, −20 %, ×1.5, +40) — in edits, item effects, anything.
 - [U-483] Anything from the setup system (keystones, trees, shards, classic runes, quintessences, masteries) can be added / modified / removed by a changed game version; test changes in the test version.
+- [U-484] LoL: self-healing % (heals only done by yourself) and heal & shield power % (mainly support items); LoL polymorph with the exact LoL combination. LoL-modified: buffing increase — EVERY buffing effect (heals, skill damage buffs, jungle buffs and their effects, shields / damage / on-hit / item buffs given to allies …).
+- [U-485] Add the Runeforge Aatrox mod (free to use) as an Aatrox skin.
 
 ---
 *Hubert continues editing the plan later — new ideas get the next free `[U-xx]` number.*

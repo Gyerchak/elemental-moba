@@ -163,6 +163,10 @@ inline constexpr std::array kItems = {
     // [U-482] LoL-modified: power for one kind of champion only
     ItemDef{.name = "Warrior's Focus", .cost = 1'400, .attack = 1'000, .more = {{{StatKey::SkillPower, 3'500}}}, .mod = "lol"},
     ItemDef{.name = "Mage's Focus", .cost = 1'400, .elemental_power = 1'000, .more = {{{StatKey::MagicPower, 3'500}}}, .mod = "lol"},
+    // [U-484] support items (LoL mod): heal & shield power, self-healing, buff power
+    ItemDef{.name = "Moonstone Charm", .cost = 2'300, .health = 20'000, .more = {{{StatKey::HealShieldPower, 1'000}, {StatKey::ManaRegen, 100}}}, .mod = "lol"},
+    ItemDef{.name = "Vital Pendant", .cost = 1'600, .health = 25'000, .more = {{{StatKey::SelfHeal, 1'500}}}, .mod = "lol"},
+    ItemDef{.name = "Banner of Command", .cost = 2'500, .health = 15'000, .defence = 1'500, .more = {{{StatKey::BuffPower, 1'200}}}, .mod = "lol"},
     ItemDef{.name = "Void Lens", .cost = 3'000, .limit = BuyLimit::One, .more = {{{StatKey::AbilityPower, 7'000}, {StatKey::MagicPenPct, 3'500}}}, .mod = "lol"},
     // [U-476] Dota 2 stats (Claude ideas)
     ItemDef{.name = "Ogre Band", .cost = 450, .more = {{{StatKey::Strength, 600}}}},

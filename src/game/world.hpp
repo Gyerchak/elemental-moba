@@ -701,7 +701,7 @@ public:
         if (u.magic_until > now_ms && d.sub == SubElement::Physical && d.kind != SkillKind::MagicStance) return SubElement(u.magic_sub);
         return d.sub;
     }
-    void heal(Unit& u, std::int32_t hundredths);
+    void heal(Unit& u, std::int32_t hundredths, const Unit* from = nullptr);  // [U-484] from = who gives it
     void apply_cc(const Stats& src_stats, std::uint32_t src_id, Unit& dst, StatusKind k, std::int32_t ms,
                   std::int32_t value, SubElement sub = SubElement::Physical);
     void knock(Unit& dst, std::int32_t from_x, std::int32_t from_y, std::int32_t dist_units, std::uint32_t src_id = 0);
@@ -720,7 +720,11 @@ public:
     bool lol_fear_step(Unit& u);
     [[nodiscard]] bool lol_silenced(const Unit& u) const;
     static void lol_modified_power(Stats& s, const ChampionDef& c);  // [U-482] skill / magic power → ability power
-    [[nodiscard]] std::int64_t lol_healing(const Unit& u, std::int64_t hundredths) const;  // [U-481] any healing → what lands
+    [[nodiscard]] std::int64_t lol_healing(const Unit& u, std::int64_t hundredths) const;
+    // [U-484] what a GIVER adds: heal & shield power, self-healing, buff power (from = nullptr: no giver, e.g. regen)
+    [[nodiscard]] std::int64_t lol_given_heal(const Unit* from, const Unit& to, std::int64_t hundredths) const;
+    [[nodiscard]] std::int32_t lol_given_shield(const Unit* from, std::int32_t hundredths) const;
+    [[nodiscard]] std::int32_t lol_buff(const Unit* from, std::int32_t value) const;  // any other buff: × (1 + buff power)  // [U-481] any healing → what lands
     // ---- [U-474] own mechanics (game/mechanics/bending_cc.cpp): chi block, disarm, subdue
     [[nodiscard]] bool chi_blocked(const Unit& u, Element el) const;
     [[nodiscard]] SubElement auto_sub(const Unit& u) const;           // what the unit's autoattack is made of

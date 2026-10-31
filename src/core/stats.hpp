@@ -73,6 +73,10 @@ struct Stats {
     // [U-482] LoL-MODIFIED (this game's own LoL-style stats): ability power that only one kind of champion uses —
     //   skill power = ability power for NON-mages only, magic power = ability power for MAGES only (hundredths)
     std::int32_t skill_power = 0, magic_power = 0;
+    // [U-484] LoL: self-healing % (heals I give MYSELF), heal & shield power % (heals / shields I give anyone);
+    //         LoL-modified: buff power % (EVERY buff I give: heals, shields, hastes, form bonuses, item active buffs,
+    //         and the effects of the jungle buffs I carry). 100 = 1 %
+    std::int32_t self_heal = 0, heal_shield_power = 0, buff_power = 0;
     // [U-476] Dota 2 (dota.cpp): attributes (hundredths of a point), regen per second (hundredths), magic resistance
     // and evasion (100 = 1 %), bash (chance / stun ms / damage), damage block (flat hundredths, chance), true strike,
     // mana break (mana burned per hit, hundredths), heal amplification
@@ -101,6 +105,7 @@ enum class StatKey : std::uint8_t {
     BashMs, BashDamage, DamageBlock, BlockChance, TrueStrike, ManaBreak, HealAmp,
     SkillPower, MagicPower,                                                                 // [U-482] LoL-modified
     ModelSize, ElementalPenetration,                                                        // [U-483] (setup tables)
+    SelfHeal, HealShieldPower, BuffPower,                                                   // [U-484]
     Count
 };
 inline constexpr const char* kStatKeyNames[] = {
@@ -109,7 +114,7 @@ inline constexpr const char* kStatKeyNames[] = {
     "crit_damage", "arcane_power", "martial_power", "skill_amp", "skill_range", "skill_radius", "spellvamp", "on_hit_damage",
     "on_hit_max_hp", "ability_power", "magic_pen", "magic_pen_pct", "strength", "agility", "intelligence", "hp_regen",
     "mana_regen", "magic_resist", "evasion", "bash_chance", "bash_ms", "bash_damage", "damage_block", "block_chance",
-    "true_strike", "mana_break", "heal_amp", "skill_power", "magic_power", "model_size", "elemental_penetration"};
+    "true_strike", "mana_break", "heal_amp", "skill_power", "magic_power", "model_size", "elemental_penetration", "self_heal", "heal_shield_power", "buff_power"};
 static_assert(std::size(kStatKeyNames) == std::size_t(StatKey::Count));
 constexpr void add_stat(Stats& s, StatKey k, std::int32_t v) {
     switch (k) {
@@ -160,6 +165,9 @@ constexpr void add_stat(Stats& s, StatKey k, std::int32_t v) {
         case StatKey::MagicPower: s.magic_power += v; break;
         case StatKey::ModelSize: s.model_size += v; break;
         case StatKey::ElementalPenetration: s.elemental_penetration += v; break;
+        case StatKey::SelfHeal: s.self_heal += v; break;
+        case StatKey::HealShieldPower: s.heal_shield_power += v; break;
+        case StatKey::BuffPower: s.buff_power += v; break;
         case StatKey::Count: break;
     }
 }
@@ -214,6 +222,9 @@ constexpr std::int64_t stat_value(const Stats& s, StatKey k) {
         case StatKey::MagicPower: return s.magic_power;
         case StatKey::ModelSize: return s.model_size;
         case StatKey::ElementalPenetration: return s.elemental_penetration;
+        case StatKey::SelfHeal: return s.self_heal;
+        case StatKey::HealShieldPower: return s.heal_shield_power;
+        case StatKey::BuffPower: return s.buff_power;
         case StatKey::Count: return 0;
     }
     return 0;
@@ -225,7 +236,7 @@ constexpr std::int64_t stat_value(const Stats& s, StatKey k) {
         case StatKey::ChampionVamp: case StatKey::CritChance: case StatKey::CritDamage: case StatKey::ArcanePower: case StatKey::MartialPower:
         case StatKey::SkillAmp: case StatKey::Spellvamp: case StatKey::OnHitMaxHp: case StatKey::MagicPenPct: case StatKey::MagicResist:
         case StatKey::Evasion: case StatKey::BashChance: case StatKey::BlockChance: case StatKey::HealAmp: case StatKey::ModelSize:
-        case StatKey::ElementalPenetration: return true;
+        case StatKey::ElementalPenetration: case StatKey::SelfHeal: case StatKey::HealShieldPower: case StatKey::BuffPower: return true;
         default: return false;
     }
 }

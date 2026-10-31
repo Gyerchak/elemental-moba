@@ -132,7 +132,7 @@ void World::use_item(Unit& u, int slot, std::int32_t target_x, std::int32_t targ
         case ItemActive::Shadow:  // [U-478] invisible for 10 s, +20 % speed (feature Invisibility)
             if (!feature(kFeatInvisibility)) return;
             u.st.add(StatusKind::Invisible, now_ms + 10'000, 0, u.id);
-            u.st.add(StatusKind::Haste, now_ms + 10'000, 20, u.id);
+            u.st.add(StatusKind::Haste, now_ms + 10'000, lol_buff(&u, 20), u.id);  // [U-484]
             break;
         case ItemActive::None: return;
     }

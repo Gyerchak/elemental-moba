@@ -104,6 +104,9 @@ block_chance true_strike mana_break heal_amp` — 100 = 1 % for percentages. Ite
 | Silence | no abilities at all (bending or not); autoattacks still work |
 | Ability power | skills deal + `ap` % of it |
 | Silence-free kit rule | non-mages: every damaging skill scales with attack, bonus attack or ability power (`ad` / `bonus_ad` / `ap`) |
+| Self-healing (`self_heal`) | heals I give MYSELF (skills, passives, vamp, items) are stronger |
+| Heal & shield power (`heal_shield_power`) | heals and shields I give (to anyone) are stronger |
+| Polymorph | no autoattacks, no skills, −60 move speed (can still walk) |
 | Healing received | EVERY heal (skills, passives, vamp, items, HP regen, fountain) × (1 + `heal_amp`); a Transform's `buff_heal_pct` adds to it; then grievous wounds |
 | Magic penetration | flat / % — lower the target's elemental defence against non-physical damage (with the elemental pens) |
 
@@ -114,6 +117,7 @@ block_chance true_strike mana_break heal_amp` — 100 = 1 % for percentages. Ite
 | Skill power (`skill_power`) | ability power that only NON-mages use |
 | Magic power (`magic_power`) | ability power that only MAGES use |
 | Skill amp (`skill_amp`) | % more damage for every skill (was called "skill power" before) |
+| Buff power (`buff_power`) | EVERY buff I give is stronger: heals, shields, hastes, form bonuses (attack / healing), item active buffs, the effects of the jungle buffs I carry |
 
 ## 6. This game's own mechanics (engine: `src/game/mechanics/bending_cc.cpp`)
 

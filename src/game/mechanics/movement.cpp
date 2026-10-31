@@ -19,6 +19,7 @@ std::int64_t per_tick(std::int64_t per_s, std::uint64_t tick, std::uint32_t hz) 
 std::int32_t World::move_speed_sub(const Unit& u) const {
     // [U-219] move speed = (base + flat bonus) × (100 % + bonus %) × statuses (slows / hastes / swimming)
     std::int64_t ms100 = u.stats.move_speed.total();
+    if (u.st.has(StatusKind::Polymorph)) ms100 = std::max<std::int64_t>(10'000, ms100 - 6'000);  // [U-484] LoL polymorph: −60 base speed
     ms100 = ms100 * (10'000 + u.stats.move_speed_pct) / 10'000;
     ms100 = ms100 * u.st.move_speed_pct() / 100;
     if (u.st.has(StatusKind::Hex)) ms100 = std::min<std::int64_t>(ms100, 14'000);  // [U-476] a critter crawls

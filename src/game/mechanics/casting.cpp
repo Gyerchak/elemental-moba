@@ -85,7 +85,7 @@ void World::finish_cast(Unit& u) {
         dry(u);
     // keystones that trigger on any skill [U-177]
     if (has_keystone(u.loadout, KeystoneId::Tailwind)) {
-        u.st.add(StatusKind::Haste, now_ms + 1'500, 20, u.id);
+        u.st.add(StatusKind::Haste, now_ms + 1'500, lol_buff(&u, 20), u.id);  // [U-484]
         ++u.stat_keystone;
     }
     if (has_keystone(u.loadout, KeystoneId::ChiRush)) u.chirush_until = now_ms + 3'000;
@@ -252,7 +252,7 @@ void World::cast_skill(Unit& u, Slot slot, std::int32_t tx, std::int32_t ty, std
                         const std::int32_t heal_here = amount + std::int32_t((cur * d.pct_current_hp + mx * d.pct_max_hp +
                                                                               (mx - cur) * d.pct_missing_hp) / 10'000);
                         u.stat_healing += std::max(0, std::min(heal_here, o.stats.health.total() - o.hp)) / 100;
-                        heal(o, heal_here);
+                        heal(o, heal_here, &u);  // [U-484] my heal power
                     }
             }
             break;
@@ -338,8 +338,9 @@ void World::cast_skill(Unit& u, Slot slot, std::int32_t tx, std::int32_t ty, std
             break;
         }
         case SkillKind::Shield: {
-            u.st.add(StatusKind::Shield, now_ms + dur_ms, std::int32_t(r.damage * 100), u.id);
-            u.stat_shielding += r.damage;
+            const std::int32_t sh = lol_given_shield(&u, std::int32_t(r.damage * 100));  // [U-484]
+            u.st.add(StatusKind::Shield, now_ms + dur_ms, sh, u.id);
+            u.stat_shielding += sh / 100;
             u.shield_sub = std::uint8_t(d.sub);  // shown on the HP bar [U-155]
             if (d.size_bonus) {  // [U-129] armour makes the model (and hitbox) bigger
                 u.tmp_size = d.size_bonus;
@@ -348,7 +349,7 @@ void World::cast_skill(Unit& u, Slot slot, std::int32_t tx, std::int32_t ty, std
             }
             break;
         }
-        case SkillKind::Haste: u.st.add(StatusKind::Haste, now_ms + dur_ms, cc_val, u.id); break;
+        case SkillKind::Haste: u.st.add(StatusKind::Haste, now_ms + dur_ms, lol_buff(&u, cc_val), u.id); break;
         case SkillKind::Blink: {
             if (!d.teleport) {  // [U-229] no dash teleports for now: a very fast dash instead
                 e.kind = FxKind::Bolt;
@@ -396,7 +397,7 @@ void World::cast_skill(Unit& u, Slot slot, std::int32_t tx, std::int32_t ty, std
             u.fly_height = d.reach_height > 0 ? std::int32_t(40 + (d.reach_height - 40) * std::min<std::int64_t>(dist, std::max(1, d.range)) /
                                                                   std::max(1, d.range))
                                               : 120;
-            u.st.add(StatusKind::Haste, now_ms + dur_ms, cc_val, u.id);
+            u.st.add(StatusKind::Haste, now_ms + dur_ms, lol_buff(&u, cc_val), u.id);
             break;
         case SkillKind::MagicStance:  // [U-264]
             u.magic_until = now_ms + dur_ms;
@@ -407,7 +408,7 @@ void World::cast_skill(Unit& u, Slot slot, std::int32_t tx, std::int32_t ty, std
             u.st.add(StatusKind::Flying, now_ms + dur_ms, 0, u.id);
             u.lifted_by = kAirSelf;
             u.fly_height = 120;
-            u.st.add(StatusKind::Haste, now_ms + dur_ms, cc_val, u.id);
+            u.st.add(StatusKind::Haste, now_ms + dur_ms, lol_buff(&u, cc_val), u.id);
             add_feed(std::format("{} enters the Avatar State!", u.name));
             break;
         case SkillKind::SelfFreeze:  // [U-143] frozen self: untouchable, no heat
@@ -464,7 +465,7 @@ void World::cast_skill(Unit& u, Slot slot, std::int32_t tx, std::int32_t ty, std
             }
             u.st.remove(StatusKind::Swimming);
             u.st.add(StatusKind::WaterRide, now_ms + dur_ms, 0, u.id);
-            u.st.add(StatusKind::Haste, now_ms + dur_ms, cc_val, u.id);
+            u.st.add(StatusKind::Haste, now_ms + dur_ms, lol_buff(&u, cc_val), u.id);
             break;
         case SkillKind::StonePush: {  // [U-406] push a lifted stone: the chosen one, else the nearest within range
             Effect* rock = nullptr;
@@ -499,9 +500,9 @@ void World::cast_skill(Unit& u, Slot slot, std::int32_t tx, std::int32_t ty, std
         }
         case SkillKind::Transform:  // [U-456] the form: attack %, healing %, speed, size for dur_ms
             u.transform_until = now_ms + dur_ms;
-            u.transform_attack_pct = d.buff_attack_pct;
-            u.transform_heal_pct = d.buff_heal_pct;
-            if (cc_val > 0) u.st.add(StatusKind::Haste, now_ms + dur_ms, cc_val, u.id);
+            u.transform_attack_pct = std::int16_t(lol_buff(&u, d.buff_attack_pct));  // [U-484] buff power
+            u.transform_heal_pct = std::int16_t(lol_buff(&u, d.buff_heal_pct));
+            if (cc_val > 0) u.st.add(StatusKind::Haste, now_ms + dur_ms, lol_buff(&u, cc_val), u.id);
             if (d.size_bonus > 0) u.tmp_size = d.size_bonus, u.tmp_size_until = now_ms + dur_ms;
             recompute_stats(u);
             if (d.cc != StatusKind::Count && r.radius > 0)  // [U-472] the form's entrance: crowd control around (e.g. fear minions away)
