@@ -164,7 +164,7 @@ void World::step_bot(Unit& u) {
                     const SkillDef* d = u.skill[std::size_t(s)];
                     if (!d || !can_cast_now(u, s)) continue;
                     if (d->kind == SkillKind::Shield || d->kind == SkillKind::Heal || d->kind == SkillKind::Haste ||
-                        d->kind == SkillKind::Flight || (d->kind == SkillKind::SelfFreeze && hp_pct < 18)) {
+                        d->kind == SkillKind::Transform || d->kind == SkillKind::Flight || (d->kind == SkillKind::SelfFreeze && hp_pct < 18)) {
                         send({.kind = CmdKind::Cast, .slot = std::uint8_t(s), .x = u.ux(), .y = u.uy()});
                         break;
                     }

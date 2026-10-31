@@ -16,7 +16,7 @@
 
 namespace em::net {
 
-inline constexpr std::uint16_t kProtocol = 12;  // 12: maps, lobby owner / queue, charges [U-420..U-433]  // 11: rule sets, own emotes [U-414][U-416]  // 7: ten item slots [U-322]; 8: cast sources [U-340]; 9: camps, jungle buffs [U-364..U-366]; 10: bounties, companions [U-407][U-413]
+inline constexpr std::uint16_t kProtocol = 13;  // 13: cast stages, chains, skill visuals, proc + recast timers [U-456..U-459]  // 12: maps, lobby owner / queue, charges [U-420..U-433]  // 11: rule sets, own emotes [U-414][U-416]  // 7: ten item slots [U-322]; 8: cast sources [U-340]; 9: camps, jungle buffs [U-364..U-366]; 10: bounties, companions [U-407][U-413]
 inline constexpr std::string_view kVersion = "official-0.1";  // [U-95][X-14]
 inline constexpr std::uint16_t kDefaultPort = 7777;
 inline constexpr int kMaxPlayers = 32;  // [U-09]
@@ -259,6 +259,18 @@ struct NetFx {
     std::int32_t x, y;
     std::int16_t radius, width, length, dx, dy;
     std::uint8_t feeds, combo, armed, ally;
+    // [U-459] the skill's own look (SkillDef::vis), drawn on the exact hitbox above: 0 = the default for its shape
+    std::uint32_t vcol;
+    std::uint8_t vfill, vglow, vtrail, vflash, vpart, vpad;
+    std::uint16_t vmark_ms;
+};
+
+// [U-456] a chain between a caster and an enemy: pulled to the anchor if still inside the circle when it ends
+struct NetTether {
+    std::int32_t sx, sy, dx, dy, ax, ay;
+    std::int16_t radius;
+    std::uint8_t team, sub;
+    std::int32_t left_ms, total_ms;
 };
 
 struct NetLight {
@@ -351,6 +363,7 @@ struct NetMe {
     std::int16_t lion_stacks[2];    // [U-364] Lion Turtle stacks per team
     std::uint8_t charges[kSkillSlots];  // [U-433] charges ready per skill (255 = the skill has no charges)
     std::int32_t charge_left_ms[kSkillSlots], charge_total_ms[kSkillSlots];  // [U-444] the next charge: time left / full
+    std::int32_t recast_left_ms[kSkillSlots], recast_total_ms[kSkillSlots];  // [U-458] a multicast's open window: time left / full
 };
 
 // [U-407] a travel companion on its way (or carrying its rider home)

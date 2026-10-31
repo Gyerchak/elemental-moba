@@ -40,6 +40,22 @@ def manifest():
         body = f[4].split(" ")[1] if " " in f[4] else "humanoid"
         out.append({"id": f[1], "kind": "humanoid", "body": body, "colour": f[5], "accent": f[6],
                     "front": str(ROOT / "art" / "raw" / "champion_front" / f"{f[1]}.png"), "px": 128, "ortho": 2.2, "anchor": 0.85, "anims": HUMAN})
+    # [U-460] own champions (custom_champions/*.champ): the model comes from their model.* keys
+    #   model.body = humanoid / slim / broad, model.height = 2.1, model.weapon = sword / staff / greatsword,
+    #   model.extras = wings horns pauldrons glow_eyes, model.accent = ff2020 (colour = the champion's colour)
+    for f in sorted((ROOT / "custom_champions").glob("*.champ")):
+        kv = {}
+        for line in f.read_text(errors="replace").splitlines():
+            if "=" in line and not line.lstrip().startswith("#"):
+                k, v = line.split("=", 1)
+                kv[k.strip()] = v.split("#")[0].strip()
+        if not kv.get("name") or "model.body" not in kv:
+            continue
+        cid = "".join("_" if c in " -" else c.lower() for c in kv["name"] if c != "'")
+        out.append({"id": cid, "kind": "humanoid", "body": kv["model.body"], "height": float(kv.get("model.height", 1.8)),
+                    "colour": kv.get("colour", "888888"), "accent": kv.get("model.accent", "ffffff"), "weapon": kv.get("model.weapon"),
+                    "extras": kv.get("model.extras", "").split(), "px": 128, "ortho": float(kv.get("model.ortho", 2.6)),
+                    "anchor": 0.85, "anims": HUMAN})
     # minions are grey: the game tints them in the team colour
     out += [
         {"id": "minion_melee", "kind": "humanoid", "body": "humanoid", "height": 1.25, "colour": "c8c8c8", "accent": "f0f0f0",

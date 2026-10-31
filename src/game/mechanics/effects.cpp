@@ -53,7 +53,8 @@ void World::effect_hits(Effect& e) {
         }
         // [U-222] sweet spot: a better hit in the best part of the hitbox (not a crit [U-221])
         bool sweet = false;
-        if (e.def && e.def->sweet_pct > 0) {
+        const std::int32_t sweet_pct = e.sweet >= 0 ? e.sweet : e.def ? e.def->sweet_pct : 0;  // [U-456] per cast stage
+        if (e.def && sweet_pct > 0) {
             const std::int64_t d = isqrt(dist2(o.ux(), o.uy(), e.ux(), e.uy()));
             switch (e.kind) {
                 case FxKind::Burst: case FxKind::Field: sweet = d <= e.radius * 40 / 100; break;
@@ -61,7 +62,7 @@ void World::effect_hits(Effect& e) {
                 case FxKind::Bolt: case FxKind::Wave: sweet = e.travel_left <= e.travel_total / 5; break;
                 default: break;
             }
-            if (sweet) dmg = dmg * (100 + e.def->sweet_pct) / 100;
+            if (sweet) dmg = dmg * (100 + sweet_pct) / 100;
         }
         hit_flags_ = sweet ? kHitSweet : 0;
         if (e.combo == Combo::Firestorm) dmg = dmg * (100 + elements::kAirEmpowersFirePct) / 100;  // [U-241]
@@ -77,6 +78,8 @@ void World::effect_hits(Effect& e) {
             for (std::size_t sl = 0; sl < owner->skill.size(); ++sl)
                 if (owner->skill[sl] == e.def) dmg_tag_.slot = std::uint8_t(sl);
         deal_damage(owner, o, dmg, e.sub, e.physical, false, &e.src);
+        if (e.def && e.def->tether_ms > 0 && o.alive && owner && o.team != owner->team)  // [U-456] the chain holds on
+            tethers.push_back({owner->id, o.id, o.ux(), o.uy(), e.def->tether_radius, e.def->pull, now_ms + e.def->tether_ms, e.def, dmg, e.sub, e.physical});
         if (owner && o.team != owner->team) {  // [U-416] passives that trigger on a skill hit
             const DmgTag keep = dmg_tag_;
             passive_proc(*owner, &o, 2);

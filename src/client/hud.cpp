@@ -354,7 +354,23 @@ void GameView::draw_bottom_panel(NetClient& net, double now_s, Ui& ui) {
         if (const double fl = last_frame_ - cd_ready_t_[std::size_t(i)]; fl >= 0 && fl < 0.35)
             fill_rect(r_, sx, sy, 50, 50, {255, 255, 230, std::uint8_t(160 * (1 - fl / 0.35))});
         if (me.stolen_ms > 0 && me.stolen_slot == i) text(r_, sx + 2, sy + 38, "STOLEN", {255, 80, 255});
-        if (me.recast[i] > 0 && d && d->casts > 1) text(r_, sx + 30, sy + 2, std::format("{}/{}", me.recast[i], d->casts), {255, 255, 120});
+        if (me.recast[i] > 0 && d && d->casts > 1) {  // [U-458] a multicast: which cast is next + how long it stays open
+            const std::int64_t wl = std::max<std::int64_t>(0, me.recast_left_ms[i] - std::int64_t(since * 1000));
+            for (int k = 0; k < std::min(d->casts, 6); ++k) {  // one pip per cast: done = dim, next = bright, later = outline
+                const float px = sx + 25 - float(std::min(d->casts, 6) - 1) * 4.f + float(k) * 8.f, py = sy - 6;
+                if (k < me.recast[i]) fill_circle(r_, px, py, 3, {120, 110, 60, 255}, 8);
+                else if (k == me.recast[i]) fill_circle(r_, px, py, 3.5f, {255, 240, 120, 255}, 8);
+                else ring_arc(r_, px, py, 3, 1.f, {200, 200, 160, 200}, 1);
+            }
+            if (wl > 0 && me.recast_total_ms[i] > 0) {
+                ring_arc(r_, sx + 25, sy + 25, 27, float(wl) / float(me.recast_total_ms[i]), {255, 225, 90, 255}, 3);  // the window running out
+                const std::string ns = std::format("{}", me.recast[i] + 1);  // the number of the NEXT cast, big
+                text(r_, sx + 26 - text_w(ns, 1.6f) / 2, sy + 15, ns, {0, 0, 0}, 1.6f);
+                text(r_, sx + 25 - text_w(ns, 1.6f) / 2, sy + 14, ns, {255, 240, 120}, 1.6f);
+                const std::string ws = std::format("{:.1f}s", wl / 1000.0);  // seconds before it goes on cooldown
+                text(r_, sx + 25 - text_w(ws) / 2, sy + 33, ws, wl < 1'000 ? Rgba{255, 120, 90} : Rgba{255, 240, 180});
+            }
+        }
         if (me.charges[i] != 255) {  // [U-433][U-444] charges ready + a ring filling up to the next charge
             fill_circle(r_, sx + 41, sy + 40, 9, {20, 20, 30, 235}, 16);
             if (me.charge_total_ms[i] > 0 && me.charge_left_ms[i] > 0)

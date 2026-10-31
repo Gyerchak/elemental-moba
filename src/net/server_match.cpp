@@ -237,10 +237,27 @@ void Server::send_snapshot(Player& p) {
         n.combo = std::uint8_t(e.combo);
         n.armed = e.kind != FxKind::Burst || W.now_ms >= e.arm_ms;
         n.ally = e.ally;
+        if (e.def) {  // [U-459]
+            const SkillDef::Visual& v = e.def->vis;
+            n.vcol = v.colour, n.vfill = v.fill, n.vglow = v.glow, n.vtrail = v.trail, n.vflash = v.flash, n.vpart = v.particles, n.vmark_ms = v.mark_ms;
+        }
         fs.push_back(n);
     }
     w.put<std::uint16_t>(std::uint16_t(fs.size()));
     for (const NetFx& n : fs) w.put(n);
+    {  // [U-456] chains this team can see (either end visible)
+        std::vector<NetTether> ts;
+        for (const Tether& t : W.tethers) {
+            const Unit* s = W.find(t.src);
+            const Unit* d = W.find(t.dst);
+            if (!s || !d || (!W.visible_to(team, *s) && !W.visible_to(team, *d))) continue;
+            ts.push_back({s->ux(), s->uy(), d->ux(), d->uy(), t.ax, t.ay, std::int16_t(t.radius), std::uint8_t(s->team),
+                          std::uint8_t(t.def ? t.def->sub : SubElement::Physical), std::int32_t(t.until_ms - W.now_ms),
+                          t.def ? t.def->tether_ms : 1});
+        }
+        w.put<std::uint16_t>(std::uint16_t(ts.size()));
+        for (const NetTether& n : ts) w.put(n);
+    }
     // lights: team-neutral layer, every team gets all [U-116][U-117]
     // [U-280] lights change at 16 Hz → sent only when they were rebuilt since this player's last snapshot (0xffff = same)
     if (p.lights_sent_tick == W.lights_tick) {
@@ -416,6 +433,18 @@ void Server::send_snapshot(Player& p) {
         m.cd_left_ms[i] = std::int32_t(std::max<std::int64_t>(0, a.cd_end_ms - W.now_ms));
         m.cd_total_ms[i] = me->skill[std::size_t(i)] ? std::int32_t(W.resolved(*me, Slot(i)).cooldown_ms) : 0;
         m.recast[i] = a.mc.casts_used;
+        if (const SkillDef* md = me->skill[std::size_t(i)]; md && md->casts > 1 && a.mc.casts_used > 0 && a.mc.casts_used < md->casts &&
+                                                             W.now_ms <= a.mc.window_end_ms) {  // [U-458] the next cast is open:
+            m.recast_left_ms[i] = std::int32_t(a.mc.window_end_ms - W.now_ms);                   // its window, no cooldown sweep
+            m.recast_total_ms[i] = md->recast_ms;
+            m.cd_left_ms[i] = 0;
+        } else if (md && md->casts > 1 && a.mc.casts_used > 0 && W.now_ms > a.mc.window_end_ms) {
+            m.recast[i] = 0;  // (the window ran out: the skill now only waits for its cooldown)
+        }
+        if (i == 0 && me->skill[0] && me->skill[0]->proc && me->skill[0]->proc_cd_ms > 0) {  // [U-457] the passive's own cooldown
+            m.cd_left_ms[0] = std::int32_t(std::max<std::int64_t>(0, me->proc_ready_ms - W.now_ms));
+            m.cd_total_ms[0] = me->skill[0]->proc_cd_ms;
+        }
         {  // [U-433]
             const SkillDef* cd = me->skill[std::size_t(i)];
             m.charges[i] = cd && cd->charges ? std::uint8_t(cd->charges - a.charges_used) : 255;

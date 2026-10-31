@@ -200,6 +200,10 @@ void World::step_units() {
             u.tmp_size_until = 0;
             recompute_stats(u);
         }
+        if (u.transform_until && u.transform_until <= now_ms) {  // [U-456] the form ends
+            u.transform_until = 0;
+            recompute_stats(u);
+        }
         if (u.lotus_until && u.lotus_until <= now_ms) {
             u.lotus_until = 0;
             recompute_stats(u);

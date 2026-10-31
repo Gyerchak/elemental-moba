@@ -425,6 +425,7 @@ void World::recompute_stats(Unit& u) {
     apply_loadout(s, u.loadout);                                   // [U-177] runes + specialisation
     if (u.lotus_until > now_ms) s.cast_speed += kLotusCastSpeed;  // [X-46][U-114]
     if (u.tmp_size_until > now_ms) s.model_size += u.tmp_size;     // [U-129]
+    if (u.transform_until > now_ms) s.attack.bonus += s.attack.base * u.transform_attack_pct / 100;  // [U-456]
     u.attack_range = d.attack_range * sky_boost(d.element, sky).auto_range_pct / 100;  // [U-370] water autos at full moon
     if (d.stance && u.stance_b) {  // [U-72] knives stance: ranged, weaker hits
         s.range = Range::Ranged;
@@ -593,7 +594,17 @@ void World::command(std::uint32_t id, const Cmd& c) {
                 break;
             }
             if (u.casting) {
-                refuse(u, "already casting");
+                if (!d->free_cast) {
+                    refuse(u, "already casting");
+                    break;
+                }
+                // [U-456] a skill that may be cast DURING another cast (e.g. a dash inside a swing): the other cast goes on
+                const Order keep = u.cast;
+                const std::int64_t keep_end = u.cast_end_ms, keep_windup = u.windup_end_ms;
+                const std::uint8_t keep_stage = u.cast_stage;
+                start_cast(u, {OrderKind::Cast, c.target, c.x, c.y, std::uint8_t(s), c.sx, c.sy});
+                if (u.casting) finish_cast(u);  // (free casts are instant)
+                u.cast = keep, u.cast_end_ms = keep_end, u.windup_end_ms = keep_windup, u.cast_stage = keep_stage, u.casting = true;
                 break;
             }
             start_cast(u, {OrderKind::Cast, c.target, c.x, c.y, std::uint8_t(s), c.sx, c.sy});
@@ -716,6 +727,7 @@ void World::step() {
     lap(2);
     step_units();
     step_companions();  // [U-407]
+    step_tethers();     // [U-456]
     separate_minions();  // [U-299]
     lap(3);
     step_effects();

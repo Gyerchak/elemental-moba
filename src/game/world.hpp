@@ -194,6 +194,9 @@ struct Unit {
     std::int64_t wind_sense_until = 0;
     std::int32_t tmp_size = 0;
     std::int64_t tmp_size_until = 0;
+    std::uint8_t cast_stage = 0;        // [U-456] which cast of a multicast is being cast (0 = the first)
+    std::int64_t transform_until = 0;   // [U-456] a Transform skill is active …
+    std::int16_t transform_attack_pct = 0, transform_heal_pct = 0;  // … with these
     std::int64_t lotus_until = 0;
     std::int64_t flask_until = 0;  // [U-81] immortal heal window
     std::int32_t flask_revive = 0; // revive heals left
@@ -290,6 +293,7 @@ struct Effect {
     std::uint32_t owner = 0;
     std::uint32_t target = 0;  // homing (autos, tower shots)
     const SkillDef* def = nullptr;
+    std::int16_t sweet = -1;  // [U-456] this cast stage's own sweet spot (-1 = the skill's)
     SubElement sub = SubElement::Physical;
     Flow flow = Flow::Plain;
     std::int32_t x = 0, y = 0;    // sub
@@ -341,6 +345,15 @@ struct CellChange {
     std::uint32_t raw = 0;
     std::uint8_t pub = 0, pad[3]{};  // [U-288] bit 1 = a change by time: every map shows it at once; [U-436] bit 2 / 4 = only
                                      // the Fire / Earth team's map (its own bending: the creator's team sees it without vision)
+};
+struct Tether {  // [U-456] a chain from a skill hit: still in the area at `until` → pulled to the anchor
+    std::uint32_t src = 0, dst = 0;
+    std::int32_t ax = 0, ay = 0, radius = 0, pull = 0;
+    std::int64_t until_ms = 0;
+    const SkillDef* def = nullptr;
+    std::int32_t dmg = 0;  // the second hit when it pulls (= the first hit)
+    SubElement sub = SubElement::Physical;
+    bool physical = true;
 };
 struct ElevLayer {  // [U-440] one raise of the ground on one cell: they ADD UP and each ends on its own
     std::int16_t x = 0, y = 0;
@@ -613,6 +626,8 @@ public:
     std::vector<Circle> rock_bodies_;
     std::vector<Effect> fx_pending_;
     std::vector<ElevLayer> elev_layers_;     // [U-440]
+    std::vector<Tether> tethers;             // [U-456]
+    void step_tethers();
     void raise_ground(int cx, int cy, int amount, std::int64_t until_ms);  // adds a layer
     void apply_elevation(int cx, int cy);    // the cell's height = its ground + every active layer
     void step_elevation();         // [U-383] effects made while the effect loop runs (added after it)        // [U-386] stone skills (boulders) this tick: they block like walls (kCollWall)

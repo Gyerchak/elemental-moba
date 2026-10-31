@@ -27,7 +27,7 @@ std::string trim(std::string s) {
 // [U-415] full own champions: any skill field by name. Enum values by their names (the order of the enums).
 constexpr std::string_view kKinds[] = {"None", "Bolt", "Wave", "Burst", "Field", "Cone", "Dash", "Wall", "Pillar", "Tornado", "Shield",
                                        "Heal", "Haste", "Blink", "Lantern", "WindSense", "Flight", "SelfFreeze", "Bloodbend", "Boulder",
-                                       "Passive", "WaterSpout", "IcePath", "Redirect", "AvatarState", "MagicStance", "StonePush", "MoveWater"};
+                                       "Passive", "WaterSpout", "IcePath", "Redirect", "AvatarState", "MagicStance", "StonePush", "Transform", "MoveWater"};
 constexpr std::string_view kSubs[] = {"Water", "Ice", "Wood", "Blood", "Mud", "Steam", "Air", "Earth", "Lava", "Metal", "EarthArmor",
                                       "MetalArmor", "Fire", "BlueFire", "Lightning", "Combustion", "Physical"};
 constexpr std::string_view kStatuses[] = {"Stun", "Root", "Slow", "Silence", "Mute", "Airborne", "Frozen", "Blind", "Burn", "Shield",
@@ -140,6 +140,7 @@ std::string parse_text(const std::string& text, ChampionDef& out) {
             const bool known = std::ranges::any_of(q_options(), [&](const SkillDef& q) { return q.name == v; });
             if (!known) return std::format("line {}: '{}' is not a Q option", n, v);
             out.q_pool[std::size_t(k[1] - '1')] = keep(v);
+        } else if (k.starts_with("model.")) {  // [U-460] read by tools/art/make_models.py (the game uses the made sprite sheet)
         } else if (k.starts_with("autos.")) {  // [U-217][U-393] autoattack shape
             const std::string f = k.substr(6);
             std::int32_t x = 0;
@@ -221,6 +222,46 @@ std::string parse_text(const std::string& text, ChampionDef& out) {
             else if (f == "wall_segs") ok = num(sk.wall_segs, 0, 20);
             else if (f == "control") ok = num(sk.control, 0, 2);
             else if (f == "sensed_target") ok = num(sk.sensed_target, -1, 1);  // [U-431]
+            // [U-456] cast stages of a multicast: stage1.kind = Cone, stage2.width = 120, stage3.sweet_pct = 70 …
+            else if (f.size() > 7 && f.starts_with("stage") && f[5] >= '1' && f[5] <= '3' && f[6] == '.') {
+                SkillDef::CastStage& st = sk.stages[std::size_t(f[5] - '1')];
+                const std::string g = f.substr(7);
+                if (g == "kind") {
+                    const int e = enum_of(kKinds, v);
+                    if (e < 0) return std::format("line {}: unknown skill kind '{}'", n, v);
+                    st.kind = SkillKind(e);
+                } else if (g == "range") ok = num(st.range, 0, 5'000);
+                else if (g == "width") ok = num(st.width, 0, 3'000);
+                else if (g == "radius") ok = num(st.radius, 0, 2'000);
+                else if (g == "dmg_pct") ok = num(st.dmg_pct, 0, 1'000);
+                else if (g == "sweet_pct") ok = num(st.sweet_pct, -1, 300);
+                else return std::format("line {}: unknown key '{}'", n, k);
+            }
+            else if (f == "tether_ms") ok = num(sk.tether_ms, 0, 10'000);  // [U-456] chains
+            else if (f == "tether_radius") ok = num(sk.tether_radius, 0, 3'000);
+            else if (f == "pull") ok = num(sk.pull, 0, 3'000);
+            else if (f == "cc2") {
+                const int e = enum_of(kStatuses, v);
+                if (e < 0) return std::format("line {}: unknown crowd control '{}'", n, v);
+                sk.cc2 = v == "None" ? StatusKind::Count : StatusKind(e);
+            }
+            else if (f == "cc2_ms") ok = num(sk.cc2_ms, 0, 20'000);
+            else if (f == "free_cast") { std::int32_t b = 0; ok = num(b, 0, 1); sk.free_cast = b != 0; }
+            else if (f == "buff_attack_pct") ok = num(sk.buff_attack_pct, 0, 500);  // [U-456] Transform
+            else if (f == "buff_heal_pct") ok = num(sk.buff_heal_pct, 0, 500);
+            // [U-459] the look on the exact hitbox: vis.colour = ff3020, vis.glow / fill / particles 0..255, trail 0..11 …
+            else if (f == "vis.colour") {
+                std::uint32_t c = 0;
+                const auto res = std::from_chars(v.data(), v.data() + v.size(), c, 16);
+                if (res.ec != std::errc{} || c > 0xffffff) return std::format("line {}: a colour is 6 hex digits (ff3020)", n);
+                sk.vis.colour = c;
+            }
+            else if (f == "vis.fill") ok = num(sk.vis.fill, 0, 255);
+            else if (f == "vis.glow") ok = num(sk.vis.glow, 0, 255);
+            else if (f == "vis.trail") ok = num(sk.vis.trail, 0, 11);
+            else if (f == "vis.flash") ok = num(sk.vis.flash, 0, 1);
+            else if (f == "vis.particles") ok = num(sk.vis.particles, 0, 40);
+            else if (f == "vis.mark_ms") ok = num(sk.vis.mark_ms, 0, 30'000);
             else if (f == "self_root_ms") ok = num(sk.self_root_ms, -1, 5'000);  // [U-434]
             else if (f == "charges") ok = num(sk.charges, 0, 9);               // [U-433]
             else if (f == "charge_ms") ok = num(sk.charge_ms, 0, 600'000);

@@ -11,6 +11,7 @@ namespace em {
 
 void World::heal(Unit& u, std::int32_t hundredths) {
     if (!u.alive) return;
+    if (u.transform_until > now_ms && hundredths > 0) hundredths = hundredths * (100 + u.transform_heal_pct) / 100;  // [U-456]
     if (classic_rules(cfg.ruleset) && hundredths > 0)  // [U-416] grievous wounds: healing −value %
         for (int i = 0; i < u.st.size(); ++i)
             if (u.st[i].kind == StatusKind::Grievous) hundredths = hundredths * (100 - std::clamp<int>(u.st[i].value, 0, 100)) / 100;
@@ -62,6 +63,23 @@ void World::interrupt(Unit& u, std::uint32_t event) {
         u.order = {};
         std::erase_if(clouds, [&](const Cloud& c) { return c.kind == CloudKind::Arrival && c.owner == u.id; });  // nobody comes
     }
+}
+
+// [U-456] chains: whoever is still inside the area when the chain ends is pulled to its anchor (+ cc2)
+void World::step_tethers() {
+    std::erase_if(tethers, [&](const Tether& t) {
+        if (t.until_ms > now_ms) return false;
+        Unit* d = find(t.dst);
+        if (d && d->alive && dist2(d->ux(), d->uy(), t.ax, t.ay) <= std::int64_t(t.radius) * t.radius) {
+            const std::int32_t far = std::int32_t(isqrt(dist2(d->ux(), d->uy(), t.ax, t.ay)));
+            if (far > 0 && t.pull > 0)  // a push away from the mirrored point = a pull to the anchor
+                knock(*d, 2 * d->ux() - t.ax, 2 * d->uy() - t.ay, std::min(far, t.pull), t.src);
+            if (Unit* s = find(t.src); s && t.dmg > 0) deal_damage(s, *d, t.dmg, t.sub, t.physical, false);
+            if (t.def && t.def->cc2 != StatusKind::Count && d->alive)
+                if (const Unit* s = find(t.src)) apply_cc(s->stats, t.src, *d, t.def->cc2, t.def->cc2_ms, 0, t.def->sub);
+        }
+        return true;
+    });
 }
 
 void World::knock(Unit& dst, std::int32_t from_x, std::int32_t from_y, std::int32_t dist, std::uint32_t src_id) {

@@ -178,6 +178,26 @@ private:
     };
     std::unordered_map<std::uint32_t, AnimMem> anim_mem_;
     std::unordered_map<std::uint32_t, double> fx_born_;
+    // [U-459] the programmable skill look: per effect its recent path (trail) + what it leaves when it ends
+    struct FxTrack {
+        float x = 0, y = 0, r = 0;
+        std::uint32_t col = 0;
+        std::uint8_t flash = 0, nh = 0;
+        std::uint16_t mark_ms = 0;
+        double seen = 0;
+        std::array<std::pair<float, float>, 12> hist{};
+    };
+    std::unordered_map<std::uint32_t, FxTrack> fx_track_;
+    struct FxMark {
+        float x, y, r;
+        double t0, dur;
+        std::uint32_t col;
+        bool flash;  // an expanding ring (start / impact) — otherwise a fading ground mark
+    };
+    std::vector<FxMark> fx_marks_;
+    void draw_fx_look(const net::NetFx& f, const Shape& s, std::uint32_t col, double now_s);
+    void draw_fx_marks(double now_s);
+    void draw_tethers(NetClient& net, double now_s);
     int sent_companion_ = -1;  // [U-407]
     bool force_quick_ = false; // [U-452] Ctrl + skill with nothing to level
     std::array<bool, kSkillSlots> cd_was_{};          // [U-444] on cooldown last frame …

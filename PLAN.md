@@ -222,3 +222,10 @@ clang 22 and GCC 16 (`README.md` → Build / Play).
 
 - [x] Text chat (Enter) [X-23].
 - [ ] Replays, spectator [X-19][X-20]; audio + sound fog [X-18]; ping wheel / voice [X-23]; PL/EN [X-28].
+
+## M21 — Round 17: Aatrox, universal skill look, clearer timers (2026-10-31)
+- [x] Cast stages, chains with pull, free casts, Transform [U-456][X-203..X-205].
+- [x] Passive proc cooldown on the P icon [U-457]; multicast pips / window ring / seconds [U-458].
+- [x] Programmable skill look on the exact hitbox (vis.*) [U-459]; own champion models from .champ (model.*) [U-460].
+- [x] `dump_content --check-champ FILE` validates an own champion file.
+- [ ] Fear status (Aatrox ult uses a slow for now); lifesteal on Umbral Dash; skill icons for the copy.

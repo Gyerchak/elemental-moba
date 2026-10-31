@@ -181,6 +181,28 @@ def humanoid(m, root, height=1.8, width=1.0, weapon=None):
         part("cyl", "staff", J["shR"], (0, -0.05, -0.55 * h), rot=(math.radians(10), 0, 0), mat=material("wood", (0.45, 0.3, 0.15)),
              r1=0.025, r2=0.025, d=1.4 * h)
         part("ico", "orb", J["shR"], (0, -0.12, 0.13 * h), mat=material("orb", acc, emit=2.0), r=0.08)
+    elif weapon == "greatsword":  # [U-460] a huge two-handed blade with a glowing eye at the guard
+        blade = material("blade", tuple(c * 0.55 for c in col), rough=0.35)
+        part("cube", "gs_blade", J["shR"], (0, -0.55, -0.62 * h), scale=(0.035, 1.1, 0.16), mat=blade)
+        part("cube", "gs_edge", J["shR"], (0, -0.55, -0.5 * h), scale=(0.02, 1.05, 0.03), mat=trim)
+        part("cube", "gs_guard", J["shR"], (0, 0.05, -0.62 * h), scale=(0.08, 0.08, 0.32), mat=dark)
+        part("sphere", "gs_eye", J["shR"], (0.045, 0.05, -0.62 * h), mat=material("gs_eye", acc, emit=4.0), r=0.045)
+    for ex in m.get("extras", []):  # [U-460] programmable add-ons from the .champ (model.extras = wings horns …)
+        if ex == "wings":
+            wing = material("wing", tuple(c * 0.6 for c in col), rough=0.6)
+            for side, sx in (("R", -1), ("L", 1)):
+                part("cube", f"wing{side}", J["hip"], (sx * 0.38 * width, 0.22, 0.55 * h), rot=(math.radians(-15), math.radians(sx * 35), 0),
+                     scale=(0.42, 0.03, 0.34 * h), mat=wing)
+        elif ex == "horns":
+            for side, sx in (("R", -1), ("L", 1)):
+                part("cyl", f"horn{side}", J["neck"], (sx * 0.09 * h, 0, 0.27 * h), rot=(0, math.radians(sx * 30), 0), mat=dark,
+                     r1=0.035 * h, r2=0.005, d=0.22 * h)
+        elif ex == "pauldrons":
+            for side, sx in (("R", -1), ("L", 1)):
+                part("sphere", f"pauldron{side}", J["hip"], (sx * 0.3 * width, 0, 0.6 * h), mat=trim, r=0.11 * width)
+        elif ex == "glow_eyes":
+            for ex2 in (-0.045, 0.045):
+                part("sphere", "eye", J["neck"], (ex2 * h, -0.12 * h, 0.16 * h), mat=material("eyes", acc, emit=5.0), r=0.022 * h)
     return J
 
 

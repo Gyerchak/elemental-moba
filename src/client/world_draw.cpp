@@ -903,6 +903,73 @@ void GameView::draw_hits(NetClient& net, double now_s) {
     }
 }
 
+// ---------------------------------------------------------------- [U-459] the programmable skill look
+// Every skill effect is drawn on its EXACT hitbox (fx_shape = the server's shape); SkillDef::vis adds steps on top of
+// it: glow (soft edge rings), trail (where it was), particles (sparks inside the hitbox), flash (a ring at the start
+// and where it ends) and mark (a ground mark it leaves for mark_ms). 0 everywhere = the default for its shape.
+void GameView::draw_fx_look(const net::NetFx& f, const Shape& s, std::uint32_t col, double now_s) {
+    const FxKind k = FxKind(f.kind);
+    const Rgba c = hex(col);
+    const float rad = float(std::max<int>({f.radius, f.width / 2, 8}));
+    const std::uint8_t trail = f.vtrail ? f.vtrail : k == FxKind::Bolt || k == FxKind::Boulder ? 5 : 0;
+    const std::uint8_t flash = f.vflash ? f.vflash : k == FxKind::Burst || k == FxKind::Bolt ? 1 : 0;
+    auto [it, fresh] = fx_track_.try_emplace(f.id);
+    FxTrack& t = it->second;
+    if (fresh && flash) fx_marks_.push_back({float(f.x), float(f.y), rad * 0.8f, now_s, 0.25, col, true});
+    if (fresh || std::hypot(float(f.x) - t.x, float(f.y) - t.y) > 6) {  // a new trail point every few units of travel
+        std::move_backward(t.hist.begin(), t.hist.end() - 1, t.hist.end());
+        t.hist[0] = {float(f.x), float(f.y)};
+        t.nh = std::uint8_t(std::min<int>(t.nh + 1, int(t.hist.size())));
+    }
+    t.x = float(f.x), t.y = float(f.y), t.r = rad, t.col = col, t.flash = flash, t.mark_ms = f.vmark_ms, t.seen = now_s;
+    for (int i = 1; i < std::min<int>(t.nh, trail + 1); ++i) {  // the trail: shrinking, fading copies behind it
+        const float q = 1.f - float(i) / float(trail + 1);
+        ground_fill(r_, view_, t.hist[std::size_t(i)].first, t.hist[std::size_t(i)].second, rad * (0.4f + 0.5f * q), with_alpha(c, std::uint8_t(110 * q)), 14);
+    }
+    if (f.vglow)
+        for (int g = 1; g <= 3; ++g)
+            outline_shape(r_, view_, s, with_alpha(mixc(c, {255, 255, 255, 255}, 30), std::uint8_t(f.vglow / (g + 1))), 2.f + float(g * f.vglow) / 60.f);
+    for (int i = 0; i < f.vpart; ++i) {  // sparks: deterministic per effect + time (no state), inside the hitbox circle
+        const std::uint32_t h = (f.seed * 2654435761u) ^ std::uint32_t(i * 40503) ^ std::uint32_t(now_s * 12) * 97u;
+        const float ang = float(h % 6283) / 1000.f, d = rad * float((h >> 13) % 100) / 100.f;
+        const float life = float(std::fmod(now_s * 12, 1.0));
+        fill_circle(r_, view_.sx(float(f.x) + std::cos(ang) * d), view_.sy_h(float(f.y) + std::sin(ang) * d, 10 + 30 * life), 2.f + view_.zoom,
+                    with_alpha(mixc(c, {255, 255, 255, 255}, 50), std::uint8_t(230 * (1 - life))), 6);
+    }
+}
+
+void GameView::draw_fx_marks(double now_s) {
+    std::erase_if(fx_marks_, [&](const FxMark& m) { return now_s - m.t0 > m.dur; });
+    if (fx_marks_.size() > 400) fx_marks_.erase(fx_marks_.begin(), fx_marks_.end() - 400);
+    for (const FxMark& m : fx_marks_) {
+        const float q = float((now_s - m.t0) / m.dur);
+        const Rgba c = hex(m.col);
+        if (m.flash) {
+            ground_ring(r_, view_, m.x, m.y, m.r * (0.6f + 0.9f * q), with_alpha(mixc(c, {255, 255, 255, 255}, 45), std::uint8_t(230 * (1 - q))), 32);
+            ground_fill(r_, view_, m.x, m.y, m.r * (0.5f + 0.5f * q), with_alpha(c, std::uint8_t(90 * (1 - q))), 20);
+        } else {
+            ground_fill(r_, view_, m.x, m.y, m.r, with_alpha(mixc(c, {0, 0, 0, 255}, 55), std::uint8_t(120 * (1 - q))), 20);
+        }
+    }
+}
+
+// [U-456] a chain: a line from the caster to the target, the circle it must leave, and how long it has left
+void GameView::draw_tethers(NetClient& net, double /*now_s*/) {
+    for (const net::NetTether& t : net.cur.tethers) {
+        const Rgba c = t.team == net.my_team ? Rgba{120, 190, 255, 255} : Rgba{255, 90, 70, 255};
+        const float q = t.total_ms > 0 ? std::clamp(float(t.left_ms) / float(t.total_ms), 0.f, 1.f) : 0.f;
+        ground_ring(r_, view_, float(t.ax), float(t.ay), float(t.radius), with_alpha(c, 200), 64);
+        ground_fill(r_, view_, float(t.ax), float(t.ay), float(t.radius) * (1 - q), with_alpha(c, 45), 48);  // fills up until it pulls
+        const float x0 = view_.sx(float(t.sx)), y0 = view_.sy_h(float(t.sy), 40), x1 = view_.sx(float(t.dx)), y1 = view_.sy_h(float(t.dy), 40);
+        for (int i = 0; i <= 10; ++i) {  // chain links
+            const float u = float(i) / 10.f;
+            fill_circle(r_, x0 + (x1 - x0) * u, y0 + (y1 - y0) * u, 2.5f + view_.zoom, with_alpha(mixc(c, {40, 40, 40, 255}, i % 2 ? 40 : 0), 230), 6);
+        }
+        const std::string s = std::format("{:.1f}", std::max(0, t.left_ms) / 1000.0);
+        outlined(r_, x1 - text_w(s) / 2, y1 - 30, s, c, 1);
+    }
+}
+
 // ---------------------------------------------------------------- the whole world
 void GameView::draw_world(NetClient& net, double now_s) {
     const Snapshot& cur = net.cur;
@@ -936,6 +1003,7 @@ void GameView::draw_world(NetClient& net, double now_s) {
             ground_ring(r_, view_, du.x, du.y, 680 + 75, {255, 80, 60, 70}, 64);
     terrain_begin(net);  // [U-389] the terrain rows are drawn between the units (draw_units); cracks with them [U-438]
     draw_clouds(net);
+    draw_fx_marks(now_s);  // [U-459] scorch marks / impact rings of skills that ended
     // skills [U-131]: fluid body + exact edge
     for (const auto& f : fx_draw_) {
         const Shape s = fx_shape(FxKind(f.kind), f.x, f.y, f.radius, f.width, f.length, {f.dx, f.dy}, Flow(f.flow), f.seed, local_tick_);
@@ -950,11 +1018,13 @@ void GameView::draw_world(NetClient& net, double now_s) {
         if (f.combo == std::uint8_t(Combo::Firestorm)) col = hex(0xff7a20);
         const FxKind k = FxKind(f.kind);
         if (k == FxKind::Steam) continue;
+        if (f.vcol) col = hex(f.vcol);  // [U-459] the skill's own colour
         if (k == FxKind::Burst && !f.armed) {  // telegraph: exact edge only
             outline_shape(r_, view_, s, with_alpha(col, 230), 2);
             continue;
         }
-        const std::uint8_t a = k == FxKind::Field ? 70 : k == FxKind::Tornado ? 90 : k == FxKind::Heal ? 80 : 150;
+        const std::uint8_t a = f.vfill ? f.vfill : k == FxKind::Field ? 70 : k == FxKind::Tornado ? 90 : k == FxKind::Heal ? 80 : 150;
+        draw_fx_look(f, s, std::uint32_t(col.r) << 16 | std::uint32_t(col.g) << 8 | col.b, now_s);  // [U-459] glow / trail / sparks: under the body
         fill_shape(r_, view_, s, with_alpha(col, a));
         outline_shape(r_, view_, s, mixc(col, {255, 255, 255, 255}, 40), 1.5f);
         if (f.feeds) text(r_, view_.sx(float(f.x)) - 12, view_.sy(float(f.y)) - 4, std::format("x{}", f.feeds + 1), {255, 255, 255}, 2);
@@ -982,6 +1052,16 @@ void GameView::draw_world(NetClient& net, double now_s) {
             }
         }
     }
+    for (auto it = fx_track_.begin(); it != fx_track_.end();)  // [U-459] an effect that vanished: its impact flash + mark
+        if (it->second.seen < now_s - 0.001) {
+            const FxTrack& t = it->second;
+            if (t.flash) fx_marks_.push_back({t.x, t.y, t.r, now_s, 0.3, t.col, true});
+            if (t.mark_ms) fx_marks_.push_back({t.x, t.y, t.r, now_s, t.mark_ms / 1000.0, t.col, false});
+            it = fx_track_.erase(it);
+        } else {
+            ++it;
+        }
+    draw_tethers(net, now_s);
     draw_ghosts(net);
     draw_companions(net, now_s);  // [U-407] under the riders
     draw_units(net, now_s);

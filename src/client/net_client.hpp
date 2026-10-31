@@ -26,6 +26,7 @@ struct Snapshot {
     std::int32_t kills[2] = {};
     std::vector<net::NetUnit> units;
     std::vector<net::NetFx> fx;
+    std::vector<net::NetTether> tethers;  // [U-456]
     std::vector<net::NetLight> lights;
     std::vector<net::NetPath> paths;  // [U-203]
     std::vector<net::NetPing> pings;  // [U-246]

@@ -23,6 +23,7 @@ const char* kind_name(SkillKind k) {
         case SkillKind::Shield: return "shield";
         case SkillKind::Heal: return "heal";
         case SkillKind::Haste: return "speed up";
+        case SkillKind::Transform: return "transform";
         case SkillKind::Blink: return "blink";
         case SkillKind::Lantern: return "hanging light";
         case SkillKind::WindSense: return "sense skills";

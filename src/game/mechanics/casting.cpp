@@ -49,6 +49,7 @@ void World::finish_cast(Unit& u) {
         const MulticastDef md{.max_casts = std::uint8_t(d.casts), .recast_window_ms = std::uint16_t(d.recast_ms)};
         if (a.mc.casts_used > 0 && now_ms > a.mc.window_end_ms) a.mc = {};
         a.mc.try_cast(md, now_ms);
+        u.cast_stage = std::uint8_t(std::max(0, int(a.mc.casts_used) - 1));  // [U-456] (before the reset below)
         a.cd_end_ms = a.mc.casts_used >= d.casts ? now_ms + r.cooldown_ms : now_ms + d.recast_ms + r.cooldown_ms;
         if (a.mc.casts_used >= d.casts) a.mc = {};
     } else if (d.charges > 0) {  // [U-433] one charge used; empty → wait for the next charge
@@ -57,6 +58,7 @@ void World::finish_cast(Unit& u) {
         a.cd_end_ms = a.charges_used < d.charges ? now_ms + d.charge_gap_ms : a.charge_next_ms;
     } else {
         a.cd_end_ms = now_ms + r.cooldown_ms;
+        u.cast_stage = 0;
     }
     // [U-279] Elemental Cycle: this skill gets the bonus if the cycle was complete; then count its element
     const bool cycle_bonus = u.cycle_ready && d.kind != SkillKind::AvatarState;
@@ -92,6 +94,16 @@ void World::finish_cast(Unit& u) {
 void World::cast_skill(Unit& u, Slot slot, std::int32_t tx, std::int32_t ty, std::uint32_t target) {
     const SkillDef& d = *u.skill[std::size_t(slot)];
     ResolvedAbility r = resolved(u, slot);
+    // [U-456] a multicast whose casts differ: this cast's own shape / size / damage
+    SkillKind kind = d.kind;
+    if (d.casts > 1 && u.cast_stage < d.stages.size() && d.stages[u.cast_stage].kind != SkillKind::None) {
+        const SkillDef::CastStage& st = d.stages[u.cast_stage];
+        kind = st.kind;
+        if (st.range) r.range = st.range * r.range / std::max(1, d.range);    // (keeps the scaling of items / sky)
+        if (st.width) r.width = d.width ? st.width * r.width / d.width : st.width;
+        if (st.radius) r.radius = d.radius ? st.radius * r.radius / d.radius : st.radius;
+        r.damage = r.damage * st.dmg_pct / 100;
+    }
     // [U-340] source first: a water skill bent from a chosen source starts there, +25 % range
     const bool from_source = water_skill(d) && u.cast.sx >= 0 && u.cast.slot == std::uint8_t(slot) &&
                              water_source_at(u.cast.sx, u.cast.sy) != WaterSource::None && water_sourced(u, d, u.cast.sx, u.cast.sy);
@@ -134,6 +146,8 @@ void World::cast_skill(Unit& u, Slot slot, std::int32_t tx, std::int32_t ty, std
     e.team = u.team;
     e.owner = u.id;
     e.def = &d;
+    if (d.casts > 1 && u.cast_stage < d.stages.size() && d.stages[u.cast_stage].kind != SkillKind::None)
+        e.sweet = d.stages[u.cast_stage].sweet_pct;  // [U-456]
     e.sub = skill_sub(u, d);  // [U-264]
     e.flow = flow_of(e.sub);
     e.x = starts_at_source ? ox * kSub : u.x;
@@ -163,10 +177,10 @@ void World::cast_skill(Unit& u, Slot slot, std::int32_t tx, std::int32_t ty, std
     e.light = std::int32_t(r.light_radius);
     if (e.light > 0) e.light_until = 0;  // set when the effect ends
     const std::int32_t speed_sub = std::int32_t(std::max<std::int64_t>(1, r.speed) * kSub / cfg.tick_hz);
-    switch (d.kind) {
+    switch (kind) {
         case SkillKind::Bolt:
         case SkillKind::Wave: {
-            e.kind = d.kind == SkillKind::Bolt ? FxKind::Bolt : FxKind::Wave;
+            e.kind = kind == SkillKind::Bolt ? FxKind::Bolt : FxKind::Wave;
             e.radius = std::int32_t(std::max<std::int64_t>(12, r.width / 2));
             e.width = std::int32_t(r.width);
             e.vx = dir.x * speed_sub / kOne;
@@ -200,21 +214,21 @@ void World::cast_skill(Unit& u, Slot slot, std::int32_t tx, std::int32_t ty, std
         }
         case SkillKind::Field:
         case SkillKind::Heal: {
-            e.kind = d.kind == SkillKind::Heal ? FxKind::Heal : FxKind::Field;
+            e.kind = kind == SkillKind::Heal ? FxKind::Heal : FxKind::Field;
             e.x = px * kSub;
             e.y = py * kSub;
             e.radius = std::int32_t(r.radius);
-            std::int32_t dur = d.kind == SkillKind::Heal ? 450 : dur_ms;
+            std::int32_t dur = kind == SkillKind::Heal ? 450 : dur_ms;
             if (has_passive(u, PassiveId::Molten) && d.sub == SubElement::Lava) dur += 1'000;
             e.end_ms = now_ms + dur;
             e.next_tick_ms = now_ms;
             Effect& f = spawn_fx(e);
             if (d.sub == SubElement::Lava) lava_pool(px, py, f.radius, dur);  // [X-56]
-            if (d.kind == SkillKind::Field) scorch(f);                        // [U-227][U-244]
+            if (kind == SkillKind::Field) scorch(f);                        // [U-227][U-244]
             if (d.cc == StatusKind::Blind)  // smoke / ash / mist / sand: a cloud that blocks vision [U-241]
                 add_cloud(d.sub == SubElement::Steam ? CloudKind::Steam : base_element(d.sub) == Element::Earth ? CloudKind::Sand : CloudKind::Smoke,
                           px, py, f.radius, dur);
-            if (d.kind == SkillKind::Heal) {
+            if (kind == SkillKind::Heal) {
                 std::int32_t amount = std::int32_t(r.damage * 100);
                 if (has_passive(u, PassiveId::Tide)) amount = amount * 130 / 100;
                 const Shape sh = shape_of(f);
@@ -470,6 +484,14 @@ void World::cast_skill(Unit& u, Slot slot, std::int32_t tx, std::int32_t ty, std
             spawn_fx(e);  // (rock may dangle after this push_back — not used any more)
             break;
         }
+        case SkillKind::Transform:  // [U-456] the form: attack %, healing %, speed, size for dur_ms
+            u.transform_until = now_ms + dur_ms;
+            u.transform_attack_pct = d.buff_attack_pct;
+            u.transform_heal_pct = d.buff_heal_pct;
+            if (d.cc_val > 0) u.st.add(StatusKind::Haste, now_ms + dur_ms, d.cc_val, u.id);
+            if (d.size_bonus > 0) u.tmp_size = d.size_bonus, u.tmp_size_until = now_ms + dur_ms;
+            recompute_stats(u);
+            break;
         case SkillKind::MoveWater: {  // [U-398] the water is MOVED: taken from the source, laid down at the target
             const std::int32_t rad = std::int32_t(std::max<std::int64_t>(48, r.radius));
             const std::int32_t life = dur_ms > 0 ? dur_ms : std::int32_t(elements::kPuddleMs);

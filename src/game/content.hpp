@@ -40,6 +40,8 @@ enum class SkillKind : std::uint8_t {
     AvatarState, // [U-279] fly + power + size for dur_ms
     MagicStance, // [U-264] non-benders: physical skills + autos become this skill's element (magic) for dur_ms
     StonePush,   // [U-406] push a LIFTED stone (own or anyone's boulder): click the stone, then where it flies — stronger
+    Transform,   // [U-456] a transformation for dur_ms: +buff_attack_pct attack, +buff_heal_pct healing received,
+                 // cc_val % move speed, size_bonus model size (e.g. a "world ender" form)
     MoveWater,   // [U-398] move water on the ground: from a chosen source (river / sea / puddle — it is taken from there)
                  // or from carried water, a puddle of `radius` appears at the target for dur_ms (cc / dmg hit there)
 };
@@ -160,6 +162,31 @@ struct SkillDef {
     // [U-434] the caster stays rooted this long after the cast (−1 = default: 300 ms for skills that shape the ground —
     // pillars, walls, lifting / pushing stones — else 0)
     std::int16_t self_root_ms = -1;
+    // [U-456] multicasts where every cast has its OWN shape (cast 1, 2, 3 …): kind None = the skill's own
+    struct CastStage {
+        SkillKind kind = SkillKind::None;
+        std::int16_t range = 0, width = 0, radius = 0;  // 0 = the skill's own
+        std::int16_t dmg_pct = 100;                      // of the skill's damage
+        std::int16_t sweet_pct = -1;                     // −1 = the skill's own
+    };
+    std::array<CastStage, 3> stages{};
+    // [U-456] a chain / tether: a hit unit that is STILL within tether_radius of the hit point after tether_ms is pulled
+    // there (pull units at most) and gets cc2 for cc2_ms
+    std::int32_t tether_ms = 0, tether_radius = 0, pull = 0;
+    StatusKind cc2 = StatusKind::Count;
+    std::int32_t cc2_ms = 0;
+    bool free_cast = false;        // [U-456] can be cast DURING another cast (it does not stop it), e.g. a dash inside a swing
+    std::int16_t buff_attack_pct = 0, buff_heal_pct = 0;  // [U-456] Transform
+    // [U-457] the programmable look, layered ON the exact hitbox shape (the same shape the game hits with):
+    struct Visual {
+        std::uint32_t colour = 0;   // 0xRRGGBB, 0 = the element's colour
+        std::uint8_t fill = 0;      // fill alpha (0 = default)
+        std::uint8_t glow = 0;      // a soft glow around the shape (0 … 255)
+        std::uint8_t trail = 0;     // a fading trail of this many steps behind moving skills
+        std::uint8_t flash = 0;     // bit 1 = a flash where it starts, bit 2 = a flash where it ends (impact)
+        std::uint8_t particles = 0; // sparks on the shape per frame
+        std::uint16_t mark_ms = 0;  // a mark left on the ground this long after it ends
+    } vis{};
     // [U-402] mouse control while the cast key is HELD: 1 = steer — the projectile turns towards the cursor (turn
     // speed steer_turn, Q14 per tick); 2 = draw — the wall follows the mouse path, raised when the key is released
     // (max length = width). Casting locks (rooted / slowed / free) stay per skill (`move`).

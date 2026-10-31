@@ -654,5 +654,13 @@ Additions outside the plan live in `ENGINE-EXTRAS.md`, never here.
 - [U-454] One unified game (every system on), with an easy switch to only LoL-like or only Dota-like code — or rather: a choice of GAME MODES (a different thing).
 - [U-455] Fix the new map: it should be a unique place of its own.
 
+## 39. Round 17 (2026-10-31)
+
+- [U-456] The Aatrox copy must play like LoL Aatrox: a model, the real skills, and its W (game key E) must really PULL. General engine parts for it: multicast casts with their own shape / size / damage / sweet spot (stage1..3), chains (tether → pull + second hit), skills usable during another cast (free_cast), transformations (Transform: attack %, healing %, speed, size).
+- [U-457] Passive procs (and every similar passive) show their own cooldown on the P icon (sweep + seconds).
+- [U-458] Multicast skills show clearly which cast is next (pips + the big number) and how long the window stays open before the skill goes on cooldown (a ring + seconds).
+- [U-459] Skill visuals are tied to the exact code hitboxes for EVERYTHING, with programmable extra steps (colour, fill, glow, trail, start / impact flash, particles, ground mark) — universal, set per skill (vis.* keys).
+- [U-460] Own champions get models from their .champ file (model.body / height / weapon / extras / accent) — Aatrox: winged darkin with a greatsword.
+
 ---
 *Hubert continues editing the plan later — new ideas get the next free `[U-xx]` number.*

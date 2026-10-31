@@ -155,7 +155,7 @@ void GameView::reset() {
     }
     // [U-389] nothing of the last match may leak into the next one
     companion_last_x_.clear(), companion_last_y_.clear(), companion_dir_.clear();
-    cc_max_.clear(), cc_last_.clear(), fx_born_.clear(), pings_seen_.clear();
+    cc_max_.clear(), cc_last_.clear(), fx_born_.clear(), pings_seen_.clear(), fx_track_.clear(), fx_marks_.clear();
     drawing_slot_ = -1, draw_path_.clear(), src_x_ = src_y_ = -1;
     show_recap_ = show_events_ = false;
 }
@@ -399,7 +399,7 @@ void GameView::cast_key(NetClient& net, int slot, bool from_click) {
         return hint(std::format("not enough resource for {}", d->name));
     if (d->full_moon_only && !bloodbending_allowed(WorldClock::at_ms(net.start_ms + net.cur.now_ms)))
         return hint("bloodbending only works at full moon");
-    const bool self = d->kind == SkillKind::Shield || d->kind == SkillKind::Haste || d->kind == SkillKind::Flight ||
+    const bool self = d->kind == SkillKind::Shield || d->kind == SkillKind::Haste || d->kind == SkillKind::Flight || d->kind == SkillKind::Transform ||
                       d->kind == SkillKind::SelfFreeze || d->kind == SkillKind::WindSense ||
                       (d->kind == SkillKind::Burst && d->range == 0) || (d->kind == SkillKind::Heal && d->range == 0);
     const bool quick = (set_.quick(slot) || force_quick_) && !from_click;
