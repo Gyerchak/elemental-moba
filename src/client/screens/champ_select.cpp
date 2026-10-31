@@ -82,16 +82,18 @@ float App::draw_loadout_editor(float x, float y, Loadout& lo, bool editable, flo
     };
     std::string tip;
     new_row(tr("Keystone"));
-    for (int k = 0; k < int(kKeystones.size()); ++k) {
+    for (int k = 0; k < int(keystones().size()); ++k) {
+        if (keystones()[std::size_t(k)].name.empty()) continue;  // [U-483] removed / a free place
         const float at = place(124);
-        if (button(ren_, ui_, at, y, 124, 22, kKeystones[std::size_t(k)].name, lo.keystone == k, editable))
+        if (button(ren_, ui_, at, y, 124, 22, keystones()[std::size_t(k)].name, lo.keystone == k, editable))
             lo.keystone = std::int8_t(lo.keystone == k ? -1 : k), changed = true;
-        if (hover(ui_, at, y, 124, 22)) tip = std::string(kKeystones[std::size_t(k)].desc);
+        if (hover(ui_, at, y, 124, 22)) tip = std::string(keystones()[std::size_t(k)].desc);
     }
     new_row(tr("Tree"));
-    for (int t = 0; t < int(kSpecTrees.size()); ++t) {
+    for (int t = 0; t < int(spec_trees().size()); ++t) {
+        if (spec_trees()[std::size_t(t)].name.empty()) continue;  // [U-483]
         const float at = place(150);
-        if (button(ren_, ui_, at, y, 150, 22, fit_text(std::format("{} ({})", kSpecTrees[std::size_t(t)].name, kSpecTrees[std::size_t(t)].theme), 146),
+        if (button(ren_, ui_, at, y, 150, 22, fit_text(std::format("{} ({})", spec_trees()[std::size_t(t)].name, spec_trees()[std::size_t(t)].theme), 146),
                    lo.tree == t, editable))
             lo.tree = std::int8_t(lo.tree == t ? -1 : t), lo.nodes = {-1, -1, -1}, changed = true;
     }
@@ -99,7 +101,8 @@ float App::draw_loadout_editor(float x, float y, Loadout& lo, bool editable, flo
         new_row(tr("Nodes"));
         for (int tier = 0; tier < 3; ++tier)
             for (int n = 0; n < 2; ++n) {
-                const SpecNode& node = kSpecTrees[std::size_t(lo.tree)].tiers[std::size_t(tier)][std::size_t(n)];
+                const SpecNode& node = spec_trees()[std::size_t(lo.tree)].tiers[std::size_t(tier)][std::size_t(n)];
+                if (node.name.empty()) continue;  // [U-483]
                 const float at = place(110);
                 if (button(ren_, ui_, at, y, 110, 22, fit_text(std::string(node.name), 106), lo.nodes[std::size_t(tier)] == n, editable))
                     lo.nodes[std::size_t(tier)] = std::int8_t(lo.nodes[std::size_t(tier)] == n ? -1 : n), changed = true;
@@ -107,9 +110,10 @@ float App::draw_loadout_editor(float x, float y, Loadout& lo, bool editable, flo
     }
     for (int slot = 0; slot < 3; ++slot) {
         new_row(tr(kRuneSlotNames[slot]));
-        for (int r = 0; r < 3; ++r) {
+        for (int r = 0; r < kMaxShards; ++r) {
+            if (shards()[std::size_t(slot)][std::size_t(r)].name.empty()) continue;  // [U-483]
             const float at = place(170);
-            if (button(ren_, ui_, at, y, 170, 22, fit_text(std::string(kRunes[std::size_t(slot)][std::size_t(r)].name), 166),
+            if (button(ren_, ui_, at, y, 170, 22, fit_text(std::string(shards()[std::size_t(slot)][std::size_t(r)].name), 166),
                        lo.runes[std::size_t(slot)] == r, editable))
                 lo.runes[std::size_t(slot)] = std::int8_t(lo.runes[std::size_t(slot)] == r ? -1 : r), changed = true;
         }
@@ -396,8 +400,8 @@ void App::champ_select() {
         py += 30;
         const Loadout& lo = pick_loadout_;
         const std::string summary = std::format("{}: {}  ·  {}: {}", tr("Keystone"),
-                                                lo.keystone >= 0 ? std::string(kKeystones[std::size_t(lo.keystone)].name) : tr("none"), tr("Tree"),
-                                                lo.tree >= 0 ? std::string(kSpecTrees[std::size_t(lo.tree)].name) : tr("none"));
+                                                lo.keystone >= 0 ? std::string(keystones()[std::size_t(lo.keystone)].name) : tr("none"), tr("Tree"),
+                                                lo.tree >= 0 ? std::string(spec_trees()[std::size_t(lo.tree)].name) : tr("none"));
         if (button(ren_, ui_, px0, py, 150, 22, show_loadout_ ? tr("Loadout ▾") : tr("Loadout ▸"), show_loadout_)) show_loadout_ = !show_loadout_;
         text(ren_, px0 + 160, py + 6, fit_text(summary, pw - 160), {200, 200, 215});
         py += 30;

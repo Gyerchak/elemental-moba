@@ -14,24 +14,22 @@ using namespace gfx;
 
 namespace {
 
-constexpr const char* kStatLabels[] = {"health", "attack", "elemental power", "defence", "elemental defence", "attack speed", "move speed",
-                                       "elemental haste", "tenacity", "cast speed", "skill range", "model size", "elemental penetration",
-                                       "max health"};
-constexpr int kStatKinds = int(StatKind::HealthPct) + 1;
+// [U-483] any stat: its label = the StatKey name with spaces
+std::string stat_label(StatKey k) {
+    std::string s = k < StatKey::Count ? kStatKeyNames[int(k)] : "?";
+    for (char& c : s) c = c == '_' ? ' ' : c;
+    return s;
+}
 constexpr const char* kKeyNames[] = {"P", "Q", "W", "E", "R", "T", "Y"};
 constexpr Rgba kGold{255, 220, 140}, kGrey{150, 150, 165}, kText{220, 220, 230};
 constexpr Rgba kKindColour[] = {{230, 120, 70, 255}, {220, 190, 80, 255}, {110, 190, 230, 255}, {150, 220, 120, 255}, {200, 140, 230, 255}};
 
-bool pct_kind(StatKind k) {
-    return k == StatKind::AttackSpeedPct || k == StatKind::Tenacity || k == StatKind::ModelSize ||
-           k == StatKind::ElementalPenetration || k == StatKind::HealthPct;
-}
-std::string fmt_value(StatKind k, std::int32_t v) {
+std::string fmt_value(StatKey k, std::int32_t v, bool pct = false) {
     const std::string num = v % 100 == 0 ? std::format("{:+d}", v / 100) : std::format("{:+.1f}", v / 100.0);
-    return num + (pct_kind(k) ? "%" : "");
+    return num + (pct || stat_is_pct(k) ? "%" : "");
 }
 std::string fmt_mod(const StatMod& m, int mult = 1) {
-    return std::format("{} {}", fmt_value(m.kind, m.value * mult), tr(kStatLabels[int(m.kind)]));
+    return std::format("{} {}{}", fmt_value(m.key, m.value * mult, m.pct), m.pct ? "of " : "", tr(stat_label(m.key)));
 }
 
 // greedy word wrap at `max_w` pixels
@@ -96,7 +94,8 @@ float tab_runes(Ctx& c, float x, float y, float w, Loadout& lo) {
         const float cw = (w - 4 * 6) / 5;
         for (int k = 0; k < kClassicKinds; ++k) {
             const float cx = x + float(k) * (cw + 6);
-            const RuneDef& d = kClassicRunes[std::size_t(sec)][std::size_t(k)];
+            const RuneDef& d = classic_runes()[std::size_t(sec)][std::size_t(k)];
+            if (d.name.empty()) continue;  // [U-483] removed by the game version
             std::uint8_t& n = lo.classic[std::size_t(sec)][std::size_t(k)];
             const bool hv = hover(c.ui, cx, y, cw, 46);
             fill_rect(c.r, cx, y, cw, 46, n ? Rgba{70, 50, 30, 235} : hv ? Rgba{60, 60, 80, 235} : Rgba{34, 34, 46, 225});
@@ -118,14 +117,17 @@ float tab_runes(Ctx& c, float x, float y, float w, Loadout& lo) {
     y += 22;
     for (int q = 0; q < kQuintSlots; ++q) {
         text(c.r, x, y + 6, std::format("Q{}", q + 1), kGrey);
-        const float bw = (w - 34 - 5 * 4) / 6;
-        for (int k = 0; k < kQuintKinds; ++k) {
-            const float bx = x + 34 + float(k) * (bw + 4);
-            std::string nm = std::string(tr(kQuints[std::size_t(k)].name));
+        int nq = 0;
+        for (const RuneDef& rd : quints()) nq += !rd.name.empty();
+        const float bw = (w - 34 - float(std::max(nq, 1) - 1) * 4) / float(std::max(nq, 1));
+        for (int k = 0, at = 0; k < kQuintKinds; ++k) {
+            if (quints()[std::size_t(k)].name.empty()) continue;
+            const float bx = x + 34 + float(at++) * (bw + 4);
+            std::string nm = std::string(tr(quints()[std::size_t(k)].name));
             const auto of = nm.find(" of ");
             if (of != std::string::npos) nm = nm.substr(of + 4);
             if (button(c.r, c.ui, bx, y, bw, 24, fit_text(nm, bw - 8), lo.quints[std::size_t(q)] == k)) lo.quints[std::size_t(q)] = std::int8_t(lo.quints[std::size_t(q)] == k ? -1 : k), c.changed = true;
-            if (hover(c.ui, bx, y, bw, 24)) c.tip = {std::string(tr(kQuints[std::size_t(k)].name)), fmt_mod(kQuints[std::size_t(k)].mod)};
+            if (hover(c.ui, bx, y, bw, 24)) c.tip = {std::string(tr(quints()[std::size_t(k)].name)), fmt_mod(quints()[std::size_t(k)].mod)};
         }
         y += 28;
     }
@@ -139,14 +141,14 @@ float tab_masteries(Ctx& c, float x, float y, float w, Loadout& lo, int& tree) {
     const float tw = (w - 12) / 3;
     for (int t = 0; t < kMasteryTrees; ++t)
         if (button(c.r, c.ui, x + float(t) * (tw + 6), y, tw, 28,
-                   std::format("{}  {}", tr(kMasteryTrees_[std::size_t(t)].name), mastery_points_in_tree(lo, t)), tree == t))
+                   std::format("{}  {}", tr(mastery_trees()[std::size_t(t)].name), mastery_points_in_tree(lo, t)), tree == t))
             tree = t;
     y += 34;
-    text(c.r, x, y, std::format("{}: {} / {}   ({}, {})", tr("Points spent"), total, kMasteryPoints, tr(kMasteryTrees_[std::size_t(tree)].theme),
+    text(c.r, x, y, std::format("{}: {} / {}   ({}, {})", tr("Points spent"), total, kMasteryPoints, tr(mastery_trees()[std::size_t(tree)].theme),
                                tr("click +1 · right click −1")), total >= kMasteryPoints ? Rgba{255, 200, 100} : kText);
     y += 20;
     const float lw = 96, nw = (w - lw - 2 * 8) / 3, nh = 46, gap = 16;
-    const MasteryTree& tr_ = kMasteryTrees_[std::size_t(tree)];
+    const MasteryTree& tr_ = mastery_trees()[std::size_t(tree)];
     for (int tier = 0; tier < kMasteryTiers; ++tier) {
         const int below = mastery_points_below(lo, tree, tier), need = tier * kMasteryTierStep;
         const bool open = below >= need;
@@ -206,21 +208,27 @@ float tab_spec(Ctx& c, float x, float y, float w, Loadout& lo) {
     const float y0 = y;
     text(c.r, x, y, tr("Keystone — pick 1 (a special effect)"), kGold);
     y += 18;
-    const float kw = (w - 4 * 6) / 5;
-    for (int k = 0; k < int(kKeystones.size()); ++k) {
-        const float kx = x + float(k) * (kw + 6);
-        if (button(c.r, c.ui, kx, y, kw, 26, fit_text(tr(kKeystones[std::size_t(k)].name), kw - 8), lo.keystone == k)) lo.keystone = std::int8_t(lo.keystone == k ? -1 : k), c.changed = true;
-        if (hover(c.ui, kx, y, kw, 26)) c.tip = {std::string(tr(kKeystones[std::size_t(k)].name)), std::string(tr(kKeystones[std::size_t(k)].desc))};
+    int nk = 0;  // [U-483] only what is there (a version may remove / add)
+    for (const KeystoneDef& kd : keystones()) nk += !kd.name.empty();
+    const float kw = (w - float(std::max(nk, 1) - 1) * 6) / float(std::max(nk, 1));
+    for (int k = 0, at = 0; k < int(keystones().size()); ++k) {
+        if (keystones()[std::size_t(k)].name.empty()) continue;
+        const float kx = x + float(at++) * (kw + 6);
+        if (button(c.r, c.ui, kx, y, kw, 26, fit_text(tr(keystones()[std::size_t(k)].name), kw - 8), lo.keystone == k)) lo.keystone = std::int8_t(lo.keystone == k ? -1 : k), c.changed = true;
+        if (hover(c.ui, kx, y, kw, 26)) c.tip = {std::string(tr(keystones()[std::size_t(k)].name)), std::string(tr(keystones()[std::size_t(k)].desc))};
     }
     y += 32;
-    y += draw_wrapped(c, x, y, w, lo.keystone >= 0 ? std::string(tr(kKeystones[std::size_t(lo.keystone)].desc)) : std::string(tr("No keystone picked.")), {255, 230, 150});
+    y += draw_wrapped(c, x, y, w, lo.keystone >= 0 ? std::string(tr(keystones()[std::size_t(lo.keystone)].desc)) : std::string(tr("No keystone picked.")), {255, 230, 150});
     y += 10;
     text(c.r, x, y, tr("Specialisation — 1 tree, then 1 node per tier"), kGold);
     y += 18;
-    const float tw = (w - 3 * 6) / 4;
-    for (int t = 0; t < int(kSpecTrees.size()); ++t) {
-        const float tx = x + float(t) * (tw + 6);
-        if (button(c.r, c.ui, tx, y, tw, 26, fit_text(std::format("{} · {}", tr(kSpecTrees[std::size_t(t)].name), tr(kSpecTrees[std::size_t(t)].theme)), tw - 8), lo.tree == t))
+    int nt = 0;
+    for (const SpecTree& st : spec_trees()) nt += !st.name.empty();
+    const float tw = (w - float(std::max(nt, 1) - 1) * 6) / float(std::max(nt, 1));
+    for (int t = 0, at = 0; t < int(spec_trees().size()); ++t) {
+        if (spec_trees()[std::size_t(t)].name.empty()) continue;
+        const float tx = x + float(at++) * (tw + 6);
+        if (button(c.r, c.ui, tx, y, tw, 26, fit_text(std::format("{} · {}", tr(spec_trees()[std::size_t(t)].name), tr(spec_trees()[std::size_t(t)].theme)), tw - 8), lo.tree == t))
             lo.tree = std::int8_t(lo.tree == t ? -1 : t), lo.nodes = {-1, -1, -1}, c.changed = true;
     }
     y += 34;
@@ -234,7 +242,8 @@ float tab_spec(Ctx& c, float x, float y, float w, Loadout& lo) {
                 rect(c.r, nx, y, nw, 30, {55, 55, 62});
                 continue;
             }
-            const SpecNode& node = kSpecTrees[std::size_t(lo.tree)].tiers[std::size_t(tier)][std::size_t(n)];
+            const SpecNode& node = spec_trees()[std::size_t(lo.tree)].tiers[std::size_t(tier)][std::size_t(n)];
+            if (node.name.empty()) continue;  // [U-483]
             if (button(c.r, c.ui, nx, y, nw, 30, fit_text(std::format("{}  {}", tr(node.name), fmt_mod(node.mod)), nw - 8), lo.nodes[std::size_t(tier)] == n))
                 lo.nodes[std::size_t(tier)] = std::int8_t(lo.nodes[std::size_t(tier)] == n ? -1 : n), c.changed = true;
             if (hover(c.ui, nx, y, nw, 30)) c.tip = {std::string(tr(node.name)), fmt_mod(node.mod)};
@@ -247,10 +256,13 @@ float tab_spec(Ctx& c, float x, float y, float w, Loadout& lo) {
     y += 18;
     for (int slot = 0; slot < 3; ++slot) {
         text(c.r, x, y + 6, tr(kRuneSlotNames[slot]), kGrey);
-        const float bw = (w - 80 - 2 * 6) / 3;
-        for (int r = 0; r < 3; ++r) {
-            const float bx = x + 80 + float(r) * (bw + 6);
-            if (button(c.r, c.ui, bx, y, bw, 24, fit_text(tr(kRunes[std::size_t(slot)][std::size_t(r)].name), bw - 8), lo.runes[std::size_t(slot)] == r))
+        int ns = 0;
+        for (const RuneDef& rd : shards()[std::size_t(slot)]) ns += !rd.name.empty();
+        const float bw = (w - 80 - float(std::max(ns, 1) - 1) * 6) / float(std::max(ns, 1));
+        for (int r = 0, at = 0; r < kMaxShards; ++r) {
+            if (shards()[std::size_t(slot)][std::size_t(r)].name.empty()) continue;
+            const float bx = x + 80 + float(at++) * (bw + 6);
+            if (button(c.r, c.ui, bx, y, bw, 24, fit_text(tr(shards()[std::size_t(slot)][std::size_t(r)].name), bw - 8), lo.runes[std::size_t(slot)] == r))
                 lo.runes[std::size_t(slot)] = std::int8_t(lo.runes[std::size_t(slot)] == r ? -1 : r), c.changed = true;
         }
         y += 28;
@@ -391,14 +403,18 @@ void App::setup_editor(float x, float y, float w, float h, SavedSetup& s) {
         float ly = py + 8;
         text(ren_, px + 10, ly, tr("Gives in total"), kGold, 1.5f);
         ly += 22;
-        std::array<std::int32_t, kStatKinds> sum{};
+        std::array<std::int32_t, std::size_t(StatKey::Count) * 2> sum{};  // [U-483] flat + "% of" per stat
         std::array<int, int(ModSource::Count)> src{};
-        for_each_mod(lo, [&](ModSource so, const StatMod& m) { sum[std::size_t(m.kind)] += m.value, ++src[std::size_t(so)]; });
+        for_each_mod(lo, [&](ModSource so, const StatMod& m) {
+            if (m.key < StatKey::Count) sum[std::size_t(m.key) * 2 + (m.pct ? 1 : 0)] += m.value;
+            ++src[std::size_t(so)];
+        });
         bool any = false;
-        for (int k = 0; k < kStatKinds; ++k)
-            if (sum[std::size_t(k)]) {
+        for (std::size_t k = 0; k < sum.size(); ++k)
+            if (sum[k]) {
                 any = true;
-                text(ren_, px + 10, ly, fit_text(std::format("{} {}", fmt_value(StatKind(k), sum[std::size_t(k)]), tr(kStatLabels[k])), panel_w - 20), {170, 230, 170});
+                const StatMod m{StatKey(k / 2), sum[k], (k & 1) != 0};
+                text(ren_, px + 10, ly, fit_text(fmt_mod(m), panel_w - 20), {170, 230, 170});
                 ly += 14;
             }
         if (!any) text(ren_, px + 10, ly, tr("nothing yet"), kGrey), ly += 14;
@@ -416,8 +432,8 @@ void App::setup_editor(float x, float y, float w, float h, SavedSetup& s) {
         };
         row(std::format("{}: {}/{} + {}/{} {}", tr("Classic runes"), marks, kClassicSections * kClassicSlots, quints, kQuintSlots, tr("quints")));
         row(std::format("{}: {}/{} {}", tr("Masteries"), mastery_points(lo), kMasteryPoints, tr("points")));
-        row(std::format("{}: {}", tr("Tree"), lo.tree >= 0 ? std::string(kSpecTrees[std::size_t(lo.tree)].name) : std::string(tr("none"))));
-        row(std::format("{}: {}", tr("Keystone"), lo.keystone >= 0 ? std::string(kKeystones[std::size_t(lo.keystone)].name) : std::string(tr("none"))), {255, 230, 150});
+        row(std::format("{}: {}", tr("Tree"), lo.tree >= 0 ? std::string(spec_trees()[std::size_t(lo.tree)].name) : std::string(tr("none"))));
+        row(std::format("{}: {}", tr("Keystone"), lo.keystone >= 0 ? std::string(keystones()[std::size_t(lo.keystone)].name) : std::string(tr("none"))), {255, 230, 150});
         int total = 0;
         for (const BuildStep& st : s.build) total += kItems[std::size_t(st.item)].cost;
         row(std::format("{}: {} {} · {} g", tr("Build"), s.build.size(), tr("steps"), total));

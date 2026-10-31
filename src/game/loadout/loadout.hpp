@@ -12,48 +12,35 @@
 #include <array>
 #include <cstdint>
 #include <string_view>
+#include <cstddef>
 
 #include "core/stats.hpp"
 
 namespace em {
 
-// A single stat change. Units follow stats.hpp (hundredths: 100 = 1.00 or 1 %).
-enum class StatKind : std::uint8_t {
-    Health, Attack, ElementalPower, Defence, ElementalDefence, AttackSpeedPct, MoveSpeed, ElementalHaste,
-    Tenacity, CastSpeed, SkillRange, ModelSize, ElementalPenetration, HealthPct,
-};
+// A single stat change: ANY stat (StatKey, core/stats.hpp), flat or "+x %" of the stat [U-483].
+// Units follow stats.hpp (hundredths: 100 = 1.00 or 1 %).
 struct StatMod {
-    StatKind kind = StatKind::Health;
+    StatKey key = StatKey::Health;
     std::int32_t value = 0;
+    bool pct = false;
 };
-constexpr void apply_mod(Stats& s, const StatMod& m) {
-    switch (m.kind) {
-        case StatKind::Health: s.health.bonus += m.value; break;
-        case StatKind::Attack: s.attack.bonus += m.value; break;
-        case StatKind::ElementalPower: s.elemental_power.bonus += m.value; break;
-        case StatKind::Defence: s.defence.bonus += m.value; break;
-        case StatKind::ElementalDefence: s.elemental_defence.bonus += m.value; break;
-        case StatKind::AttackSpeedPct: s.attack_speed.bonus += m.value; break;
-        case StatKind::MoveSpeed: s.move_speed.bonus += m.value; break;
-        case StatKind::ElementalHaste: s.elemental_haste += m.value; break;
-        case StatKind::Tenacity: s.tenacity += m.value; break;
-        case StatKind::CastSpeed: s.cast_speed += m.value; break;
-        case StatKind::SkillRange: s.skill_range += m.value; break;
-        case StatKind::ModelSize: s.model_size += m.value; break;
-        case StatKind::ElementalPenetration: s.elemental_penetration += m.value; break;
-        case StatKind::HealthPct: s.health.bonus += s.health.base * m.value / 10'000; break;
-    }
+inline void apply_mod(Stats& s, const StatMod& m) {
+    if (m.key == StatKey::Count || !m.value) return;
+    if (m.pct) add_stat_pct(s, m.key, m.value);
+    else add_stat(s, m.key, m.value);
 }
 
 // ---------------------------------------------------------------- keystones
-enum class KeystoneId : std::uint8_t { ElementalSurge, Stoneheart, Tailwind, FuelTheFire, ChiRush };
+enum class KeystoneId : std::uint8_t { ElementalSurge, Stoneheart, Tailwind, FuelTheFire, ChiRush, StatOnly };  // StatOnly [U-483]: added by a version
 struct KeystoneDef {
     KeystoneId id;
     std::string_view name;
     std::string_view desc;
     std::string_view impact;  // what the post-game screen counts
+    StatMod mod{StatKey::Count, 0, false};  // [U-483] + a stat (versions can give any keystone one; added keystones only have this)
 };
-inline constexpr std::array kKeystones = {
+inline constexpr std::array kDefaultKeystones = {
     KeystoneDef{KeystoneId::ElementalSurge, "Elemental Surge",
                 "3 skill hits on the same champion within 3 s: +40 (+15 % EP) damage", "bonus damage dealt"},
     KeystoneDef{KeystoneId::Stoneheart, "Stoneheart",
@@ -76,23 +63,23 @@ struct SpecTree {
     std::string_view theme;
     std::array<std::array<SpecNode, 2>, 3> tiers;  // pick 1 of 2 in each tier
 };
-inline constexpr std::array kSpecTrees = {
+inline constexpr std::array kDefaultSpecTrees = {
     SpecTree{"Ferocity", "damage",
-             {{{{{"Sharp Mind", {StatKind::ElementalPower, 1'200}}, {"Heavy Hands", {StatKind::Attack, 800}}}},
-               {{{"Quick Hands", {StatKind::AttackSpeedPct, 800}}, {"Focus", {StatKind::ElementalHaste, 800}}}},
-               {{{"Piercing", {StatKind::ElementalPenetration, 800}}, {"Long Reach", {StatKind::SkillRange, 6'000}}}}}}},
+             {{{{{"Sharp Mind", {StatKey::ElementalPower, 1'200}}, {"Heavy Hands", {StatKey::Attack, 800}}}},
+               {{{"Quick Hands", {StatKey::AttackSpeed, 800}}, {"Focus", {StatKey::ElementalHaste, 800}}}},
+               {{{"Piercing", {StatKey::ElementalPenetration, 800}}, {"Long Reach", {StatKey::SkillRange, 6'000}}}}}}},
     SpecTree{"Resolve", "toughness",
-             {{{{{"Thick Skin", {StatKind::Defence, 800}}, {"Spirit Ward", {StatKind::ElementalDefence, 800}}}},
-               {{{"Endurance", {StatKind::HealthPct, 500}}, {"Unshaken", {StatKind::Tenacity, 1'000}}}},
-               {{{"Bulk", {StatKind::Health, 12'000}}, {"Rooted Stance", {StatKind::ModelSize, 500}}}}}}},
+             {{{{{"Thick Skin", {StatKey::Defence, 800}}, {"Spirit Ward", {StatKey::ElementalDefence, 800}}}},
+               {{{"Endurance", {StatKey::Health, 500, true}}, {"Unshaken", {StatKey::Tenacity, 1'000}}}},
+               {{{"Bulk", {StatKey::Health, 12'000}}, {"Rooted Stance", {StatKey::ModelSize, 500}}}}}}},
     SpecTree{"Insight", "casting",
-             {{{{{"Calm Breath", {StatKind::CastSpeed, 1'500}}, {"Clarity", {StatKind::ElementalHaste, 1'000}}}},
-               {{{"Far Sight", {StatKind::SkillRange, 8'000}}, {"Inner Power", {StatKind::ElementalPower, 1'500}}}},
-               {{{"Flow", {StatKind::CastSpeed, 2'000}}, {"Wisdom", {StatKind::ElementalHaste, 1'200}}}}}}},
+             {{{{{"Calm Breath", {StatKey::CastSpeed, 1'500}}, {"Clarity", {StatKey::ElementalHaste, 1'000}}}},
+               {{{"Far Sight", {StatKey::SkillRange, 8'000}}, {"Inner Power", {StatKey::ElementalPower, 1'500}}}},
+               {{{"Flow", {StatKey::CastSpeed, 2'000}}, {"Wisdom", {StatKey::ElementalHaste, 1'200}}}}}}},
     SpecTree{"Harmony", "mobility",
-             {{{{{"Light Step", {StatKind::MoveSpeed, 1'500}}, {"Small Frame", {StatKind::ModelSize, -500}}}},
-               {{{"Swift Strikes", {StatKind::AttackSpeedPct, 1'000}}, {"Steady", {StatKind::Tenacity, 800}}}},
-               {{{"Wind Runner", {StatKind::MoveSpeed, 2'000}}, {"Balance", {StatKind::Health, 8'000}}}}}}},
+             {{{{{"Light Step", {StatKey::MoveSpeed, 1'500}}, {"Small Frame", {StatKey::ModelSize, -500}}}},
+               {{{"Swift Strikes", {StatKey::AttackSpeed, 1'000}}, {"Steady", {StatKey::Tenacity, 800}}}},
+               {{{"Wind Runner", {StatKey::MoveSpeed, 2'000}}, {"Balance", {StatKey::Health, 8'000}}}}}}},
 };
 
 // ---------------------------------------------------------------- runes (stat shards)
@@ -101,13 +88,13 @@ struct RuneDef {
     StatMod mod;
 };
 // rows = slots (0 offense, 1 flex, 2 defense), columns = the shard picked
-inline constexpr std::array<std::array<RuneDef, 3>, 3> kRunes{{
-    {{{"+9 elemental power", {StatKind::ElementalPower, 900}}, {"+6 attack", {StatKind::Attack, 600}},
-      {"+10 % attack speed", {StatKind::AttackSpeedPct, 1'000}}}},
-    {{{"+9 elemental power", {StatKind::ElementalPower, 900}}, {"+6 attack", {StatKind::Attack, 600}},
-      {"+6 defence", {StatKind::Defence, 600}}}},
-    {{{"+65 health", {StatKind::Health, 6'500}}, {"+8 elemental defence", {StatKind::ElementalDefence, 800}},
-      {"+10 % tenacity", {StatKind::Tenacity, 1'000}}}},
+inline constexpr std::array<std::array<RuneDef, 3>, 3> kDefaultRunes{{
+    {{{"+9 elemental power", {StatKey::ElementalPower, 900}}, {"+6 attack", {StatKey::Attack, 600}},
+      {"+10 % attack speed", {StatKey::AttackSpeed, 1'000}}}},
+    {{{"+9 elemental power", {StatKey::ElementalPower, 900}}, {"+6 attack", {StatKey::Attack, 600}},
+      {"+6 defence", {StatKey::Defence, 600}}}},
+    {{{"+65 health", {StatKey::Health, 6'500}}, {"+8 elemental defence", {StatKey::ElementalDefence, 800}},
+      {"+10 % tenacity", {StatKey::Tenacity, 1'000}}}},
 }};
 inline constexpr const char* kRuneSlotNames[] = {"Offense", "Flex", "Defense"};
 
@@ -115,23 +102,23 @@ inline constexpr const char* kRuneSlotNames[] = {"Offense", "Flex", "Defense"};
 // A page = 9 marks (offence) + 9 seals (defence) + 9 glyphs (utility): each slot is one of 5 kinds of that
 // section, so the page stores HOW MANY of each kind (the sum per section is at most 9). Quintessences:
 // 3 slots, few kinds, each strong. All free. The numbers are per piece, in the units of stats.hpp.
-inline constexpr int kClassicSections = 3, kClassicKinds = 5, kClassicSlots = 9, kQuintSlots = 3, kQuintKinds = 6;
+inline constexpr int kClassicSections = 3, kClassicKinds = 5, kClassicSlots = 9, kQuintSlots = 3, kQuintKinds = 8;  // [U-483] 6 + 2 free places
 inline constexpr const char* kClassicSectionNames[] = {"Marks (offence)", "Seals (defence)", "Glyphs (utility)"};
-inline constexpr std::array<std::array<RuneDef, kClassicKinds>, kClassicSections> kClassicRunes{{
-    {{{"Mark of Power", {StatKind::ElementalPower, 100}}, {"Mark of Might", {StatKind::Attack, 80}},
-      {"Mark of Rhythm", {StatKind::AttackSpeedPct, 90}}, {"Mark of Piercing", {StatKind::ElementalPenetration, 60}},
-      {"Mark of Focus", {StatKind::ElementalHaste, 80}}}},
-    {{{"Seal of Hide", {StatKind::Defence, 90}}, {"Seal of Spirit", {StatKind::ElementalDefence, 90}},
-      {"Seal of Vigour", {StatKind::Health, 600}}, {"Seal of Growth", {StatKind::HealthPct, 40}},
-      {"Seal of Resolve", {StatKind::Tenacity, 70}}}},
-    {{{"Glyph of Clarity", {StatKind::ElementalHaste, 80}}, {"Glyph of Flow", {StatKind::CastSpeed, 120}},
-      {"Glyph of Wind", {StatKind::MoveSpeed, 100}}, {"Glyph of Sight", {StatKind::SkillRange, 500}},
-      {"Glyph of Tempo", {StatKind::AttackSpeedPct, 60}}}},
+inline constexpr std::array<std::array<RuneDef, kClassicKinds>, kClassicSections> kDefaultClassicRunes{{
+    {{{"Mark of Power", {StatKey::ElementalPower, 100}}, {"Mark of Might", {StatKey::Attack, 80}},
+      {"Mark of Rhythm", {StatKey::AttackSpeed, 90}}, {"Mark of Piercing", {StatKey::ElementalPenetration, 60}},
+      {"Mark of Focus", {StatKey::ElementalHaste, 80}}}},
+    {{{"Seal of Hide", {StatKey::Defence, 90}}, {"Seal of Spirit", {StatKey::ElementalDefence, 90}},
+      {"Seal of Vigour", {StatKey::Health, 600}}, {"Seal of Growth", {StatKey::Health, 40, true}},
+      {"Seal of Resolve", {StatKey::Tenacity, 70}}}},
+    {{{"Glyph of Clarity", {StatKey::ElementalHaste, 80}}, {"Glyph of Flow", {StatKey::CastSpeed, 120}},
+      {"Glyph of Wind", {StatKey::MoveSpeed, 100}}, {"Glyph of Sight", {StatKey::SkillRange, 500}},
+      {"Glyph of Tempo", {StatKey::AttackSpeed, 60}}}},
 }};
-inline constexpr std::array<RuneDef, kQuintKinds> kQuints{{
-    {"Quintessence of Power", {StatKind::ElementalPower, 1'500}}, {"Quintessence of Might", {StatKind::Attack, 1'000}},
-    {"Quintessence of Vitality", {StatKind::Health, 12'000}}, {"Quintessence of the Bulwark", {StatKind::Defence, 1'200}},
-    {"Quintessence of Warding", {StatKind::ElementalDefence, 1'200}}, {"Quintessence of Swiftness", {StatKind::MoveSpeed, 2'000}},
+inline constexpr std::array<RuneDef, 6> kDefaultQuints{{
+    {"Quintessence of Power", {StatKey::ElementalPower, 1'500}}, {"Quintessence of Might", {StatKey::Attack, 1'000}},
+    {"Quintessence of Vitality", {StatKey::Health, 12'000}}, {"Quintessence of the Bulwark", {StatKey::Defence, 1'200}},
+    {"Quintessence of Warding", {StatKey::ElementalDefence, 1'200}}, {"Quintessence of Swiftness", {StatKey::MoveSpeed, 2'000}},
 }};
 
 // ---------------------------------------------------------------- [U-319] masteries 30 / 30 / 30
@@ -150,27 +137,53 @@ struct MasteryTree {
     std::string_view theme;
     std::array<std::array<MasteryDef, kMasteryPerTier>, kMasteryTiers> tiers;
 };
-inline constexpr std::array<MasteryTree, kMasteryTrees> kMasteryTrees_{{
+inline constexpr std::array<MasteryTree, kMasteryTrees> kDefaultMasteryTrees{{
     {"Offence", "elemental fury",
-     {{{{{"Sparks", 3, {StatKind::ElementalPower, 50}}, {"Sharpened Edge", 3, {StatKind::Attack, 40}}, {"Quick Fingers", 2, {StatKind::AttackSpeedPct, 100}}}},
-       {{{"Focus", 3, {StatKind::ElementalHaste, 100}}, {"Cold Steel", 2, {StatKind::ElementalPenetration, 80}}, {"Kindling", 3, {StatKind::ElementalPower, 50}}}},
-       {{{"Far Reach", 2, {StatKind::SkillRange, 1'500}}, {"Burning Core", 3, {StatKind::ElementalPower, 60}}, {"Flurry", 3, {StatKind::AttackSpeedPct, 100}}}},
-       {{{"Piercing Flame", 3, {StatKind::ElementalPenetration, 100}}, {"Dragon Strength", 3, {StatKind::Attack, 50}}, {"Spell Mastery", 2, {StatKind::ElementalPower, 80}}}},
-       {{{"Avatar's Fury", 1, {StatKind::ElementalPower, 300}}, {"Warlord", 1, {StatKind::Attack, 200}}, {}}}}}},
+     {{{{{"Sparks", 3, {StatKey::ElementalPower, 50}}, {"Sharpened Edge", 3, {StatKey::Attack, 40}}, {"Quick Fingers", 2, {StatKey::AttackSpeed, 100}}}},
+       {{{"Focus", 3, {StatKey::ElementalHaste, 100}}, {"Cold Steel", 2, {StatKey::ElementalPenetration, 80}}, {"Kindling", 3, {StatKey::ElementalPower, 50}}}},
+       {{{"Far Reach", 2, {StatKey::SkillRange, 1'500}}, {"Burning Core", 3, {StatKey::ElementalPower, 60}}, {"Flurry", 3, {StatKey::AttackSpeed, 100}}}},
+       {{{"Piercing Flame", 3, {StatKey::ElementalPenetration, 100}}, {"Dragon Strength", 3, {StatKey::Attack, 50}}, {"Spell Mastery", 2, {StatKey::ElementalPower, 80}}}},
+       {{{"Avatar's Fury", 1, {StatKey::ElementalPower, 300}}, {"Warlord", 1, {StatKey::Attack, 200}}, {}}}}}},
     {"Defence", "stone and spirit",
-     {{{{{"Tough Hide", 3, {StatKind::Defence, 60}}, {"Spirit Ward", 3, {StatKind::ElementalDefence, 60}}, {"Vigour", 2, {StatKind::Health, 400}}}},
-       {{{"Endurance", 3, {StatKind::HealthPct, 50}}, {"Resolve", 2, {StatKind::Tenacity, 80}}, {"Iron Will", 3, {StatKind::Defence, 60}}}},
-       {{{"Stoneskin", 2, {StatKind::ElementalDefence, 60}}, {"Deep Roots", 3, {StatKind::Health, 500}}, {"Calm", 3, {StatKind::Tenacity, 60}}}},
-       {{{"Fortitude", 3, {StatKind::HealthPct, 60}}, {"Bulwark", 3, {StatKind::Defence, 80}}, {"Warding", 2, {StatKind::ElementalDefence, 80}}}},
-       {{{"Mountain Heart", 1, {StatKind::Health, 3'000}}, {"Unbreakable", 1, {StatKind::Tenacity, 400}}, {}}}}}},
+     {{{{{"Tough Hide", 3, {StatKey::Defence, 60}}, {"Spirit Ward", 3, {StatKey::ElementalDefence, 60}}, {"Vigour", 2, {StatKey::Health, 400}}}},
+       {{{"Endurance", 3, {StatKey::Health, 50, true}}, {"Resolve", 2, {StatKey::Tenacity, 80}}, {"Iron Will", 3, {StatKey::Defence, 60}}}},
+       {{{"Stoneskin", 2, {StatKey::ElementalDefence, 60}}, {"Deep Roots", 3, {StatKey::Health, 500}}, {"Calm", 3, {StatKey::Tenacity, 60}}}},
+       {{{"Fortitude", 3, {StatKey::Health, 60, true}}, {"Bulwark", 3, {StatKey::Defence, 80}}, {"Warding", 2, {StatKey::ElementalDefence, 80}}}},
+       {{{"Mountain Heart", 1, {StatKey::Health, 3'000}}, {"Unbreakable", 1, {StatKey::Tenacity, 400}}, {}}}}}},
     {"Utility", "wind and flow",
-     {{{{{"Light Feet", 3, {StatKind::MoveSpeed, 100}}, {"Clear Mind", 3, {StatKind::CastSpeed, 100}}, {"Wisdom", 2, {StatKind::ElementalHaste, 80}}}},
-       {{{"Wanderer", 2, {StatKind::MoveSpeed, 100}}, {"Far Sight", 3, {StatKind::SkillRange, 1'500}}, {"Meditation", 3, {StatKind::ElementalHaste, 80}}}},
-       {{{"Tailwind Step", 3, {StatKind::MoveSpeed, 100}}, {"Flow", 3, {StatKind::CastSpeed, 120}}, {"Small Frame", 2, {StatKind::ModelSize, -100}}}},
-       {{{"Fleet Foot", 3, {StatKind::MoveSpeed, 120}}, {"Echoing Chi", 3, {StatKind::ElementalHaste, 100}}, {"Sage", 2, {StatKind::ElementalPower, 60}}}},
-       {{{"Windwalker", 1, {StatKind::MoveSpeed, 500}}, {"Master of Tempo", 1, {StatKind::ElementalHaste, 400}}, {}}}}}},
+     {{{{{"Light Feet", 3, {StatKey::MoveSpeed, 100}}, {"Clear Mind", 3, {StatKey::CastSpeed, 100}}, {"Wisdom", 2, {StatKey::ElementalHaste, 80}}}},
+       {{{"Wanderer", 2, {StatKey::MoveSpeed, 100}}, {"Far Sight", 3, {StatKey::SkillRange, 1'500}}, {"Meditation", 3, {StatKey::ElementalHaste, 80}}}},
+       {{{"Tailwind Step", 3, {StatKey::MoveSpeed, 100}}, {"Flow", 3, {StatKey::CastSpeed, 120}}, {"Small Frame", 2, {StatKey::ModelSize, -100}}}},
+       {{{"Fleet Foot", 3, {StatKey::MoveSpeed, 120}}, {"Echoing Chi", 3, {StatKey::ElementalHaste, 100}}, {"Sage", 2, {StatKey::ElementalPower, 60}}}},
+       {{{"Windwalker", 1, {StatKey::MoveSpeed, 500}}, {"Master of Tempo", 1, {StatKey::ElementalHaste, 400}}, {}}}}}},
 }};
 [[nodiscard]] constexpr int mastery_index(int tree, int tier, int col) { return tree * kMasteryTreeSize + tier * kMasteryPerTier + col; }
+
+// ---------------------------------------------------------------- [U-483] the tables IN USE (game versions edit them)
+// Copies of the defaults above with free places: an entry with an EMPTY name is not there (removed by a version, or a
+// free place a version can fill). game/loadout/setup_tables.cpp; restore_setup() = back to the defaults.
+inline constexpr int kMaxKeystones = 8, kMaxSpecTrees = 6, kMaxShards = 5;
+using KeystoneTable = std::array<KeystoneDef, kMaxKeystones>;
+using SpecTreeTable = std::array<SpecTree, kMaxSpecTrees>;
+using ShardTable = std::array<std::array<RuneDef, kMaxShards>, 3>;
+using ClassicTable = std::array<std::array<RuneDef, kClassicKinds>, kClassicSections>;
+using QuintTable = std::array<RuneDef, kQuintKinds>;
+using MasteryTable = std::array<MasteryTree, kMasteryTrees>;
+const KeystoneTable& keystones();
+const SpecTreeTable& spec_trees();
+const ShardTable& shards();
+const ClassicTable& classic_runes();
+const QuintTable& quints();
+const MasteryTable& mastery_trees();
+KeystoneTable& keystones_mut();
+SpecTreeTable& spec_trees_mut();
+ShardTable& shards_mut();
+ClassicTable& classic_runes_mut();
+QuintTable& quints_mut();
+MasteryTable& mastery_trees_mut();
+void restore_setup();
+// names that versions set at run time must live somewhere stable
+std::string_view keep_setup_name(std::string_view s);
 
 // ---------------------------------------------------------------- the loadout a champion plays with
 struct Loadout {
@@ -187,13 +200,19 @@ struct Loadout {
 };
 
 // Clamp anything out of range to "nothing" (server-side check [X-24]).
-[[nodiscard]] constexpr Loadout validated(Loadout l) {
-    if (l.keystone < -1 || l.keystone >= std::int8_t(kKeystones.size())) l.keystone = -1;
-    if (l.tree < -1 || l.tree >= std::int8_t(kSpecTrees.size())) l.tree = -1;
-    for (auto& n : l.nodes)
-        if (l.tree < 0 || n < -1 || n > 1) n = -1;
-    for (auto& r : l.runes)
-        if (r < -1 || r > 2) r = -1;
+[[nodiscard]] inline Loadout validated(Loadout l) {
+    // [U-483] a pick of something a version removed (empty name) is cleared too
+    if (l.keystone < -1 || l.keystone >= std::int8_t(kMaxKeystones) || (l.keystone >= 0 && keystones()[std::size_t(l.keystone)].name.empty())) l.keystone = -1;
+    if (l.tree < -1 || l.tree >= std::int8_t(kMaxSpecTrees) || (l.tree >= 0 && spec_trees()[std::size_t(l.tree)].name.empty())) l.tree = -1;
+    for (std::size_t t = 0; t < 3; ++t) {
+        auto& n = l.nodes[t];
+        if (l.tree < 0 || n < -1 || n > 1 || (n >= 0 && spec_trees()[std::size_t(l.tree)].tiers[t][std::size_t(n)].name.empty())) n = -1;
+    }
+    for (std::size_t r = 0; r < 3; ++r)
+        if (l.runes[r] < -1 || l.runes[r] >= kMaxShards || (l.runes[r] >= 0 && shards()[r][std::size_t(l.runes[r])].name.empty())) l.runes[r] = -1;
+    for (std::size_t sec = 0; sec < kClassicSections; ++sec)
+        for (std::size_t k = 0; k < kClassicKinds; ++k)
+            if (classic_runes()[sec][k].name.empty()) l.classic[sec][k] = 0;
     for (auto& sec : l.classic) {  // [U-318] at most 9 per section
         int left = kClassicSlots;
         for (auto& n : sec) {
@@ -202,7 +221,7 @@ struct Loadout {
         }
     }
     for (auto& q : l.quints)
-        if (q < -1 || q >= kQuintKinds) q = -1;
+        if (q < -1 || q >= kQuintKinds || (q >= 0 && quints()[std::size_t(q)].name.empty())) q = -1;
     int total = 0;  // [U-319] ranks ≤ max, tier unlocked by points in earlier tiers of the same tree, 30 in all
     for (int t = 0; t < kMasteryTrees; ++t) {
         int spent = 0;
@@ -210,7 +229,7 @@ struct Loadout {
             int in_tier = 0;
             for (int c = 0; c < kMasteryPerTier; ++c) {
                 auto& r = l.masteries[std::size_t(mastery_index(t, tier, c))];
-                const int mx = kMasteryTrees_[std::size_t(t)].tiers[std::size_t(tier)][std::size_t(c)].max_rank;
+                const int mx = mastery_trees()[std::size_t(t)].tiers[std::size_t(tier)][std::size_t(c)].max_rank;
                 int v = spent >= tier * kMasteryTierStep ? r : 0;
                 v = v > mx ? mx : v;
                 v = v > kMasteryPoints - total ? kMasteryPoints - total : v;
@@ -244,62 +263,46 @@ struct Loadout {
 enum class ModSource : std::uint8_t { Specialisation, Shards, ClassicRunes, Masteries, Count };
 // Calls f(source, mod) for every active bonus of the loadout (counts and ranks already multiplied in).
 template <class F>
-constexpr void for_each_mod(const Loadout& l, F&& f) {
-    if (l.tree >= 0)
+void for_each_mod(const Loadout& l, F&& f) {
+    if (l.keystone >= 0 && l.keystone < kMaxKeystones && keystones()[std::size_t(l.keystone)].mod.key != StatKey::Count)  // [U-483]
+        f(ModSource::Specialisation, keystones()[std::size_t(l.keystone)].mod);
+    if (l.tree >= 0 && l.tree < kMaxSpecTrees)
         for (std::size_t t = 0; t < 3; ++t)
-            if (l.nodes[t] >= 0) f(ModSource::Specialisation, kSpecTrees[std::size_t(l.tree)].tiers[t][std::size_t(l.nodes[t])].mod);
+            if (l.nodes[t] >= 0) f(ModSource::Specialisation, spec_trees()[std::size_t(l.tree)].tiers[t][std::size_t(l.nodes[t])].mod);
     for (std::size_t r = 0; r < 3; ++r)
-        if (l.runes[r] >= 0) f(ModSource::Shards, kRunes[r][std::size_t(l.runes[r])].mod);
+        if (l.runes[r] >= 0 && l.runes[r] < kMaxShards) f(ModSource::Shards, shards()[r][std::size_t(l.runes[r])].mod);
     for (std::size_t sec = 0; sec < kClassicSections; ++sec)  // [U-318]
         for (std::size_t k = 0; k < kClassicKinds; ++k)
             if (l.classic[sec][k]) {
-                StatMod m = kClassicRunes[sec][k].mod;
+                StatMod m = classic_runes()[sec][k].mod;
                 m.value *= l.classic[sec][k];
                 f(ModSource::ClassicRunes, m);
             }
     for (auto q : l.quints)
-        if (q >= 0) f(ModSource::ClassicRunes, kQuints[std::size_t(q)].mod);
+        if (q >= 0 && q < kQuintKinds) f(ModSource::ClassicRunes, quints()[std::size_t(q)].mod);
     for (std::size_t t = 0; t < kMasteryTrees; ++t)  // [U-319]
         for (std::size_t tier = 0; tier < kMasteryTiers; ++tier)
             for (std::size_t c = 0; c < kMasteryPerTier; ++c) {
                 const std::uint8_t r = l.masteries[std::size_t(mastery_index(int(t), int(tier), int(c)))];
                 if (!r) continue;
-                StatMod m = kMasteryTrees_[t].tiers[tier][c].mod;
+                StatMod m = mastery_trees()[t].tiers[tier][c].mod;
                 m.value *= r;
                 f(ModSource::Masteries, m);
             }
 }
 
 // All stat bonuses of a loadout.
-constexpr void apply_loadout(Stats& s, const Loadout& l) {
+inline void apply_loadout(Stats& s, const Loadout& l) {
     for_each_mod(l, [&](ModSource, const StatMod& m) { apply_mod(s, m); });
 }
 
-[[nodiscard]] constexpr bool has_keystone(const Loadout& l, KeystoneId k) {
-    return l.keystone >= 0 && kKeystones[std::size_t(l.keystone)].id == k;
+[[nodiscard]] inline bool has_keystone(const Loadout& l, KeystoneId k) {
+    return l.keystone >= 0 && l.keystone < kMaxKeystones && keystones()[std::size_t(l.keystone)].id == k && !keystones()[std::size_t(l.keystone)].name.empty();
 }
 
-static_assert([] {
-    Stats s;
-    Loadout l{.keystone = 0, .tree = 0, .nodes = {0, 0, 1}, .runes = {0, -1, 2}};
-    apply_loadout(s, l);
-    return s.elemental_power.bonus == 1'200 + 900 && s.attack_speed.bonus == 800 && s.skill_range == 6'000 &&
-           s.tenacity == 1'000;
-}());
-// [U-318][U-319] 9 marks of power, a quintessence, 3 ranks of Sparks; a locked tier is cleared
-static_assert([] {
-    Stats s;
-    Loadout l;
-    l.classic[0][0] = 12;  // too many → 9
-    l.quints[0] = 0;
-    l.masteries[std::size_t(mastery_index(0, 0, 0))] = 3;
-    l.masteries[std::size_t(mastery_index(0, 4, 0))] = 1;  // tier 5 needs 16 points → cleared
-    l = validated(l);
-    apply_loadout(s, l);
-    return l.classic[0][0] == 9 && l.masteries[std::size_t(mastery_index(0, 4, 0))] == 0 && s.elemental_power.bonus == 900 + 1'500 + 150;
-}());
+// (the old compile-time checks of apply_loadout / validated moved: the tables are run-time now [U-483])
 static_assert([] {  // every tree can take all 30 points
-    for (const auto& t : kMasteryTrees_) {
+    for (const auto& t : kDefaultMasteryTrees) {
         int n = 0;
         for (const auto& tier : t.tiers)
             for (const auto& m : tier) n += m.max_rank;
@@ -307,6 +310,5 @@ static_assert([] {  // every tree can take all 30 points
     }
     return true;
 }());
-static_assert(validated(Loadout{.keystone = 9, .tree = -1, .nodes = {1, 1, 1}}).keystone == -1);
 
 }  // namespace em

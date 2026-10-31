@@ -100,6 +100,7 @@ enum class StatKey : std::uint8_t {
     Strength, Agility, Intelligence, HpRegen, ManaRegen, MagicResist, Evasion, BashChance,  // [U-476] Dota 2
     BashMs, BashDamage, DamageBlock, BlockChance, TrueStrike, ManaBreak, HealAmp,
     SkillPower, MagicPower,                                                                 // [U-482] LoL-modified
+    ModelSize, ElementalPenetration,                                                        // [U-483] (setup tables)
     Count
 };
 inline constexpr const char* kStatKeyNames[] = {
@@ -108,7 +109,7 @@ inline constexpr const char* kStatKeyNames[] = {
     "crit_damage", "arcane_power", "martial_power", "skill_amp", "skill_range", "skill_radius", "spellvamp", "on_hit_damage",
     "on_hit_max_hp", "ability_power", "magic_pen", "magic_pen_pct", "strength", "agility", "intelligence", "hp_regen",
     "mana_regen", "magic_resist", "evasion", "bash_chance", "bash_ms", "bash_damage", "damage_block", "block_chance",
-    "true_strike", "mana_break", "heal_amp", "skill_power", "magic_power"};
+    "true_strike", "mana_break", "heal_amp", "skill_power", "magic_power", "model_size", "elemental_penetration"};
 static_assert(std::size(kStatKeyNames) == std::size_t(StatKey::Count));
 constexpr void add_stat(Stats& s, StatKey k, std::int32_t v) {
     switch (k) {
@@ -157,6 +158,8 @@ constexpr void add_stat(Stats& s, StatKey k, std::int32_t v) {
         case StatKey::HealAmp: s.heal_amp += v; break;
         case StatKey::SkillPower: s.skill_power += v; break;
         case StatKey::MagicPower: s.magic_power += v; break;
+        case StatKey::ModelSize: s.model_size += v; break;
+        case StatKey::ElementalPenetration: s.elemental_penetration += v; break;
         case StatKey::Count: break;
     }
 }
@@ -209,9 +212,22 @@ constexpr std::int64_t stat_value(const Stats& s, StatKey k) {
         case StatKey::HealAmp: return s.heal_amp;
         case StatKey::SkillPower: return s.skill_power;
         case StatKey::MagicPower: return s.magic_power;
+        case StatKey::ModelSize: return s.model_size;
+        case StatKey::ElementalPenetration: return s.elemental_penetration;
         case StatKey::Count: return 0;
     }
     return 0;
+}
+// [U-483] stats whose value is a percentage (100 = 1 %) — for showing "+10%" instead of "+10"
+[[nodiscard]] constexpr bool stat_is_pct(StatKey k) {
+    switch (k) {
+        case StatKey::AttackSpeed: case StatKey::MoveSpeedPct: case StatKey::Tenacity: case StatKey::Lifesteal: case StatKey::Omnivamp:
+        case StatKey::ChampionVamp: case StatKey::CritChance: case StatKey::CritDamage: case StatKey::ArcanePower: case StatKey::MartialPower:
+        case StatKey::SkillAmp: case StatKey::Spellvamp: case StatKey::OnHitMaxHp: case StatKey::MagicPenPct: case StatKey::MagicResist:
+        case StatKey::Evasion: case StatKey::BashChance: case StatKey::BlockChance: case StatKey::HealAmp: case StatKey::ModelSize:
+        case StatKey::ElementalPenetration: return true;
+        default: return false;
+    }
 }
 // "+30 %" of a stat (pct: 100 = 1 %); applied after every flat bonus
 constexpr void add_stat_pct(Stats& s, StatKey k, std::int32_t pct) {

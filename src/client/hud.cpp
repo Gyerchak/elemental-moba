@@ -394,19 +394,19 @@ void GameView::draw_bottom_panel(NetClient& net, double now_s, Ui& ui) {
             ly += 12;
         };
         if (lo.keystone >= 0) {
-            const KeystoneDef& k = kKeystones[std::size_t(lo.keystone)];
+            const KeystoneDef& k = keystones()[std::size_t(lo.keystone)];
             put(std::string(k.name), {255, 230, 150});
             put(std::format("{} {}", me.keystone_impact, k.impact), {200, 230, 200});
         } else {
             put(tr("no keystone"), {150, 150, 160});
         }
         if (lo.tree >= 0) {
-            put(std::string(kSpecTrees[std::size_t(lo.tree)].name), {220, 220, 230});
+            put(std::string(spec_trees()[std::size_t(lo.tree)].name), {220, 220, 230});
             for (std::size_t t = 0; t < 3; ++t)
-                if (lo.nodes[t] >= 0) put("  " + std::string(kSpecTrees[std::size_t(lo.tree)].tiers[t][std::size_t(lo.nodes[t])].name), {190, 190, 205});
+                if (lo.nodes[t] >= 0) put("  " + std::string(spec_trees()[std::size_t(lo.tree)].tiers[t][std::size_t(lo.nodes[t])].name), {190, 190, 205});
         }
         for (std::size_t r2 = 0; r2 < 3; ++r2)
-            if (lo.runes[r2] >= 0 && ly < y0 + 118) put(std::string(kRunes[r2][std::size_t(lo.runes[r2])].name), {190, 190, 205});
+            if (lo.runes[r2] >= 0 && ly < y0 + 118) put(std::string(shards()[r2][std::size_t(lo.runes[r2])].name), {190, 190, 205});
     }
     text(r_, sx0, y0 + 88, std::format("{} {}", tr("gold"), me.gold), {255, 215, 80}, 1.5f);
     if (cd.stance) text(r_, sx0, y0 + 106, me.stance_b ? tr("stance: knives") : tr("stance: fists"), {200, 200, 220});

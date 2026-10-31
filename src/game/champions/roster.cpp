@@ -1,4 +1,5 @@
 // [X-13][X-59] The champion roster and the special-skill list. One file per champion in this folder.
+#include "game/loadout/loadout.hpp"
 #include <algorithm>
 #include <array>
 #include <vector>
@@ -119,6 +120,7 @@ void restore_official_numbers() {  // built-in champions, Q options and specials
     for (std::size_t i = 0; i < kRoster.size(); ++i) v[i] = kRoster[i];
     specials_store() = kSpecials;
     q_store() = kQ;
+    restore_setup();  // [U-483] runes / masteries / keystones / trees back to the defaults
 }
 Element q_option_element(int q) {
     return q >= 0 && q < int(kQ.size()) ? data::kQOptions[std::size_t(q)].element : Element::None;

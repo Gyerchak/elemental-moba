@@ -9,6 +9,10 @@
 
 #include "core/numbers.hpp"
 #include "game/content.hpp"
+#include "game/loadout/loadout.hpp"
+#include <span>
+#include <vector>
+#include <cstdlib>
 #include <limits>
 #include <optional>
 
@@ -27,6 +31,174 @@ std::string trim(std::string s) {
     while (i < s.size() && (s[i] == ' ' || s[i] == '\t')) ++i;
     return s.substr(i);
 }
+// ---------------------------------------------------------------- [U-483] the setup system (runes, masteries, keystones, trees)
+//   setup.<kind>.<name>.<key> = value     kind: keystone tree node shard rune quint mastery
+//   keys: name / desc (keystone) / theme (tree) = text; stat = a stat name (kStatKeyNames); value = a number or formula
+//   (points: 9 = 9, +20%, *1.5 …); pct = 1 → the value is "% of the stat"; max_rank (mastery); removed = 1;
+//   place = where a NEW one goes (a free place): keystone / tree / quint: new; node: <tree> <tier 1-3> <1-2>;
+//   shard: Offense / Flex / Defense; rune: Marks / Seals / Glyphs; mastery: <tree> <tier 1-5>
+std::string apply_setup_line(const std::string& kind, const std::string& name, const std::string& key, const std::string& v) {
+    auto words = [](const std::string& s) {
+        std::vector<std::string> w;
+        std::string cur;
+        for (char c : s + " ")
+            if (c == ' ') {
+                if (!cur.empty()) w.push_back(cur);
+                cur.clear();
+            } else {
+                cur += c;
+            }
+        return w;
+    };
+    auto stat_of = [](const std::string& s) {
+        for (int i = 0; i < int(StatKey::Count); ++i)
+            if (s == kStatKeyNames[i]) return StatKey(i);
+        return StatKey::Count;
+    };
+    // the entry: its name + its stat change (+ extras per kind)
+    // EVERY entry with this name (the same shard can be in two rows)
+    struct Hit {
+        std::string_view* nm = nullptr;
+        StatMod* mod = nullptr;
+        std::string_view* text2 = nullptr;  // desc / theme
+        std::uint8_t* max_rank = nullptr;
+    };
+    std::vector<Hit> hits;
+    // a NEW entry goes to a spare place first (after the defaults), so saved setups never point at a different thing
+    auto free_place = [](auto& span, std::size_t defaults, auto&& empty) -> decltype(&span[0]) {
+        for (std::size_t i = defaults; i < span.size(); ++i)
+            if (empty(span[i])) return &span[i];
+        for (std::size_t i = 0; i < std::min(defaults, span.size()); ++i)
+            if (empty(span[i])) return &span[i];
+        return nullptr;
+    };
+    if (kind == "keystone") {
+        for (KeystoneDef& k : keystones_mut())
+            if (!k.name.empty() && k.name == name) hits.push_back({&k.name, &k.mod, &k.desc, nullptr});
+        if (hits.empty() && key == "place") {
+            if (v != "new") return "keystone place = new";
+            if (KeystoneDef* k = free_place(keystones_mut(), kDefaultKeystones.size(), [](const KeystoneDef& x) { return x.name.empty(); })) {
+                *k = KeystoneDef{KeystoneId::StatOnly, keep_setup_name(name), "", "times picked", {StatKey::Count, 0, false}};
+                return {};
+            }
+            return "no free keystone place (max 8)";
+        }
+    } else if (kind == "tree") {
+        for (SpecTree& t : spec_trees_mut())
+            if (!t.name.empty() && t.name == name) hits.push_back({&t.name, nullptr, &t.theme, nullptr});
+        if (hits.empty() && key == "place") {
+            if (SpecTree* t = free_place(spec_trees_mut(), kDefaultSpecTrees.size(), [](const SpecTree& x) { return x.name.empty(); })) {
+                *t = SpecTree{};
+                t->name = keep_setup_name(name);
+                return {};
+            }
+            return "no free tree place (max 6)";
+        }
+    } else if (kind == "node") {
+        for (SpecTree& t : spec_trees_mut())
+            for (auto& tier : t.tiers)
+                for (SpecNode& n : tier)
+                    if (!n.name.empty() && n.name == name) hits.push_back({&n.name, &n.mod, nullptr, nullptr});
+        if (hits.empty() && key == "place") {  // <tree> <tier> <col>
+            const auto w = words(v);
+            if (w.size() < 3) return "node place = <tree> <tier 1-3> <1-2>";
+            std::string tree;
+            for (std::size_t i = 0; i + 2 < w.size(); ++i) tree += (tree.empty() ? "" : " ") + w[i];
+            const int tier = std::atoi(w[w.size() - 2].c_str()) - 1, col = std::atoi(w.back().c_str()) - 1;
+            for (SpecTree& t : spec_trees_mut())
+                if (!t.name.empty() && t.name == tree && tier >= 0 && tier < 3 && col >= 0 && col < 2) {
+                    SpecNode& n = t.tiers[std::size_t(tier)][std::size_t(col)];
+                    if (!n.name.empty()) return std::format("that place is taken by '{}' (remove it first)", n.name);
+                    n = SpecNode{keep_setup_name(name), {StatKey::Count, 0, false}};
+                    return {};
+                }
+            return std::format("no tree '{}' / bad tier or column", tree);
+        }
+    } else if (kind == "shard" || kind == "rune" || kind == "quint") {
+        auto scan = [&](RuneDef& r) {
+            if (!r.name.empty() && r.name == name) hits.push_back({&r.name, &r.mod, nullptr, nullptr});
+        };
+        if (kind == "shard")
+            for (auto& row : shards_mut())
+                for (RuneDef& r : row) scan(r);
+        if (kind == "rune")
+            for (auto& row : classic_runes_mut())
+                for (RuneDef& r : row) scan(r);
+        if (kind == "quint")
+            for (RuneDef& r : quints_mut()) scan(r);
+        if (hits.empty() && key == "place") {
+            std::span<RuneDef> row;
+            std::size_t defaults = 0;
+            if (kind == "quint") row = quints_mut(), defaults = kDefaultQuints.size();
+            else if (kind == "shard") {
+                for (int i = 0; i < 3; ++i)
+                    if (v == kRuneSlotNames[i]) row = shards_mut()[std::size_t(i)], defaults = 3;
+            } else {
+                constexpr const char* kSec[] = {"Marks", "Seals", "Glyphs"};
+                for (int i = 0; i < 3; ++i)
+                    if (v == kSec[i]) row = classic_runes_mut()[std::size_t(i)], defaults = std::size_t(kClassicKinds);
+            }
+            if (row.empty()) return std::format("{} place: {}", kind, kind == "shard" ? "Offense / Flex / Defense" : kind == "rune" ? "Marks / Seals / Glyphs" : "new");
+            if (RuneDef* r = free_place(row, defaults, [](const RuneDef& x) { return x.name.empty(); })) {
+                *r = RuneDef{keep_setup_name(name), {StatKey::Count, 0, false}};
+                return {};
+            }
+            return std::format("no free {} place there", kind);
+        }
+    } else if (kind == "mastery") {
+        for (MasteryTree& t : mastery_trees_mut())
+            for (auto& tier : t.tiers)
+                for (MasteryDef& m : tier)
+                    if (m.max_rank && m.name == name) hits.push_back({&m.name, &m.mod, nullptr, &m.max_rank});
+        if (hits.empty() && key == "place") {  // <tree> <tier>
+            const auto w = words(v);
+            if (w.size() < 2) return "mastery place = <tree> <tier 1-5>";
+            const int tier = std::atoi(w.back().c_str()) - 1;
+            for (MasteryTree& t : mastery_trees_mut())
+                if (t.name == w[0] && tier >= 0 && tier < kMasteryTiers) {
+                    for (MasteryDef& m : t.tiers[std::size_t(tier)])
+                        if (m.max_rank == 0) {
+                            m = MasteryDef{keep_setup_name(name), 1, {StatKey::Count, 0, false}};
+                            return {};
+                        }
+                    return "no free place in that tier (3 per tier; remove one first)";
+                }
+            return std::format("no mastery tree '{}' or bad tier", w[0]);
+        }
+    } else {
+        return std::format("unknown setup kind '{}' (keystone tree node shard rune quint mastery)", kind);
+    }
+    if (hits.empty()) return std::format("no {} named '{}' (to add one: setup.{}.{}.place = …)", kind, name, kind, name);
+    if (key == "place") return {};  // (already there)
+    const std::string_view new_text = keep_setup_name(v);
+    for (const Hit& h : hits) {
+        if (key == "name") *h.nm = new_text;
+        else if ((key == "desc" || key == "theme") && h.text2) *h.text2 = new_text;
+        else if (key == "removed") {
+            if (v != "0") {
+                *h.nm = {};
+                if (h.max_rank) *h.max_rank = 0;
+            }
+        } else if (key == "stat" && h.mod) {
+            const StatKey sk = stat_of(v);
+            if (sk == StatKey::Count) return std::format("unknown stat '{}'", v);
+            h.mod->key = sk;
+        } else if (key == "pct" && h.mod) h.mod->pct = v != "0";
+        else if (key == "value" && h.mod) {
+            const std::optional<NumExpr> e = parse_num_expr(v);
+            if (!e) return std::format("'{}' is not a number", v);
+            h.mod->value = std::int32_t(std::clamp<std::int64_t>(apply_num_expr(*e, h.mod->value, 100), -10'000'000, 10'000'000));
+        } else if (key == "max_rank" && h.max_rank) {
+            const std::optional<NumExpr> e = parse_num_expr(v);
+            if (!e) return std::format("'{}' is not a number", v);
+            *h.max_rank = std::uint8_t(std::clamp<std::int64_t>(apply_num_expr(*e, *h.max_rank, 1), 1, 9));
+        } else {
+            return std::format("unknown key '{}' for a {}", key, kind);
+        }
+    }
+    return {};
+}
+
 // [U-482] any number may be relative to the official one: +30%, -20%, *1.5, +40 (core/numbers.hpp)
 bool set_champion(ChampionDef& c, const std::string& key, const NumExpr& e) {
     auto put = [&](std::int32_t& f, double scale) { f = std::int32_t(std::clamp<std::int64_t>(apply_num_expr(e, f, scale), -1'000'000'000, 1'000'000'000)); };
@@ -156,6 +328,19 @@ std::string apply_version(const std::string& name, int* changes) {
             break;
         }
         const std::string kind = k.substr(0, d1), what = k.substr(d1 + 1, d2 - d1 - 1), key = k.substr(d2 + 1);
+        if (kind == "setup") {  // [U-483] setup.<kind>.<name>.<key>
+            const auto d3 = what.find('.');
+            if (d3 == std::string::npos) {
+                error = std::format("line {}: write setup.<kind>.<name>.<key>", line_no);
+                break;
+            }
+            if (const std::string e = apply_setup_line(what.substr(0, d3), what.substr(d3 + 1), key, v); !e.empty()) {
+                error = std::format("line {}: {}", line_no, e);
+                break;
+            }
+            ++n;
+            continue;
+        }
         const std::optional<NumExpr> value = parse_num_expr(v);  // [U-482]
         if (!value) {
             error = std::format("line {}: '{}' is not a number (570, +40, -20%, *1.5 …)", line_no, v);

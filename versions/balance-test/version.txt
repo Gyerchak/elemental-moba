@@ -11,3 +11,51 @@ skill.Fire Bolt.damage = 70             # official 80
 skill.Fire Bolt.cooldown_ms = 6000      # official 5000
 skill.Rock Throw.cooldown_ms = 8000     # official 9000
 skill.Air Blade.range = 950             # official 900
+
+# ---- [U-483] the setup system can be changed by a version too (Claude's test changes for Hubert)
+# modify
+setup.mastery.Sparks.value = +20%                 # 0.5 → 0.6 elemental power per rank
+setup.shard.+6 attack.value = 8                   # the attack shard gives 8 …
+setup.shard.+6 attack.name = +8 attack            # … and says so
+setup.keystone.Chi Rush.stat = attack_speed       # a keystone can get a stat on top of its effect
+setup.keystone.Chi Rush.value = 5                 # +5 % attack speed
+setup.keystone.Chi Rush.desc = The first autoattack within 3 s after a skill deals +30 % damage. Also +5 % attack speed
+# remove
+setup.quint.Quintessence of Swiftness.removed = 1
+setup.node.Small Frame.removed = 1
+# add
+setup.shard.+8 haste.place = Flex
+setup.shard.+8 haste.stat = elemental_haste
+setup.shard.+8 haste.value = 8
+setup.quint.Quintessence of Insight.place = new
+setup.quint.Quintessence of Insight.stat = skill_amp
+setup.quint.Quintessence of Insight.value = 3     # +3 % skill damage
+setup.mastery.Stone Fist.place = Offence 5        # the free place in the last Offence tier
+setup.mastery.Stone Fist.stat = attack
+setup.mastery.Stone Fist.pct = 1                  # "% of the stat" …
+setup.mastery.Stone Fist.value = 5                # … +5 % attack
+setup.keystone.Iron Body.place = new              # a stat keystone (no special effect)
+setup.keystone.Iron Body.stat = health
+setup.keystone.Iron Body.pct = 1
+setup.keystone.Iron Body.value = 8                # +8 % max health
+setup.keystone.Iron Body.desc = +8 % max health (a plain stat keystone, test version only)
+setup.tree.Tempest.place = new
+setup.tree.Tempest.theme = storms
+setup.node.Gust.place = Tempest 1 1
+setup.node.Gust.stat = move_speed
+setup.node.Gust.value = 12
+setup.node.Static.place = Tempest 1 2
+setup.node.Static.stat = crit_chance
+setup.node.Static.value = 5
+setup.node.Thunderhead.place = Tempest 2 1
+setup.node.Thunderhead.stat = skill_amp
+setup.node.Thunderhead.value = 4
+setup.node.Eye of Calm.place = Tempest 2 2
+setup.node.Eye of Calm.stat = tenacity
+setup.node.Eye of Calm.value = 10
+setup.node.Downpour.place = Tempest 3 1
+setup.node.Downpour.stat = hp_regen
+setup.node.Downpour.value = 3
+setup.node.Lightning Rod.place = Tempest 3 2
+setup.node.Lightning Rod.stat = magic_resist
+setup.node.Lightning Rod.value = 6

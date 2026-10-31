@@ -76,8 +76,8 @@ void App::postgame() {
             const auto e = net_.roster.find(r.unit);
             const std::string who = e != net_.roster.end() ? e->second.name : "?";
             std::string ks = "-";
-            if (r.keystone >= 0 && r.keystone < std::int8_t(kKeystones.size())) {
-                const KeystoneDef& k = kKeystones[std::size_t(r.keystone)];
+            if (r.keystone >= 0 && r.keystone < std::int8_t(keystones().size())) {
+                const KeystoneDef& k = keystones()[std::size_t(r.keystone)];
                 ks = std::format("{} ({} {})", k.name, r.keystone_impact, k.impact);
             }
             const std::string line = std::format("{:<22}{:>5}{:>12}{:>6}{:>8}{:>9}{:>9}{:>9}{:>9}   {}", who.substr(0, 21), r.level,

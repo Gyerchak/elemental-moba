@@ -15,6 +15,7 @@
 #include "game/skills/specials.hpp"
 #include "game/champions/custom.hpp"
 #include "game/versions.hpp"
+#include "game/loadout/loadout.hpp"
 #include "game/world.hpp"
 #include <fstream>
 #include <sstream>
@@ -52,6 +53,36 @@ int main(int argc, char** argv) {
         std::println("ok {} ({} changes), pack '{}', linked '{}', mod lol: {}", current_version(), n, version_pack_dir(), version_linked_pack(), mod_enabled("lol"));
         for (const ItemDef& d : kItems)
             if (!d.mod.empty()) std::println("  mod item {} [{}] available: {}", d.name, d.mod, item_available(d, 0, 0));
+        // [U-483] the setup tables as this version has them
+        auto m = [](const StatMod& x) {
+            return x.key == StatKey::Count ? std::string("-") : std::format("{}{:+g}{} {}", "", x.value / 100.0, x.pct ? "%" : "", kStatKeyNames[int(x.key)]);
+        };
+        for (const KeystoneDef& k : keystones())
+            if (!k.name.empty()) std::println("  keystone {}  [{}]", k.name, m(k.mod));
+        for (const SpecTree& t : spec_trees())
+            if (!t.name.empty()) {
+                std::string ns;
+                for (const auto& tier : t.tiers)
+                    for (const SpecNode& nd : tier) ns += nd.name.empty() ? std::string(" (none)") : std::format(" {}[{}]", nd.name, m(nd.mod));
+                std::println("  tree {} ({}):{}", t.name, t.theme, ns);
+            }
+        for (int r = 0; r < 3; ++r) {
+            std::string ns;
+            for (const RuneDef& d : shards()[std::size_t(r)])
+                if (!d.name.empty()) ns += std::format(" {}[{}]", d.name, m(d.mod));
+            std::println("  shards {}:{}", kRuneSlotNames[r], ns);
+        }
+        std::string qs;
+        for (const RuneDef& d : quints())
+            if (!d.name.empty()) qs += std::format(" {}[{}]", d.name, m(d.mod));
+        std::println("  quints:{}", qs);
+        for (const MasteryTree& t : mastery_trees()) {
+            std::string ns;
+            for (const MasteryDef& d : t.tiers[0]) if (d.max_rank) ns += std::format(" {}x{}[{}]", d.name, d.max_rank, m(d.mod));
+            ns += "  | tier 5:";
+            for (const MasteryDef& d : t.tiers[4]) if (d.max_rank) ns += std::format(" {}x{}[{}]", d.name, d.max_rank, m(d.mod));
+            std::println("  masteries {} tier 1:{}", t.name, ns);
+        }
         return 0;
     }
     if (argc > 2 && std::string_view(argv[1]) == "--check-champ") {  // [U-460] parse an own champion file, print what it became
@@ -82,10 +113,12 @@ int main(int argc, char** argv) {
     for (const data::SpecialRow& r : data::kSpecialRows) skill(r.def, r.element, "");
     for (const ItemDef& i : kItems) std::println("item\t{}\tNone\t{}\t", slug(i.name), i.name);
     // [U-432] runes + masteries (icons for the setup editor)
-    for (const auto& sec : kClassicRunes)
-        for (const RuneDef& r : sec) std::println("rune\t{}\tNone\t{}\t", slug(r.name), r.name);
-    for (const RuneDef& r : kQuints) std::println("rune\t{}\tNone\t{}\t", slug(r.name), r.name);
-    for (const MasteryTree& t : kMasteryTrees_)
+    for (const auto& sec : classic_runes())
+        for (const RuneDef& r : sec)
+            if (!r.name.empty()) std::println("rune\t{}\tNone\t{}\t", slug(r.name), r.name);
+    for (const RuneDef& r : quints())
+        if (!r.name.empty()) std::println("rune\t{}\tNone\t{}\t", slug(r.name), r.name);
+    for (const MasteryTree& t : mastery_trees())
         for (const auto& tier : t.tiers)
             for (const MasteryDef& m : tier)
                 if (m.max_rank) std::println("mastery\t{}\tNone\t{}\t{}", slug(m.name), m.name, t.name);
