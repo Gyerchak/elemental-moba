@@ -25,7 +25,7 @@ constexpr Look kStatus[] = {
     {"ROT", "Root", "cannot move", {120, 200, 80}, true},
     {"SLW", "Slow", "moves slower", {120, 160, 255}, true},
     {"SIL", "Silence", "cannot use abilities", {200, 120, 255}, true},
-    {"MUT", "Mute", "no bending: no abilities, no elemental autoattacks", {160, 160, 160}, true},
+    {"CHI", "Chi blocked", "no bending (its elements): bending skills and bending autoattacks", {160, 160, 160}, true},  // [U-474]
     {"AIR", "Airborne", "knocked up: cannot act", {230, 240, 255}, true},
     {"FRZ", "Frozen", "frozen in ice: cannot act, no heat", {170, 230, 255}, true},
     {"BLD", "Blind", "sees less, no targeted skills", {90, 90, 90}, true},
@@ -41,6 +41,8 @@ constexpr Look kStatus[] = {
     {"WET", "Wet", "lightning damage taken +25 %; the next fire hit −25 % (then dry)", {80, 160, 255}, true},
     {"GRV", "Grievous wounds", "healing on it is reduced", {170, 60, 60}, true},
     {"FER", "Fear", "runs away in fear: cannot act", {150, 60, 160}, true},  // [U-472]
+    {"DSA", "Disarmed", "no weapon autoattacks, no weapon skills", {200, 160, 110}, true},  // [U-474]
+    {"SBD", "Subdued", "no bending and disarmed: only non-elemental magic is left", {120, 100, 140}, true},
 };
 static_assert(std::size(kStatus) == std::size_t(StatusKind::Count));
 

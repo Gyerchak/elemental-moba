@@ -353,7 +353,7 @@ AnimSlot GameView::anim_of(const net::NetUnit& u) const {
     if (has(StatusKind::Swimming)) return AnimSlot::Swim;
     if (has(StatusKind::Channel)) return AnimSlot::Recall;
     if (has(StatusKind::Blind)) return AnimSlot::Blinded;
-    if (has(StatusKind::Silence) || has(StatusKind::Mute)) return AnimSlot::Silenced;
+    if (has(StatusKind::Silence) || has(StatusKind::Mute) || has(StatusKind::Disarm) || has(StatusKind::Subdue)) return AnimSlot::Silenced;
     if (has(StatusKind::Burn)) return AnimSlot::Burning;
     if (u.casting) return AnimSlot::Cast;
     if (has(StatusKind::Slow)) return AnimSlot::Slowed;

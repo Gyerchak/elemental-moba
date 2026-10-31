@@ -677,6 +677,7 @@ Additions outside the plan live in `ENGINE-EXTRAS.md`, never here.
 - [U-471] Umbral Dash goes through minions and walls (a general dash setting).
 - [U-472] Aatrox's ultimate does not slow: it FEARS minions away. One single ultimate on T; Y gets a totally random skill. Fear is a League of Legends mechanic.
 - [U-473] Omnivamp, spellvamp, lifesteal, on-hit mechanics (and fear) all exist in the game code, in one League of Legends mechanics section.
+- [U-474] Silence belongs to the League of Legends mechanics. Own mechanics: an effect that disables bending (per element: fire / water / earth / air) — bending skills AND bending autoattacks; silence = all skills, also non-bending; disarm = no autoattacks and no non-magical weapon skills; one for both kinds.
 
 ---
 *Hubert continues editing the plan later — new ideas get the next free `[U-xx]` number.*

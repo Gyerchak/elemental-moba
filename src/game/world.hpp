@@ -694,6 +694,12 @@ public:
     bool lol_crit(const Unit& u, std::int32_t& dmg);
     void lol_on_hit(Unit& u, Unit& target, bool physical);
     bool lol_fear_step(Unit& u);
+    [[nodiscard]] bool lol_silenced(const Unit& u) const;
+    // ---- [U-474] own mechanics (game/mechanics/bending_cc.cpp): chi block, disarm, subdue
+    [[nodiscard]] bool chi_blocked(const Unit& u, Element el) const;
+    [[nodiscard]] SubElement auto_sub(const Unit& u) const;           // what the unit's autoattack is made of
+    [[nodiscard]] const char* skill_block_reason(const Unit& u, const SkillDef& d) const;  // nullptr = may cast
+    [[nodiscard]] bool auto_allowed(const Unit& u) const;
     void attack_on_the_move(Unit& u);
     void start_cast(Unit& u, const Order& o);
     void finish_cast(Unit& u);

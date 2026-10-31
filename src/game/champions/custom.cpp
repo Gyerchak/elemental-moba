@@ -33,7 +33,9 @@ constexpr std::string_view kZones[] = {"Auto", "Centre", "Edge", "Tip"};        
 constexpr std::string_view kSubs[] = {"Water", "Ice", "Wood", "Blood", "Mud", "Steam", "Air", "Earth", "Lava", "Metal", "EarthArmor",
                                       "MetalArmor", "Fire", "BlueFire", "Lightning", "Combustion", "Physical"};
 constexpr std::string_view kStatuses[] = {"Stun", "Root", "Slow", "Silence", "Mute", "Airborne", "Frozen", "Blind", "Burn", "Shield",
-                                          "Haste", "Flying", "Bloodbound", "Channel", "Swimming", "WaterRide", "Redirect", "Wet", "Grievous", "Fear", "None"};
+                                          "Haste", "Flying", "Bloodbound", "Channel", "Swimming", "WaterRide", "Redirect", "Wet", "Grievous", "Fear", "Disarm", "Subdue", "None"};
+// [U-474] "ChiBlock" = the chi block status (its wire / enum name is Mute)
+int status_index(std::string_view v);
 constexpr std::string_view kElements[] = {"Water", "Earth", "Fire", "Air", "None"};
 constexpr std::string_view kResources[] = {"Water", "Fuel", "None", "Ammo", "Energy", "Rage"};
 constexpr std::string_view kRoles[] = {"Mage", "Marksman", "Fighter", "Tank", "Assassin", "Support"};
@@ -44,6 +46,7 @@ int enum_of(const std::string_view (&names)[N], std::string_view v) {
         if (names[i] == v) return int(i);
     return -1;
 }
+int status_index(std::string_view v) { return v == "ChiBlock" ? int(StatusKind::Mute) : enum_of(kStatuses, v); }  // [U-474]
 std::string_view keep(const std::string& s) {  // string_view fields need a stable copy
     auto it = std::ranges::find(g_strings, s);
     if (it == g_strings.end()) g_strings.push_back(s.substr(0, 400)), it = std::prev(g_strings.end());
@@ -249,7 +252,7 @@ std::string parse_text(const std::string& text, ChampionDef& out) {
                 if (e < 0) return std::format("line {}: unknown sub-element '{}'", n, v);
                 sk.sub = SubElement(e);
             } else if (f == "cc") {
-                const int e = enum_of(kStatuses, v);
+                const int e = status_index(v);
                 if (e < 0) return std::format("line {}: unknown crowd control '{}'", n, v);
                 sk.cc = v == "None" ? StatusKind::Count : StatusKind(e);
             } else if (f == "move") sk.move = v == "Free" ? CastMove::Free : v == "Slowed" ? CastMove::Slowed : CastMove::Rooted;
@@ -371,7 +374,7 @@ std::string parse_text(const std::string& text, ChampionDef& out) {
             else if (f == "tether_radius") ok = num(sk.tether_radius, 0, 3'000);
             else if (f == "pull") ok = num(sk.pull, 0, 3'000);
             else if (f == "cc2") {
-                const int e = enum_of(kStatuses, v);
+                const int e = status_index(v);
                 if (e < 0) return std::format("line {}: unknown crowd control '{}'", n, v);
                 sk.cc2 = v == "None" ? StatusKind::Count : StatusKind(e);
             }
@@ -407,7 +410,7 @@ std::string parse_text(const std::string& text, ChampionDef& out) {
             else if (f == "proc_shield") ok = num(sk.proc_shield, 0, 100'000);
             else if (f == "proc_cc_ms") ok = num(sk.proc_cc_ms, 0, 20'000);
             else if (f == "proc_cc") {
-                const int e2 = enum_of(kStatuses, v);
+                const int e2 = status_index(v);
                 if (e2 < 0) return std::format("line {}: unknown crowd control '{}'", n, v);
                 sk.proc_cc = v == "None" ? StatusKind::Count : StatusKind(e2);
             }

@@ -374,6 +374,7 @@ bool World::can_cast_now(const Unit& u, Slot s, std::string* why, std::int32_t s
     const AbilityRt& a = u.ab[std::size_t(s)];
     if (a.rank == 0) return no("not learned");
     if (!u.st.can_cast()) return no("can't cast (CC)");
+    if (const char* why_not = skill_block_reason(u, *d)) return no(why_not);  // [U-474] silence / chi block / disarm / subdue
     if (u.stolen_until > now_ms && u.stolen_slot == std::uint8_t(s)) return no("stolen by the Face Stealer");
     const Element el = base_element(d->sub);
     if (el != Element::None && sky_boost(el, sky).muted) return no("muted by the eclipse");  // [U-125]

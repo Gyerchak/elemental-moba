@@ -326,7 +326,7 @@ void World::step_units() {
             if (turns && (u.cast.x != u.ux() || u.cast.y != u.uy())) turn_towards(u, want);
             const bool facing = !turns || (std::int64_t(u.face.x) * want.x + std::int64_t(u.face.y) * want.y) / kOne >= kOne / 2;
             if (!facing) u.cast_end_ms += tick_ms;  // [U-74] turn first, then the cast time runs
-            if (!u.st.can_cast()) u.casting = false;
+            if (!u.st.can_cast() || (d && skill_block_reason(u, *d))) u.casting = false;  // [U-474]
             else if (now_ms >= u.cast_end_ms) finish_cast(u);
             if (d && d->move == CastMove::Rooted && u.casting) continue;  // [U-53]
         }

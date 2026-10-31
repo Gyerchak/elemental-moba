@@ -282,7 +282,7 @@ void World::update_attack(Unit& u) {
     }
     const Dir want = dir_of(std::int64_t(t->x) - u.x, std::int64_t(t->y) - u.y);
     turn_towards(u, want);
-    if (!u.st.can_attack(elemental)) return;
+    if (!auto_allowed(u)) return;  // [U-474] hard CC, chi block (bending autos), disarm (weapon autos)
     // [U-191] melee autoattacks can't reach flying / water-raised units
     const bool melee_auto = u.attack_range < 200 && !(u.kind == UnitKind::Champion && champions()[std::size_t(u.champ)].range == Range::Ranged);
     if (melee_auto && unit_height(*t) > ground_height(u.ux(), u.uy()) + 40) {  // [U-216] melee reach 40
@@ -332,7 +332,7 @@ void World::update_attack_wall(Unit& u) {
     }
     turn_towards(u, dir_of(std::int64_t(wx) - u.ux(), std::int64_t(wy) - u.uy()));
     const bool elemental = champions()[std::size_t(u.champ)].element != Element::None;
-    if (!u.st.can_attack(elemental) || u.st.has(StatusKind::Blind)) return;
+    if (!auto_allowed(u) || u.st.has(StatusKind::Blind)) return;  // [U-474]
     const std::int32_t period = attack_period_ms(u);
     if (u.windup_end_ms == 0) {
         if (now_ms < u.attack_ready_ms) return;
@@ -484,7 +484,7 @@ void World::auto_extras(Unit& u, Unit& primary, std::int32_t dmg, SubElement sub
 
 // [U-217] walking AND autoattacking: fire at the closest enemy in range whenever the attack is ready.
 void World::attack_on_the_move(Unit& u) {
-    if (now_ms < u.attack_ready_ms || !u.st.can_attack(true) || u.st.has(StatusKind::Blind)) return;
+    if (now_ms < u.attack_ready_ms || !auto_allowed(u) || u.st.has(StatusKind::Blind)) return;  // [U-474]
     Unit* best = nullptr;
     std::int64_t bg = u.attack_range + 1;
     for (Unit& o : units)

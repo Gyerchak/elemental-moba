@@ -33,7 +33,7 @@ inline constexpr std::int64_t kRecallMs = 6'000;  // recall and the spirit porta
         case StatusKind::Frozen: return kIntFrozen;
         case StatusKind::Bloodbound: return kIntBloodbound;
         case StatusKind::Silence: return kIntSilence;
-        case StatusKind::Mute: return kIntMute;
+        case StatusKind::Mute: case StatusKind::Subdue: return kIntMute;  // [U-474] (a channel of bending breaks)
         case StatusKind::Root: return kIntRoot;
         case StatusKind::Slow: return kIntSlow;
         case StatusKind::Blind: return kIntBlind;

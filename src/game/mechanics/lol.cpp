@@ -1,6 +1,6 @@
 // [U-473] LEAGUE OF LEGENDS MECHANICS — one place for the LoL-style rules of the unified engine:
 //   lifesteal (autoattacks), spellvamp (skills), omnivamp (everything), champion vamp (only damage to champions),
-//   grievous wounds on hit, critical strikes, on-hit damage, fear.
+//   grievous wounds on hit, critical strikes, on-hit damage, fear, silence.
 // Champions / items / skills only hold the NUMBERS (Stats fields, StatKey names, ChampionDef::crits, StatusKind::Fear);
 // the rules live here. Dota-style rules stay in their own places (denies, …).
 #include <algorithm>
@@ -49,5 +49,12 @@ bool World::lol_fear_step(Unit& u) {
     }
     return true;
 }
+
+}  // namespace em
+
+namespace em {
+
+// Silence: no abilities at all (bending or not); autoattacks still work.
+bool World::lol_silenced(const Unit& u) const { return u.st.has(StatusKind::Silence); }
 
 }  // namespace em

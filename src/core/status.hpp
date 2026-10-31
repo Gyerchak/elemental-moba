@@ -14,7 +14,8 @@ enum class StatusKind : std::uint8_t {
     Root,      // no move
     Slow,      // value = % move speed lost
     Silence,   // no abilities
-    Mute,      // no bending: abilities AND elemental autoattacks [U-125 style]
+    Mute,      // [U-474] CHI BLOCK (own): bending blocked — bending skills AND bending autoattacks of the elements in `value`
+               // (bit 1 << Element: 1 water, 2 earth, 4 fire, 8 air; 0 = every element). Non-bending skills still work.
     Airborne,  // knock-up: like stun, ignores tenacity [X-68]
     Frozen,    // ice prison: like stun; NO HEAT → invisible to heat sense [U-143]
     Blind,     // value = % sight lost (sandbending) [U-137][X-75]
@@ -30,6 +31,8 @@ enum class StatusKind : std::uint8_t {
     Wet,       // [U-241] soaked: lightning +25 %; fire or waterbending dries it
     Grievous,  // [U-416] healing reduced by `value` % (classic rule sets only)
     Fear,      // [U-472] runs away from the one who scared it (slowly, by `value` % slow); cannot act
+    Disarm,    // [U-474] own: no weapon autoattacks, no non-magical (weapon) skills
+    Subdue,    // [U-474] own: both kinds — no bending (all elements, skills + autoattacks) AND disarmed
     Count
 };
 
@@ -37,7 +40,7 @@ enum class StatusKind : std::uint8_t {
     switch (k) {
         case StatusKind::Stun: case StatusKind::Root: case StatusKind::Slow: case StatusKind::Silence:
         case StatusKind::Mute: case StatusKind::Airborne: case StatusKind::Frozen: case StatusKind::Blind:
-        case StatusKind::Bloodbound: case StatusKind::Fear:
+        case StatusKind::Bloodbound: case StatusKind::Fear: case StatusKind::Disarm: case StatusKind::Subdue:
             return true;
         default:
             return false;
@@ -104,13 +107,10 @@ public:
                has(StatusKind::Bloodbound) || has(StatusKind::Fear);
     }
     [[nodiscard]] constexpr bool can_move() const { return !hard_cc() && !has(StatusKind::Root); }
-    [[nodiscard]] constexpr bool can_cast() const {
-        return !hard_cc() && !has(StatusKind::Silence) && !has(StatusKind::Mute);
-    }
-    // Physical autoattacks still work while muted; elemental autoattacks do not [U-125].
-    [[nodiscard]] constexpr bool can_attack(bool elemental_auto) const {
-        return !hard_cc() && !(elemental_auto && has(StatusKind::Mute));
-    }
+    // [U-474] only the HARD crowd control here. Which skills / autoattacks are blocked by silence (LoL: lol.cpp) or by
+    // chi block / disarm / subdue (own: bending_cc.cpp) depends on the skill → World::skill_block_reason / auto_allowed.
+    [[nodiscard]] constexpr bool can_cast() const { return !hard_cc(); }
+    [[nodiscard]] constexpr bool can_attack() const { return !hard_cc(); }
     // Move speed % after slows / hastes. Slows don't stack: strongest wins.
     [[nodiscard]] constexpr std::int32_t move_speed_pct() const {
         const std::int32_t pct = std::max(10, 100 - value(StatusKind::Slow) + value(StatusKind::Haste));
@@ -162,8 +162,8 @@ static_assert([] {
 }());
 static_assert([] {
     StatusSet s;
-    s.add(StatusKind::Mute, 1'000, 0, 0);
-    return !s.can_cast() && s.can_attack(false) && !s.can_attack(true) && s.can_move();
+    s.add(StatusKind::Mute, 1'000, 0, 0);  // [U-474] chi block is not hard CC: the World decides per skill / autoattack
+    return s.can_cast() && s.can_attack() && s.can_move();
 }());
 
 }  // namespace em

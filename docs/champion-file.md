@@ -47,7 +47,8 @@ Any existing skill works too: `w = Fire Whip`.
 
 - **What it does** — `kind` (Bolt Wave Burst Field Cone Dash Wall Pillar Tornado Shield Heal Haste Blink … Transform),
   `sub` (element), `dmg dmg_rank ep ad bonus_ad`, `range width radius speed`, `cast_ms cd_ms cd_rank cost`,
-  `dur_ms delay_ms tick_ms`, `cc cc_ms cc_val` (Stun Root Slow Silence … Fear), `knock`, `hits = Minion SiegeMinion`.
+  `dur_ms delay_ms tick_ms`, `cc cc_ms cc_val` (Stun Root Slow Silence ChiBlock Disarm Subdue Fear …), `knock`,
+  `hits = Minion SiegeMinion`. ChiBlock: `cc_val` = the elements (1 water, 2 earth, 4 fire, 8 air, add them; 0 = all).
 - **Shape** [U-462] — `geo = Circle / Ring / Line / Rect / Cone / Arc` (Auto = the kind's usual shape), `inner` = the
   hole of a Ring / Arc.
 - **Sweet spot** [U-461] — `sweet_pct` (+% damage), `sweet_zone = Centre / Edge / Tip`, `sweet_size` (% of the shape).
@@ -84,3 +85,15 @@ martial_power skill_power skill_range skill_radius on_hit_damage on_hit_max_hp` 
 | Critical strike | champions with `crits = 1`: crit chance → × crit damage (175 % default) |
 | On-hit | every autoattack that lands: + flat damage + % of the target's max HP |
 | Fear | cannot act, runs straight away from the one who scared it |
+| Silence | no abilities at all (bending or not); autoattacks still work |
+
+## 6. This game's own mechanics (engine: `src/game/mechanics/bending_cc.cpp`)
+
+A skill is **bending** when its sub-element belongs to an element (water, earth, fire, air families); a **weapon**
+skill has no element and is not `arcane` (arcane = non-elemental magic, never blocked by these).
+
+| Mechanic | Rule |
+|---|---|
+| Chi Block | bending of the chosen elements is gone: those bending skills AND bending autoattacks; other skills work |
+| Disarm | no weapon autoattacks, no weapon skills; bending still works |
+| Subdue | both kinds: no bending at all and disarmed (only arcane magic is left) |
