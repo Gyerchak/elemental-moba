@@ -14,6 +14,7 @@
 #include "client/modifiers.hpp"
 #include "client/sprites.hpp"
 #include "client/postfx.hpp"
+#include "client/particles.hpp"
 #include "client/item_browser.hpp"
 #include "client/net_client.hpp"
 #include "client/own_emotes.hpp"
@@ -183,12 +184,18 @@ private:
     std::unordered_map<std::uint32_t, double> fx_born_;
     PostFx post_;              // [U-501] post-processing of the world
     bool post_tried_ = false;
+    SDL_Texture* mask_tex_ = nullptr;      // [U-502] per map cell: r water, g lava (the animated ground shader)
+    std::vector<std::uint32_t> mask_px_;
+    bool mask_dirty_ = true;
+    Particles particles_;                  // [U-503]
+    double particles_t_ = 0;
     // [U-459] the programmable skill look: per effect its recent path (trail) + what it leaves when it ends
     struct FxTrack {
         float x = 0, y = 0, r = 0;
         std::uint32_t col = 0;
         std::uint8_t flash = 0, nh = 0;
         std::uint16_t mark_ms = 0;
+        std::uint8_t sub = 0;
         double seen = 0;
         std::array<std::pair<float, float>, 12> hist{};
     };

@@ -35,6 +35,7 @@ struct AppOptions {
     std::string name;          // nickname override
     bool starter = true;       // autotest: this client presses Start
     bool windowed = false;     // force a window (tests / two screens)
+    int quality = -1, effects = -1;  // [U-502] --quality / --effects: this run only
     int shots = 1;             // [U-446] autotest: this many screenshots, one per frame
     bool shot_select = false;  // autotest: screenshot of champion select (loadout open) instead of the match, then quit
 };

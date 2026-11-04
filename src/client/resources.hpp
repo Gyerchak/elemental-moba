@@ -52,6 +52,7 @@ public:
     const Sound* sound(const std::string& name);  // "sounds/<name>.wav"
     const Sound* music(const std::string& name);  // "music/<name>.wav"
     [[nodiscard]] static std::string champion_id(int champ);
+    [[nodiscard]] SDL_Renderer* renderer() const { return r_; }
     [[nodiscard]] std::string pack() const;  // the whole search order as one key (sprite cache)
 
 private:

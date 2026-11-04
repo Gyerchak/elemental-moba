@@ -36,6 +36,10 @@ void line(SDL_Renderer* r, float x0, float y0, float x1, float y1, Rgba c);
 // and symbols (− × → …) show and text stays readable on the map. `scale` 1 ≈ the old 8 px debug font.
 // Falls back to the SDL debug font when the font file is missing. Strings are cached between frames.
 void text(SDL_Renderer* r, float x, float y, std::string_view s, Rgba c = {}, float scale = 1);
+// [U-502] while on, text() only remembers: names and damage numbers are drawn after the world image is scaled, so they stay
+// readable at every quality level
+void defer_text(bool on);
+void flush_text(SDL_Renderer* r);
 [[nodiscard]] float text_w(std::string_view s, float scale = 1);
 void init_text(SDL_Renderer* r);  // once, after the renderer exists
 // Cut `s` (UTF-8 safe) so it fits in `max_w` pixels, ending with "…" when cut [U-250] (no text over other text).

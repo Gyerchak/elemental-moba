@@ -449,7 +449,7 @@ void GameView::draw_units(NetClient& net, double now_s) {
             if (u.id == net.my_unit) outline_shape(r_, view_, body, {255, 230, 80, std::uint8_t(std::max<int>(ha, 60))}, 1.f);
             if (anim == AnimSlot::Swim) ground_ring(r_, view_, du.x, du.y, 50 + 10 * float(std::sin(now_s * 4)), {200, 230, 255, 160}, 24);
             if (sheet) {  // [U-258] the Blender model, as a sprite
-                if (set_.gfx_quality >= 1 && lift < 1) {  // [U-501] a soft shadow grounds the model
+                if (set_.fx_shadows && lift < 1) {  // [U-501] a soft shadow grounds the model
                     const float sr = float(body_reach(body_by_index(u.body), u.size_pct)) * 1.7f;
                     soft_disc(r_, view_.sx(du.x), view_.sy(du.y), view_.rx(sr), view_.ry(sr), {0, 0, 0, 120});
                 }
@@ -909,6 +909,9 @@ void GameView::draw_hits(NetClient& net, double now_s) {
             if (du.u.id == lh.h.src) src = &du;
         }
         if (!dst) continue;
+        if (t < float(std::min(frame_ms_, 50.0)) / 1000.f && lh.h.amount > 0)  // [U-503] a new hit: a few sparks of its kind
+            particles_.burst(lh.h.pad & 2 ? Element::None : base_element(SubElement(lh.h.sub)), SubElement(lh.h.sub), dst->x, dst->y, 18,
+                             lh.h.pad & 2 ? Rgba{255, 190, 120, 255} : hex(element_colour(base_element(SubElement(lh.h.sub)))), lh.h.is_auto ? 0.35f : 0.7f);
         const float dx = view_.sx(dst->x), dy = view_.sy_h(dst->y, 70);
         if (lh.h.is_auto && src && t < 0.18f) {  // autoattack slash
             const float sx2 = view_.sx(src->x), sy2 = view_.sy_h(src->y, 50);
@@ -944,7 +947,10 @@ void GameView::draw_fx_look(const net::NetFx& f, const Shape& s, std::uint32_t c
     const FxKind k = FxKind(f.kind);
     const Rgba c = hex(col);
     const float rad = float(std::max<int>({f.radius, f.width / 2, 8}));
-    if (set_.gfx_quality >= 1 && k != FxKind::Steam) {  // [U-501] every skill lights its surroundings (bloom picks up the bright core)
+    if (k != FxKind::Steam && k != FxKind::Auto && k != FxKind::TowerShot)  // [U-503] particles of its bending, on the real hitbox
+        particles_.trail(base_element(SubElement(f.sub)), SubElement(f.sub), float(f.x), float(f.y), k == FxKind::Bolt || k == FxKind::Boulder ? rad * 0.5f : rad,
+                         float(std::min(frame_ms_, 50.0)) / 1000.f, c, 1.f + float(f.vpart) / 10.f);
+    if (set_.fx_glow && k != FxKind::Steam) {  // [U-501] every skill lights its surroundings (bloom picks up the bright core)
         const bool small = k == FxKind::Bolt || k == FxKind::Auto || k == FxKind::TowerShot;
         const float gr = rad * (small ? 3.f : k == FxKind::Field ? 1.2f : 1.7f);
         const int ga = std::min(255, (small ? 190 : k == FxKind::Field ? 45 : 110) + f.vglow / 3);
@@ -955,12 +961,13 @@ void GameView::draw_fx_look(const net::NetFx& f, const Shape& s, std::uint32_t c
     auto [it, fresh] = fx_track_.try_emplace(f.id);
     FxTrack& t = it->second;
     if (fresh && flash) fx_marks_.push_back({float(f.x), float(f.y), rad * 0.8f, now_s, 0.25, col, true});
+    if (fresh) particles_.burst(base_element(SubElement(f.sub)), SubElement(f.sub), float(f.x), float(f.y), rad, c, 0.6f);  // [U-503]
     if (fresh || std::hypot(float(f.x) - t.x, float(f.y) - t.y) > 6) {  // a new trail point every few units of travel
         std::move_backward(t.hist.begin(), t.hist.end() - 1, t.hist.end());
         t.hist[0] = {float(f.x), float(f.y)};
         t.nh = std::uint8_t(std::min<int>(t.nh + 1, int(t.hist.size())));
     }
-    t.x = float(f.x), t.y = float(f.y), t.r = rad, t.col = col, t.flash = flash, t.mark_ms = f.vmark_ms, t.seen = now_s;
+    t.x = float(f.x), t.y = float(f.y), t.r = rad, t.col = col, t.flash = flash, t.mark_ms = f.vmark_ms, t.seen = now_s, t.sub = f.sub;
     for (int i = 1; i < std::min<int>(t.nh, trail + 1); ++i) {  // the trail: shrinking, fading copies behind it
         const float q = 1.f - float(i) / float(trail + 1);
         ground_fill(r_, view_, t.hist[std::size_t(i)].first, t.hist[std::size_t(i)].second, rad * (0.4f + 0.5f * q), with_alpha(c, std::uint8_t(110 * q)), 14);
@@ -968,13 +975,6 @@ void GameView::draw_fx_look(const net::NetFx& f, const Shape& s, std::uint32_t c
     if (f.vglow)
         for (int g = 1; g <= 3; ++g)
             outline_shape(r_, view_, s, with_alpha(mixc(c, {255, 255, 255, 255}, 30), std::uint8_t(f.vglow / (g + 1))), 2.f + float(g * f.vglow) / 60.f);
-    for (int i = 0; i < f.vpart; ++i) {  // sparks: deterministic per effect + time (no state), inside the hitbox circle
-        const std::uint32_t h = (f.seed * 2654435761u) ^ std::uint32_t(i * 40503) ^ std::uint32_t(now_s * 12) * 97u;
-        const float ang = float(h % 6283) / 1000.f, d = rad * float((h >> 13) % 100) / 100.f;
-        const float life = float(std::fmod(now_s * 12, 1.0));
-        fill_circle(r_, view_.sx(float(f.x) + std::cos(ang) * d), view_.sy_h(float(f.y) + std::sin(ang) * d, 10 + 30 * life), 2.f + view_.zoom,
-                    with_alpha(mixc(c, {255, 255, 255, 255}, 50), std::uint8_t(230 * (1 - life))), 6);
-    }
 }
 
 void GameView::draw_fx_marks(double now_s) {
@@ -1030,6 +1030,10 @@ void GameView::draw_world(NetClient& net, double now_s) {
         else SDL_RenderTexture(r_, t, &s, &d);
     };
     draw_layer(map_tex_, float(kGroundPx));
+    if (set_.fx_water && post_.ready() && src.w > 0 && src.h > 0 && mask_tex_) {  // [U-502] animated water + lava
+        if (mask_dirty_) SDL_UpdateTexture(mask_tex_, nullptr, mask_px_.data(), kGridSize * 4), mask_dirty_ = false;
+        post_.draw_water(mask_tex_, src, d, view_.flip, float(std::fmod(now_s, 3'600.0)), float(kGridSize));
+    }
     {  // [U-149] shop territory at my fountain
         const auto [fx_, fy_] = net.my_team == 0 ? cur_map().fountain : mirror(cur_map().fountain);
         const float wxs = float(fx_ * kCellUnits + 16), wys = float(fy_ * kCellUnits + 16);
@@ -1043,7 +1047,7 @@ void GameView::draw_world(NetClient& net, double now_s) {
             ground_ring(r_, view_, du.x, du.y, 680 + 75, {255, 80, 60, 70}, 64);
     terrain_begin(net);  // [U-389] the terrain rows are drawn between the units (draw_units); cracks with them [U-438]
     draw_clouds(net);
-    if (set_.gfx_quality >= 1) {  // [U-501] warm pools of light (stronger at night), under the fog layer
+    if (set_.fx_lights) {  // [U-501] warm pools of light (stronger at night), under the fog layer
         const bool dark = !WorldClock::at_ms(net.start_ms + cur.now_ms).is_day;
         int n = 0;
         for (const auto& l : cur.lights) {
@@ -1116,6 +1120,7 @@ void GameView::draw_world(NetClient& net, double now_s) {
         if (it->second.seen < now_s - 0.001) {
             const FxTrack& t = it->second;
             if (t.flash) fx_marks_.push_back({t.x, t.y, t.r, now_s, 0.3, t.col, true});
+            particles_.burst(base_element(SubElement(t.sub)), SubElement(t.sub), t.x, t.y, t.r, hex(t.col));  // [U-503] impact
             if (t.mark_ms) fx_marks_.push_back({t.x, t.y, t.r, now_s, t.mark_ms / 1000.0, t.col, false});
             it = fx_track_.erase(it);
         } else {
@@ -1126,6 +1131,9 @@ void GameView::draw_world(NetClient& net, double now_s) {
     draw_companions(net, now_s);  // [U-407] under the riders
     draw_units(net, now_s);
     draw_wall_damage(net);  // [U-288][U-341] falling pieces fly over everything
+    particles_.step(float(std::clamp(now_s - particles_t_, 0.0, 0.1)));  // [U-503]
+    particles_t_ = now_s;
+    particles_.draw(r_, view_);
     draw_paths(net);
     draw_pings(net);
     draw_waves(net, now_s);

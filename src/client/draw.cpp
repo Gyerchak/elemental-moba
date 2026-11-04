@@ -250,8 +250,29 @@ std::string fit_text(std::string s, float max_w, float scale) {
     return s;
 }
 
+namespace {
+struct LaterText {
+    float x, y;
+    std::string s;
+    Rgba c;
+    float scale;
+};
+std::vector<LaterText> g_later;
+bool g_defer = false;
+}  // namespace
+void defer_text(bool on) { g_defer = on; }
+void flush_text(SDL_Renderer* r) {
+    g_defer = false;
+    for (const LaterText& t : g_later) text(r, t.x, t.y, t.s, t.c, t.scale);
+    g_later.clear();
+}
+
 void text(SDL_Renderer* r, float x, float y, std::string_view s, Rgba c, float scale) {
     if (s.empty()) return;
+    if (g_defer) {
+        g_later.push_back({x, y, std::string(s), c, scale});
+        return;
+    }
     if (!g_text.ok) {  // fallback: SDL debug font (ASCII only)
         float sx = 1, sy = 1;
         SDL_GetRenderScale(r, &sx, &sy);

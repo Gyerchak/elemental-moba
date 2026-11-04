@@ -17,8 +17,8 @@ void App::options(bool in_game) {
         text(ren_, x, y, tr("Options"), {255, 200, 120}, 3);
         y += 40;
     }
-    const char* pages[] = {"Game", "Window", "Graphics", "Sound", "Controls", "Quick cast", "Language"};
-    for (int p = 0; p < 7; ++p)
+    const char* pages[] = {"Game", "Window", "Graphics", "Sound", "Controls", "Quick cast", "Language", "Effects"};
+    for (int p = 0; p < 8; ++p)
         if (button(ren_, ui_, x + float(p) * 92, y, 88, 28, tr(pages[p]), options_page_ == p)) options_page_ = p, bind_wait_ = -1;
     y += 40;
     bool changed = false, window_changed = false;
@@ -93,10 +93,10 @@ void App::options(bool in_game) {
             toggle(tr("Crowd-control timers above units"), set_.cc_timers);
             toggle(tr("Path lines (mine and allies')"), set_.show_paths);
             toggle(tr("Tree and bush models"), set_.tree_models);
-            {  // [U-501] one switch for everything the graphics engine can add
-                constexpr const char* kQ[] = {"Low (no effects)", "Medium (smooth animation, soft light, colours)", "High (+ bloom glow)", "Ultra (+ sharpening, HD models)"};
-                if (button(ren_, ui_, x, y, 520, 26, std::format("{}: {}", tr("Graphics quality"), tr(kQ[std::clamp(set_.gfx_quality, 0, 3)])), false))
-                    set_.gfx_quality = (set_.gfx_quality + 1) % 4, changed = true;
+            {  // [U-502] quality = resolution: the original at the top, the others are scaled-down versions of it
+                constexpr const char* kQ[] = {"Low (33 %)", "Medium (50 %)", "High (75 %)", "Highest (100 %, the original)"};
+                if (button(ren_, ui_, x, y, 520, 26, std::format("{}: {}", tr("Graphics quality"), tr(kQ[std::clamp(set_.render_quality, 0, 3)])), false))
+                    set_.render_quality = (set_.render_quality + 1) % 4, changed = true;
                 y += 32;
             }
             toggle(tr("Colourblind team colours"), set_.colourblind);
@@ -131,6 +131,32 @@ void App::options(bool in_game) {
                     changed = true;
                 }
             }
+            break;
+        }
+        case 7: {  // [U-502] effects: separate from the quality; a preset, or each one by hand
+            text(ren_, x, y + 6, tr("Preset:"), {200, 200, 210});
+            constexpr const char* kP[] = {"None", "Low", "Medium", "High"};
+            for (int p = 0; p < 4; ++p)
+                if (button(ren_, ui_, x + 90 + float(p) * 110, y, 104, 26, tr(kP[p]), set_.fx_preset == p)) set_.apply_fx_preset(p), changed = true;
+            text(ren_, x + 90 + 4 * 110 + 8, y + 6, set_.fx_preset == 4 ? tr("Custom") : "", {255, 220, 120});
+            y += 36;
+            auto fx = [&](std::string_view label, bool& v) {
+                if (button(ren_, ui_, x, y, 640, 24, std::format("{}: {}", label, v ? tr("ON") : tr("OFF")), v)) v = !v, set_.fx_preset = 4, changed = true;
+                y += 27;
+            };
+            fx(tr("Smooth animation (frames blend)"), set_.fx_blend);
+            fx(tr("Soft shadows under units"), set_.fx_shadows);
+            fx(tr("Glow around skills"), set_.fx_glow);
+            fx(tr("Pools of light"), set_.fx_lights);
+            fx(tr("Animated water and lava"), set_.fx_water);
+            fx(tr("Bloom (bright things glow)"), set_.fx_bloom);
+            fx(tr("Colours (contrast, saturation, day / night tint)"), set_.fx_grade);
+            fx(tr("Vignette (darker screen edges)"), set_.fx_vignette);
+            fx(tr("Sharpening"), set_.fx_sharpen);
+            constexpr const char* kD[] = {"off", "low", "medium", "high"};
+            if (button(ren_, ui_, x, y, 640, 24, std::format("{}: {}", tr("Skill particles"), tr(kD[std::clamp(set_.fx_particles, 0, 3)])), set_.fx_particles > 0))
+                set_.fx_particles = (set_.fx_particles + 1) % 4, set_.fx_preset = 4, changed = true;
+            y += 27;
             break;
         }
         case 3: {  // sound [U-201]

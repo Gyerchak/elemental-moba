@@ -21,6 +21,8 @@ using namespace gfx;
 App::App(AppOptions o) : opt_(std::move(o)) {
     set_.load();  // settings.cfg next to where the game starts [U-99]
     if (!opt_.name.empty()) set_.name = opt_.name;
+    if (opt_.quality >= 0) set_.render_quality = std::min(opt_.quality, 3);  // [U-502] (not saved unless Options change something)
+    if (opt_.effects >= 0) set_.apply_fx_preset(std::min(opt_.effects, 3));
     loc::load(set_.language);  // [U-239]
     if (!apply_version(set_.version).empty()) set_.version = kOfficialVersion;  // [U-95] own version (bad file → official)
     load_custom_champions(set_.custom_champions);  // [U-210] before any match — AFTER the version (they copy its numbers)

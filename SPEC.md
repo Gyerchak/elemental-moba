@@ -708,6 +708,9 @@ Additions outside the plan live in `ENGINE-EXTRAS.md`, never here.
 - [U-499] Installation scripts for every system; custom skins / champions must work from the GitHub repo (the Aatrox skin did not load on the laptop).
 - [U-500] Host the server on the public IP (router: TOTOLINK) and put the address (IP:port) on GitHub as a .txt.
 - [U-501] Back to game development: more advanced graphics steps and a Vulkan-only graphics engine.
+- [U-502] Graphics quality = resolution only: the original is the highest level, the lower ones are scaled-down (more pixelated) versions of it; everything matches. A whole Effects panel: None / Low / Medium / High, or each effect by hand. Animated water and lava.
+- [U-503] Skill particles (sparks, smoke, embers …).
+- [U-504] Real 3D art for champions, as good as LoL or better; skills too. (Real shadows + more directions: removed from the plan.) Check for graphic bugs.
 
 ---
 *Hubert continues editing the plan later — new ideas get the next free `[U-xx]` number.*

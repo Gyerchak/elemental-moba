@@ -76,6 +76,9 @@ GameView::GameView(SDL_Renderer* r, Settings& s, Resources& res, Audio& audio) :
     SDL_SetTextureScaleMode(fog_tex_, SDL_SCALEMODE_LINEAR);
     SDL_SetTextureBlendMode(fog_tex_, SDL_BLENDMODE_BLEND);
     map_px_.resize(std::size_t(kGridSize) * kGridSize * kGroundPx * kGroundPx);
+    mask_px_.assign(std::size_t(kGridSize) * kGridSize, 0);  // [U-502]
+    mask_tex_ = SDL_CreateTexture(r_, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, kGridSize, kGridSize);
+    if (mask_tex_) SDL_SetTextureBlendMode(mask_tex_, SDL_BLENDMODE_BLEND), SDL_SetTextureScaleMode(mask_tex_, SDL_SCALEMODE_LINEAR);
     map_raw_.assign(std::size_t(kGridSize) * kGridSize, 0xffffffffu);
     fog_px_.resize(std::size_t(kGridSize) * kGridSize);
 }
@@ -106,6 +109,14 @@ const SDL_Surface* GameView::ground_texture(int which) {
 }
 
 void GameView::paint_cell(int x, int y, Cell c) {
+    {  // [U-502] the animated ground: open water (not frozen / walled) and lava
+        const Surface sf = c.surface();
+        const bool open = c.wall() == Wall::None;
+        const std::uint32_t m = pack(Rgba{std::uint8_t(open && (sf == Surface::Water || sf == Surface::DeepWater) ? 255 : 0),
+                                          std::uint8_t(open && sf == Surface::Magma ? 255 : 0), 0, 255});
+        std::uint32_t& mp = mask_px_[std::size_t(y) * std::size_t(kGridSize) + std::size_t(x)];
+        if (mp != m) mp = m, mask_dirty_ = true;
+    }
     const Rgba base = cell_colour(c);
     int which = int(c.surface());  // the surface's texture (index = Surface)
     if (c.tree() == Tree::Burned || c.tree() == Tree::Destroyed) which = 13;
@@ -146,6 +157,7 @@ void GameView::reset() {
     sky_seen_once_ = false;
     sky_banners_.clear();
     anim_mem_.clear();
+    particles_.clear();
     // [U-497] the ground textures come from THIS match's map pack: forget the last match's (they stuck to every later map)
     for (std::size_t i = 0; i < ground_src_.size(); ++i) {
         if (ground_src_[i]) SDL_DestroySurface(ground_src_[i]);
@@ -781,23 +793,32 @@ void GameView::frame(NetClient& net, double now_s, Ui& ui) {
         fog_fade_t_ = -1;
         last_fog_ = now_s;
     }
-    // [U-501] Medium and up: the world goes through the shaders; the HUD and the aiming preview stay crisp on top
+    // [U-501][U-502] the world image: scaled by the QUALITY (resolution only); shaders by the EFFECTS. HUD + aiming preview stay crisp on top.
     if (!post_tried_) post_tried_ = true, post_.init(r_);
-    Sprites::smooth = set_.gfx_quality >= 1;
-    Sprites::hd = set_.gfx_quality >= 3;
-    const bool post_on = set_.gfx_quality >= 1 && post_.ready() && !set_.dev_mode;
-    if (post_on) post_.begin(w, h);
+    static constexpr float kScale[] = {1.f / 3.f, 0.5f, 0.75f, 1.f};
+    const float rscale = set_.dev_mode ? 1.f : kScale[std::clamp(set_.render_quality, 0, 3)];
+    sprites_.set_scale(rscale);
+    Sprites::smooth = set_.fx_blend;
+    particles_.set_density(set_.fx_particles);
+    const bool post_on = post_.ready() && !set_.dev_mode && (rscale < 1.f || set_.fx_bloom || set_.fx_grade || set_.fx_vignette || set_.fx_sharpen);
+    if (post_on) post_.begin(w, h, rscale);
+    gfx::defer_text(post_on && rscale < 1.f);  // [U-502] world text stays readable at every quality
     draw_world(net, now_s);
     if (post_on) {
         const SkyState psky = WorldClock::at_ms(net.start_ms + cur.now_ms);
         PostParams pp;
-        const float night = psky.is_day ? 0.f : 1.f;  // warm day, cool night
-        pp.tint[0] = 1.03f - 0.11f * night, pp.tint[1] = 1.0f - 0.05f * night, pp.tint[2] = 0.97f + 0.09f * night;
-        pp.contrast = 1.05f, pp.saturation = 1.10f, pp.vignette = set_.gfx_quality >= 2 ? 0.22f : 0.12f;
-        if (set_.gfx_quality >= 2) pp.bloom = set_.gfx_quality >= 3 ? 0.8f : 0.6f;
-        if (set_.gfx_quality >= 3) pp.sharpen = 0.35f;
+        pp.grade = set_.fx_grade || set_.fx_vignette || set_.fx_sharpen;
+        if (set_.fx_grade) {
+            const float night = psky.is_day ? 0.f : 1.f;  // warm day, cool night
+            pp.tint[0] = 1.03f - 0.11f * night, pp.tint[1] = 1.0f - 0.05f * night, pp.tint[2] = 0.97f + 0.09f * night;
+            pp.contrast = 1.05f, pp.saturation = 1.10f;
+        }
+        if (set_.fx_vignette) pp.vignette = 0.22f;
+        if (set_.fx_bloom) pp.bloom = 0.7f;
+        if (set_.fx_sharpen) pp.sharpen = 0.3f;
         post_.end(pp);
     }
+    gfx::flush_text(r_);
     play_sounds(net);
     draw_indicator(net);
     draw_hud(net, now_s, ui);

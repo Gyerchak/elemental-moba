@@ -27,6 +27,8 @@ struct SpriteSheet {
     std::map<std::string, Anim> anims;
     std::map<std::string, std::string> use;  // [U-486] `use <key> <anim>`: this model plays <anim> for <key>
     int wrap = 0;                            // [U-486] `wrap N`: N frames per block row, blocks stacked (big sheets)
+    float tex_scale = 1;                     // [U-502] the texture is this much smaller than the original sheet
+    bool owned = false;                      // … a scaled copy of ours (destroyed on a quality change)
     // the animation for a key: remap → exact → fallback chain (client/anim.hpp); nullptr only for an empty sheet
     [[nodiscard]] const Anim* find(std::string key) const;
 };
@@ -34,13 +36,13 @@ struct SpriteSheet {
 class Sprites {
 public:
     void init(Resources* res) { res_ = res; }
-    // nullptr = no sheet for this model; [U-501] Ultra quality prefers models_hd/<id> (more pixels, twice the frames)
+    // nullptr = no sheet for this model. [U-502] The ORIGINAL is the biggest sheet there is (models_hd/<id>, else models/<id>);
+    // lower qualities use that same sheet scaled down, never another picture.
     const SpriteSheet* get(const std::string& id) {
-        if (hd)
-            if (const SpriteSheet* s = get_dir("models_hd/" + id)) return s;
+        if (const SpriteSheet* s = get_dir("models_hd/" + id)) return s;
         return get_dir("models/" + id);
     }
-    static inline bool hd = false;
+    void set_scale(float s);  // [U-502] texture size of every sheet (1 = the original); a change reloads them
     // a sheet in any pack folder, e.g. "champions/ember_monk/skins/comet/model" (a skin's own model)
     const SpriteSheet* get_dir(const std::string& dir);
     // Draws one frame. (sx, sy) = the ground point on the screen; `scale` = screen px per game unit × size;
@@ -52,6 +54,7 @@ public:
 private:
     Resources* res_ = nullptr;
     std::map<std::string, std::unique_ptr<SpriteSheet>> cache_;
+    float scale_ = 1;
 };
 
 // screen direction 0…7 from a world facing vector (flip = the view is turned 180° for the Earth team)

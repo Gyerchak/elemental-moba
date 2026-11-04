@@ -142,7 +142,18 @@ bool Settings::load(const std::string& path) {
         else if (k == "minimap") minimap = b;
         else if (k == "show_chat") show_chat = b;
         else if (k == "tree_models") tree_models = b;
-        else if (k == "gfx_quality") gfx_quality = std::clamp(to_int(v, 2), 0, 3);  // [U-501]
+        else if (k == "render_quality") render_quality = std::clamp(to_int(v, 3), 0, 3);  // [U-502]
+        else if (k == "fx_preset") fx_preset = std::clamp(to_int(v, 3), 0, 4);
+        else if (k == "fx_blend") fx_blend = b;
+        else if (k == "fx_shadows") fx_shadows = b;
+        else if (k == "fx_glow") fx_glow = b;
+        else if (k == "fx_lights") fx_lights = b;
+        else if (k == "fx_bloom") fx_bloom = b;
+        else if (k == "fx_grade") fx_grade = b;
+        else if (k == "fx_vignette") fx_vignette = b;
+        else if (k == "fx_sharpen") fx_sharpen = b;
+        else if (k == "fx_water") fx_water = b;
+        else if (k == "fx_particles") fx_particles = std::clamp(to_int(v, 3), 0, 3);
         else if (k == "resource_pack") resource_pack = v;
         else if (k == "show_other_skins") show_other_skins = b;
         else if (k == "force_own_skins") force_own_skins = b;
@@ -289,7 +300,9 @@ void Settings::save(const std::string& path) const {
     out << "# ---- graphics\ndev_mode=" << dev_mode << "\nhitbox_opacity=" << hitbox_opacity << "\nsmooth_fog=" << smooth_fog
         << "\ndamage_numbers=" << damage_numbers << "\ncc_timers=" << cc_timers << "\nshow_paths=" << show_paths
         << "\nshow_rewards=" << show_rewards << "\nshow_names=" << show_names << "\ncolourblind=" << colourblind
-        << "\nminimap=" << minimap << "\nshow_chat=" << show_chat << "\ntree_models=" << tree_models << "\ngfx_quality=" << gfx_quality << '\n';
+        << "\nminimap=" << minimap << "\nshow_chat=" << show_chat << "\ntree_models=" << tree_models << "\nrender_quality=" << render_quality << "\nfx_preset=" << fx_preset << "\nfx_blend=" << fx_blend << "\nfx_shadows=" << fx_shadows
+        << "\nfx_glow=" << fx_glow << "\nfx_lights=" << fx_lights << "\nfx_bloom=" << fx_bloom << "\nfx_grade=" << fx_grade << "\nfx_vignette=" << fx_vignette
+        << "\nfx_sharpen=" << fx_sharpen << "\nfx_water=" << fx_water << "\nfx_particles=" << fx_particles << '\n';
     out << "# ---- skins / resource packs\nresource_pack=" << resource_pack << "\nshow_other_skins=" << show_other_skins
         << "\nforce_own_skins=" << force_own_skins << "\nserver_skins_only=" << server_skins_only << '\n';
     out << "# ---- sound (0-100)\nvol_master=" << vol_master << "\nvol_music=" << vol_music << "\nvol_effects=" << vol_effects

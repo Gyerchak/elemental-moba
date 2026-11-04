@@ -112,7 +112,20 @@ struct Settings {
     bool minimap = true;
     bool show_chat = true;
     bool tree_models = true;               // [U-202]
-    int gfx_quality = 2;                   // [U-501] 0 Low (the old look), 1 Medium, 2 High, 3 Ultra
+    // [U-502] QUALITY = resolution only: Highest = the originals, the others are scaled-down versions (world image + model textures)
+    int render_quality = 3;                // 0 Low 33 %, 1 Medium 50 %, 2 High 75 %, 3 Highest 100 %
+    // [U-502] EFFECTS are separate: a preset, or each one by hand
+    int fx_preset = 3;                     // 0 None, 1 Low, 2 Medium, 3 High, 4 Custom
+    bool fx_blend = true, fx_shadows = true, fx_glow = true, fx_lights = true, fx_bloom = true, fx_grade = true, fx_vignette = true,
+         fx_sharpen = true, fx_water = true;
+    int fx_particles = 3;                  // 0 off, 1 low, 2 medium, 3 high
+    void apply_fx_preset(int preset) {
+        fx_preset = preset;
+        fx_blend = fx_shadows = preset >= 1;
+        fx_glow = fx_lights = fx_grade = fx_water = preset >= 2;
+        fx_bloom = fx_vignette = fx_sharpen = preset >= 3;
+        fx_particles = preset >= 3 ? 3 : preset == 2 ? 2 : 0;
+    }
     // ---- skins / resource packs [U-97][U-98][U-197]
     std::string resource_pack = "default";
     bool show_other_skins = true;          // [U-98] default ON

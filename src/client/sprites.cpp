@@ -40,7 +40,20 @@ const SpriteSheet* Sprites::get_dir(const std::string& dir) {
                 s->anims[name] = a;
             }
         }
-        s->tex = res_->texture(dir + "/sheet.png");
+        if (scale_ < 0.99f) {  // [U-502] a scaled-down copy of the original (the full size never goes to the GPU)
+            const std::string png = res_->file(dir + "/sheet.png");
+            if (SDL_Surface* full = png.empty() ? nullptr : SDL_LoadPNG(png.c_str())) {
+                if (SDL_Surface* small = SDL_ScaleSurface(full, std::max(1, int(float(full->w) * scale_)), std::max(1, int(float(full->h) * scale_)), SDL_SCALEMODE_LINEAR)) {
+                    if (SDL_Texture* t = SDL_CreateTextureFromSurface(res_->renderer(), small)) {
+                        SDL_SetTextureScaleMode(t, SDL_SCALEMODE_NEAREST);
+                        s->tex = t, s->owned = true, s->tex_scale = scale_;
+                    }
+                    SDL_DestroySurface(small);
+                }
+                SDL_DestroySurface(full);
+            }
+        }
+        if (!s->tex) s->tex = res_->texture(dir + "/sheet.png");
         if (!s->tex && !s->anims.empty())  // [U-499] e.g. bigger than the GPU allows: say so (logs/models.txt) instead of failing silently
             if (std::error_code ec; std::filesystem::create_directories("logs", ec), true)
                 if (std::ofstream lg("logs/models.txt", std::ios::app); lg) lg << dir << "/sheet.png could not be loaded: " << SDL_GetError() << '\n';
@@ -49,6 +62,14 @@ const SpriteSheet* Sprites::get_dir(const std::string& dir) {
     const SpriteSheet* p = s.get();
     cache_[key] = std::move(s);
     return p;
+}
+
+void Sprites::set_scale(float s) {
+    if (std::abs(s - scale_) < 0.001f) return;
+    scale_ = s;
+    for (auto& [k, sh] : cache_)
+        if (sh && sh->owned && sh->tex) SDL_DestroyTexture(sh->tex);
+    cache_.clear();
 }
 
 const SpriteSheet::Anim* SpriteSheet::find(std::string key) const {
@@ -84,7 +105,8 @@ void Sprites::draw(SDL_Renderer* r, const SpriteSheet& s, const std::string& ani
         // half a pixel inside the frame: the smooth filter must never read the NEIGHBOUR frame (thin lines / specks) [U-338]
         // [U-486] wrapped sheets: frame i sits in block i / wrap (each block = `dirs` rows), column i % wrap
         const int i = a.col + fr, cx = s.wrap > 0 ? i % s.wrap : i, block = s.wrap > 0 ? i / s.wrap : 0;
-        return SDL_FRect{float(cx * s.px) + 0.5f, float((block * s.dirs + row) * s.px) + 0.5f, float(s.px) - 1.f, float(s.px) - 1.f};
+        const float k = s.tex_scale, fp = float(s.px) * k;  // [U-502] (the sheet may be a scaled copy)
+        return SDL_FRect{float(cx) * fp + 0.5f, float(block * s.dirs + row) * fp + 0.5f, fp - 1.f, fp - 1.f};
     };
     SDL_SetTextureColorMod(s.tex, tint.r, tint.g, tint.b);
     SDL_SetTextureAlphaMod(s.tex, tint.a);
