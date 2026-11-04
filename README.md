@@ -32,6 +32,16 @@ Search everything outside the plan: `grep -rn "\[X-" .`
 | `docs/time-and-sky.md`   | Day/night, moon, eclipses, comet — exact timings.     |
 | `CMakeLists.txt`, `src/`, `tools/` | C++23 game (SDL3 + enet). Mechanics by origin: `src/game/mechanics/lol.cpp`, `dota.cpp`, `bending_cc.cpp`. |
 
+## Install (one script per system) [U-499]
+
+| System | Command |
+|---|---|
+| Linux (Arch / CachyOS, Debian / Ubuntu, Fedora, openSUSE) | `curl -fsSL https://raw.githubusercontent.com/Gyerchak/elemental-moba/main/install/linux.sh \| bash` |
+| macOS (Homebrew) | `bash install/macos.sh` |
+| Windows (MSYS2) | `powershell -ExecutionPolicy Bypass -File install\windows.ps1` |
+
+Public test server: the address in `SERVER.txt` → in the game *Multiplayer → Direct connect*.
+
 ## Build
 
 Needs (already on this PC): CMake, Ninja, clang++ or g++ (C++23), `sdl3`, `sdl3_ttf`, `enet`.
