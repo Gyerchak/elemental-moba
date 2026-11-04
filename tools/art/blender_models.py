@@ -25,6 +25,19 @@ def reset():
     sc = bpy.context.scene
     sc.render.engine = "CYCLES"
     sc.cycles.device = "CPU"
+    if os.environ.get("EM_GPU"):  # [U-501] render on the graphics card when it can
+        prefs = bpy.context.preferences.addons["cycles"].preferences
+        for kind in ("OPTIX", "CUDA"):
+            try:
+                prefs.compute_device_type = kind
+                prefs.get_devices()
+                if any(d.type == kind for d in prefs.devices):
+                    for d in prefs.devices:
+                        d.use = d.type == kind
+                    sc.cycles.device = "GPU"
+                    break
+            except TypeError:
+                pass
     sc.cycles.samples = 16
     sc.cycles.use_denoising = True
     sc.render.film_transparent = True
@@ -361,6 +374,8 @@ def pose(J, kind, anim, t):
 
 # ---------------------------------------------------------------- main
 FRAMES = {"idle": 2, "walk": 6, "cast": 3, "attack": 3, "death": 3}
+if os.environ.get("EM_HD"):  # [U-501] HD models: twice the frames
+    FRAMES = {k: v * 2 for k, v in FRAMES.items()}
 
 for m in MANIFEST:
     out = os.path.join(OUT, m["id"])

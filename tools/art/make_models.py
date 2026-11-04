@@ -26,6 +26,14 @@ PACK = ROOT / "resourcepacks" / "default" / "models"
 WORK = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(os.environ.get("OCC_BOX_SCRATCH", "/tmp/em-models")) / "models"
 FRAMES = {"idle": 2, "walk": 6, "cast": 3, "attack": 3, "death": 3}
 FPS = {"idle": 2, "walk": 10, "cast": 8, "attack": 10, "death": 5}  # (structures collapse in 1 s)
+# [U-501] HD models for Ultra quality: EM_HD=1 → 1.5 × the pixels, 2 × the frames, into models_hd/ (not in git: big; made
+# locally; a model without one simply uses the normal sheet). EM_ONLY=a,b = only these. EM_GPU=1 = render on the graphics card.
+HD = bool(os.environ.get("EM_HD"))
+if HD:
+    PACK = ROOT / "resourcepacks" / "default" / "models_hd"
+    WORK = WORK / "hd"
+    FRAMES = {k: v * 2 for k, v in FRAMES.items()}
+    FPS = {k: v * 2 for k, v in FPS.items()}
 HUMAN = ["idle", "walk", "cast", "attack", "death"]
 MOB = ["idle", "walk", "attack", "death"]
 
@@ -125,9 +133,14 @@ def pack(m):
         lines.append(f"anim {a} {col} {n} {FPS[a]}")
         cols += [(a, f) for f in range(n)]
         col += n
-    files = [str(src / f"{a}_{d}_{f}.png") for d in range(dirs) for (a, f) in cols]
-    subprocess.run(["magick", "montage", *files, "-tile", f"{len(cols)}x{dirs}", "-geometry", "+0+0", "-background", "none",
+    # [U-501] never wider than 4096 px (what every GPU loads): long sheets wrap into blocks of `dirs` rows
+    wrap = 4096 // m["px"] if len(cols) * m["px"] > 4096 else len(cols)
+    blocks = [cols[i:i + wrap] for i in range(0, len(cols), wrap)]
+    files = [str(src / f"{b[i][0]}_{d}_{b[i][1]}.png") if i < len(b) else "null:" for b in blocks for d in range(dirs) for i in range(wrap)]
+    subprocess.run(["magick", "montage", *files, "-tile", f"{wrap}x{len(blocks) * dirs}", "-geometry", f"{m['px']}x{m['px']}+0+0", "-background", "none",
                     str(dst / "sheet.png")], check=True)
+    if wrap != len(cols):
+        lines.insert(0, f"wrap {wrap}")
     anchor = m.get("anchor", 0.8)
     (dst / "sheet.txt").write_text(
         "# [U-258] placeholder model sprite sheet (made by tools/art/make_models.py from a Blender model)\n"
@@ -139,6 +152,21 @@ def pack(m):
 def main():
     WORK.mkdir(parents=True, exist_ok=True)
     ms = manifest()
+    if os.environ.get("EM_ONLY"):
+        only = set(os.environ["EM_ONLY"].split(","))
+        ms = [m for m in ms if m["id"] in only]
+    if HD:  # one by one: each finished model is usable at once; a stopped run continues where it was
+        for m in ms:
+            if (PACK / m["id"] / "sheet.png").exists():
+                continue
+            m["px"] = m["px"] * 3 // 2
+            mf = WORK / "manifest.json"
+            mf.write_text(json.dumps([m]))
+            subprocess.run(["blender", "-b", "--factory-startup", "-P", str(ROOT / "tools" / "art" / "blender_models.py"), "--", str(mf), str(WORK)],
+                           check=True, stdout=subprocess.DEVNULL)
+            pack(m)
+            print("packed HD", m["id"], flush=True)
+        return
     if os.environ.get("EM_MODELS_NEW"):  # only models that have no sprite sheet yet
         ms = [m for m in ms if not (PACK / m["id"] / "sheet.png").exists()]
         print(len(ms), "new models", flush=True)

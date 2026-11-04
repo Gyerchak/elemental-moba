@@ -784,6 +784,7 @@ void GameView::frame(NetClient& net, double now_s, Ui& ui) {
     // [U-501] Medium and up: the world goes through the shaders; the HUD and the aiming preview stay crisp on top
     if (!post_tried_) post_tried_ = true, post_.init(r_);
     Sprites::smooth = set_.gfx_quality >= 1;
+    Sprites::hd = set_.gfx_quality >= 3;
     const bool post_on = set_.gfx_quality >= 1 && post_.ready() && !set_.dev_mode;
     if (post_on) post_.begin(w, h);
     draw_world(net, now_s);

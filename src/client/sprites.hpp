@@ -34,7 +34,13 @@ struct SpriteSheet {
 class Sprites {
 public:
     void init(Resources* res) { res_ = res; }
-    const SpriteSheet* get(const std::string& id) { return get_dir("models/" + id); }  // nullptr = no sheet for this model
+    // nullptr = no sheet for this model; [U-501] Ultra quality prefers models_hd/<id> (more pixels, twice the frames)
+    const SpriteSheet* get(const std::string& id) {
+        if (hd)
+            if (const SpriteSheet* s = get_dir("models_hd/" + id)) return s;
+        return get_dir("models/" + id);
+    }
+    static inline bool hd = false;
     // a sheet in any pack folder, e.g. "champions/ember_monk/skins/comet/model" (a skin's own model)
     const SpriteSheet* get_dir(const std::string& dir);
     // Draws one frame. (sx, sy) = the ground point on the screen; `scale` = screen px per game unit × size;

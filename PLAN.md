@@ -255,3 +255,13 @@ clang 22 and GCC 16 (`README.md` → Build / Play).
 - [ ] NEXT — "Alt expands everything": item tooltips, status chips, the stats panel (formula lines like the skill tooltip).
 - [ ] NEXT — damage record also in the post-game stats (pre / post / mitigated per champion).
 - [ ] CHECK in a real match: Taliyah W, the lag, the glitches after the U-487 fix; the router port forward for SERVER.txt.
+
+## M25 — Vulkan graphics engine (2026-11-04)
+- [x] SDL GPU renderer locked to Vulkan + SPIR-V shaders; bloom, grade, vignette, sharpen; frame blending; soft shadows; skill glow; light pools; quality setting; HD model pipeline [U-501].
+- [ ] NEXT graphics steps, in order of effect:
+      1. Real 3D art instead of the placeholder models (the biggest visual gain; shaders cannot add detail).
+      2. Animated water and lava: a mask texture from the map cells + a scrolling shader (ground is a static texture today).
+      3. Particles for skills (sparks, smoke, embers) with the same additive soft discs; heat haze over lava.
+      4. Real shadows from the sun direction; more than 8 model directions.
+      5. Multi-page sheets, so converted League skins can use more pixels (now 100 px to fit 4096).
+      6. A real 3D engine on SDL_GPU (a rewrite of the drawing; big).
