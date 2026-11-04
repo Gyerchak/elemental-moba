@@ -692,5 +692,21 @@ Additions outside the plan live in `ENGINE-EXTRAS.md`, never here.
 - [U-486] All of Aatrox's animations from the mod, and every animation kind configurable in the base game engine.
 - [U-487] Crash on both computers at ~6 min (LAN) + glitches + lag: the server wrote the wall part of a snapshot in another order than the client read it.
 
+## 41. Round 21 (2026-11-01 … 11-04)
+
+- [U-488] Ping and FPS on screen (Options: on / off); Graphics: FPS limit; quality settings for bigger-resolution models (today's = the lowest); smoother animations (more frames; today's = the lowest).
+- [U-489] Taliyah W (game key) glitches the game when it hits nothing.
+- [U-490] The whole game lags for a while, then recovers (not only graphics).
+- [U-491] Companion: the caller moves freely while it comes, can cancel it any time; 3 min cooldown from the moment it is called (also when cancelled).
+- [U-492] Damage like LoL: pre-mitigation, post-mitigation, mitigated, pre-penetration damage; true damage (ignores all defensive stats) in every combination; absolute damage (also ignores damage-reduction effects).
+- [U-493] CS shown at the top; Rage → "Fire Rage", Fuel → "Fire Fuel".
+- [U-494] A camera lock button (key U) on the bottom bar next to AA / QC.
+- [U-495] Death: the body lies on the ground (last frame of the death animation) until respawn; dead = untouchable, cannot act. When the death timer ends the companion comes to the body (+50 % speed, no cooldown) and carries it home; every death timer −3 s.
+- [U-496] Vulkan only (maybe the screen glitches).
+- [U-497] The second map has no own graphics: every map gets base graphics made from its hitboxes, replaceable by resource packs.
+- [U-498] Sky power as a clear modifier per champion with elemental damage anywhere in the kit (also when gained later): moon for water, sun / comet for fire, the 60:00 event for every bender; Alt shows every modifier — any tooltip expands with Alt.
+- [U-499] Installation scripts for every system; custom skins / champions must work from the GitHub repo (the Aatrox skin did not load on the laptop).
+- [U-500] Host the server on the public IP (router: TOTOLINK) and put the address (IP:port) on GitHub as a .txt.
+
 ---
 *Hubert continues editing the plan later — new ideas get the next free `[U-xx]` number.*
