@@ -146,6 +146,11 @@ void GameView::reset() {
     sky_seen_once_ = false;
     sky_banners_.clear();
     anim_mem_.clear();
+    // [U-497] the ground textures come from THIS match's map pack: forget the last match's (they stuck to every later map)
+    for (std::size_t i = 0; i < ground_src_.size(); ++i) {
+        if (ground_src_[i]) SDL_DestroySurface(ground_src_[i]);
+        ground_src_[i] = nullptr, ground_tried_[i] = false;
+    }
     sent_companion_ = -1;
     my_emotes_ = load_own_emotes(), my_emotes_loaded_ = true;  // [U-414]
     for (std::size_t i = 0; i < ground_src_.size(); ++i) {  // [U-420] the ground textures of THIS map's pack
@@ -1086,6 +1091,8 @@ void GameView::draw_hud(NetClient& net, double now_s, Ui& ui) {
     const float bx0 = W - 480;
     fill_rect(r_, bx0, 0, 480, 64, {0, 0, 0, 160});
     text(r_, bx0 + 8, 6, std::format("{}   {} {} : {} {}", mmss(now_ms), tr("Fire"), cur.kills[0], cur.kills[1], tr("Earth")), {255, 255, 255}, 2);
+    for (const auto& s : cur.scores)  // [U-493] my CS at the top
+        if (s.id == net.my_unit) text(r_, bx0 + 300, 8, std::format("CS {}", s.cs), {230, 230, 160}, 1.5f);
     // [U-253] sky: clock, sight, the next event with a countdown, and every active sky effect as a chip.
     // Hover a chip → what it does to MY champion (numbers). Chips with a gold frame change my power.
     const NextEvent nx = next_sky_event(net.start_ms + now_ms);
@@ -1093,7 +1100,7 @@ void GameView::draw_hud(NetClient& net, double now_s, Ui& ui) {
                                       sky.minute_of_day % 60, tr("sight"), vision_range_pct(sky),
                                       nx.name.empty() ? std::string() : std::format("   {}: {} {}", tr("next"), nx.name, mmss(nx.in_ms))),
          {220, 220, 160});
-    {  // [U-389] right end of the clock line (it used to sit in the chip row)
+    if (set_.show_perf) {  // [U-389] right end of the clock line; [U-488] can be switched off
         const std::string pf = std::format("{:.0f} ms  {:.0f} fps", net.ping_ms, frame_ms_ > 0 ? 1000.0 / frame_ms_ : 0.0);
         text(r_, bx0 + 472 - text_w(pf), 10, pf, {150, 160, 180});
     }
@@ -1293,7 +1300,8 @@ void GameView::draw_hud(NetClient& net, double now_s, Ui& ui) {
     // death / end
     if (mu && !mu->alive && net.winner < 0) {
         fill_rect(r_, 0, 0, W, H, {40, 40, 40, 90});
-        const std::string rs = std::format("{} {:.0f} s", tr("Respawn in"), std::max(0.0, me.respawn_ms / 1000.0 - since));
+        const std::string rs = me.respawn_ms / 1000.0 - since > 0 ? std::format("{} {:.0f} s", tr("Respawn in"), std::max(0.0, me.respawn_ms / 1000.0 - since))
+                                                                  : tr("Your companion is bringing you home");  // [U-495]
         text(r_, (W - text_w(rs, 3)) / 2, H * 0.3f - 60, rs, {255, 255, 255}, 3);  // [U-430] higher
         if (net.features & kFeatBuyback) {  // [U-478] pay to come back now
             const bool ready = me.buyback_left_ms == 0 && me.gold >= me.buyback_cost;

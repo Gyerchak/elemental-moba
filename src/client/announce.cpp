@@ -260,11 +260,12 @@ void GameView::draw_death_recap(NetClient& net, double now_s) {
     Ui& ui = *ui_;
     const float W = view_.sw, H = view_.sh;
     // totals by damage type
-    std::int64_t total = 0, phys = 0, dot = 0, shielded = 0;
+    std::int64_t total = 0, phys = 0, dot = 0, shielded = 0, pre = 0, pre_pen = 0, truedmg = 0;  // [U-492]
     std::map<int, std::int64_t> by_el;  // element → damage
     for (const auto& h : rc.hits) {
         total += h.amount;
         shielded += h.shielded;
+        pre += h.pre, pre_pen += h.pre_pen, truedmg += h.dtype ? h.amount : 0;
         if (h.physical) phys += h.amount;
         else by_el[int(base_element(SubElement(h.sub)))] += h.amount;
         if (DmgFrom(h.from) == DmgFrom::Burn) dot += h.amount;
@@ -317,6 +318,11 @@ void GameView::draw_death_recap(NetClient& net, double now_s) {
     text(r_, x + 10, y + 8, std::format("{} — {} {}  ({} {})", tr("Death recap"), total, tr("damage taken"), shielded, tr("absorbed by shields")),
          {255, 230, 200}, 1.4f);
     y += 32;
+    // [U-492] LoL-style: before defences → what penetration added → after (+ true / absolute damage)
+    text(r_, x + 10, y - 6, std::format("{} {}   {} {}   {} {}   {} {}   {} {}", tr("pre-mitigation"), pre, tr("without penetration"), pre_pen,
+                                        tr("post-mitigation"), total, tr("mitigated"), std::max<std::int64_t>(0, pre - total), tr("true / absolute"), truedmg),
+         {200, 200, 220});
+    y += 12;
     auto colour_of = [](bool physical, std::uint8_t sub) {
         if (physical) return Rgba{255, 150, 60};
         switch (base_element(SubElement(sub))) {

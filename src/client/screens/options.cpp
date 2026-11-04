@@ -70,6 +70,17 @@ void App::options(bool in_game) {
             const bool vs = set_.vsync;
             toggle(tr("V-sync"), set_.vsync);
             if (vs != set_.vsync) SDL_SetRenderVSync(ren_, set_.vsync ? 1 : 0);
+            toggle(tr("Show ping and FPS"), set_.show_perf);  // [U-488]
+            {  // [U-488] FPS limit: a click = the next step
+                constexpr int kLimits[] = {0, 30, 60, 90, 120, 144, 165, 240, 360};
+                if (button(ren_, ui_, x, y, 320, 26, std::format("{}: {}", tr("FPS limit"), set_.fps_limit ? std::to_string(set_.fps_limit) : tr("none")), false)) {
+                    int i = 0;
+                    while (i < int(std::size(kLimits)) && kLimits[i] != set_.fps_limit) ++i;
+                    set_.fps_limit = kLimits[(i + 1) % int(std::size(kLimits))];
+                    changed = true;
+                }
+                y += 32;
+            }
             text(ren_, x, y + 6, std::format("{}: {}", tr("Renderer"), renderer_name_), {170, 170, 190});
             y += 26;
             break;

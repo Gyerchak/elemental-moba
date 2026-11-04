@@ -88,7 +88,15 @@ def main():
 
 def pack(mp, skin, sk, work: Path, base: Path):
     frames = json.loads((work / "frames" / "frames.json").read_text())
-    wrap, px = mp.get("wrap", 16), mp["px"]
+    # [U-499] the sheet must fit 4096 × 4096 (many laptop GPUs cannot load bigger textures): frames per row and the
+    # frame size are chosen so it does (frames are scaled down only when needed)
+    total = sum(n for n, _ in frames.values())
+    px = mp["px"]
+    while True:
+        wrap = max(1, 4096 // px)
+        if math.ceil(total / wrap) * 8 * px <= 4096 or px <= 48:
+            break
+        px -= 4
     dst = ROOT / "resourcepacks" / "default" / "champions" / mp["champion"] / "skins" / skin
     model = dst / "model"
     model.mkdir(parents=True, exist_ok=True)

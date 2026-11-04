@@ -97,6 +97,8 @@ struct Settings {
     WindowMode window = WindowMode::Fullscreen;  // true fullscreen by default
     bool confine_mouse = true;             // the mouse can't leave the game window (off = two screens / windowed)
     bool vsync = true;
+    bool show_perf = true;   // [U-488] ping + FPS on screen
+    int fps_limit = 0;       // [U-488] 0 = no limit
     // ---- graphics [U-198][U-204][U-208]
     bool dev_mode = false;                 // developer view: top-down, full hitboxes, no textures
     int hitbox_opacity = 10;               // [U-176] game view: hitbox = grey shadow, this % opacity

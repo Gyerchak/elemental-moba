@@ -202,6 +202,10 @@ struct SkillDef {
     bool arcane = false;     // [U-464] non-elemental MAGIC (arcane power); physical sub = martial; else elemental
     bool aa_reset = false;   // [U-465] using it resets the autoattack timer (rare)
     std::int16_t ap = 0;     // [U-475] damage + this % of ability power (LoL)
+    // [U-492] damage type: 0 normal (physical / elemental), 1 TRUE (ignores every defensive stat), 2 ABSOLUTE (also
+    // ignores damage-reduction effects); true_pct = this % of the damage is dealt as that type (100 = all), the rest normal
+    std::uint8_t dmg_type = 0;
+    std::int16_t true_pct = 100;
     std::int16_t scepter_dmg_pct = 0, scepter_cd_pct = 0;  // [U-478] a scepter on an ultimate: +damage %, −cooldown % (0 = 30 / 20)
     std::uint8_t dispel = 0; // [U-476] Dota: 1 = basic dispel (soft debuffs off the caster, buffs off enemies hit), 2 = strong (stuns too)
     bool pass_units = false; // [U-471] a dash goes through units (walls: through_walls — it jumps over them)

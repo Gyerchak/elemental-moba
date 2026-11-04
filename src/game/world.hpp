@@ -132,6 +132,10 @@ struct TakenHit {
     std::uint8_t src_kind = 255, src_extra = 0;  // [U-302] what dealt it (UnitKind; minion type / monster name id / champion)
     std::uint8_t cc = 255;      // [U-343] a crowd-control entry (StatusKind), amount 0 …
     std::int32_t cc_ms = 0;     // … and how long it held
+    // [U-492] LoL-style damage record: before defences (pre-mitigation), what it would have been WITHOUT the attacker's
+    // penetration (pre-penetration), and its type (0 normal, 1 true, 2 absolute); amount = post-mitigation
+    std::int32_t pre = 0, pre_pen = 0;
+    std::uint8_t dtype = 0;
 };
 struct Unit {
     std::uint32_t id = 0;
@@ -254,6 +258,7 @@ struct Unit {
     std::int32_t death_streak = 0;      // [U-413] deaths without a kill (lowers the bounty)
     CompanionKind companion = CompanionKind::SkyBison;  // [U-407] chosen travel animal
     bool riding = false;                // [U-407] carried home by the companion: no moving, casting or attacking
+    std::int64_t companion_ready_ms = 0; // [U-491] the companion can be called again (3 min from the call)
     std::int64_t proc_ready_ms = 0;     // [U-416] the passive's own cooldown (procs)
     std::array<std::int64_t, 2> sensed_until{};  // [U-431] sensed by team 0 / 1 (seismic, heat, sound) until then
     std::uint8_t steer_slot = 0;        // [U-402] steering this skill's projectiles …
@@ -506,6 +511,7 @@ struct Companion {
     CompanionKind kind = CompanionKind::SkyBison;
     std::int32_t x = 0, y = 0;  // game units
     bool carrying = false;      // false: on the way to the champion; true: carrying them home
+    bool revive = false;        // [U-495] fetching a dead champion's body (+50 % speed, no cooldown)
 };
 
 // The terrain timers: walls collapse [U-24], trees regrow [U-14], lava cools [X-56], fog clears [X-57].
@@ -607,7 +613,9 @@ public:
     std::vector<CellChange> cell_changes;  // for the network (cleared by the server)
     std::vector<FeedLine> feed;            // kill feed / events
     std::vector<HitEvent> hits;            // last 1 s of damage [X-103]
-    std::uint8_t hit_flags_ = 0;           // flags for the next HitEvent (set around deal_damage)
+    std::uint8_t hit_flags_ = 0;
+    std::uint8_t dmg_type_ = 0;              // [U-492] for the next deal_damage: 0 normal, 1 true, 2 absolute
+    std::int32_t last_pre_ = 0, last_pre_pen_ = 0;  // [U-492] the last hit's pre-mitigation / pre-penetration damage           // flags for the next HitEvent (set around deal_damage)
     DmgTag dmg_tag_{};                     // [U-254] source of the next hit (set around deal_damage; Other = guess)
     std::vector<Announce> announces;       // [U-263] (the server sends and clears them)
     std::vector<DeathRecap> recaps;        // [U-262] (the server sends and clears them)

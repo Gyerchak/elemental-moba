@@ -193,7 +193,14 @@ void World::step_units() {
     for (std::size_t i = 0; i < units.size(); ++i) {
         Unit& u = units[i];
         if (!u.alive) {
-            if (u.kind == UnitKind::Champion && now_ms >= u.respawn_ms) respawn(u);
+            if (u.kind == UnitKind::Champion && now_ms >= u.respawn_ms) {
+                // [U-495] the death timer is over: the companion fetches the body and brings it home (then respawn)
+                if (cfg.classic_recall) respawn(u);
+                else if (!std::ranges::any_of(companions, [&](const Companion& c) { return c.owner == u.id; })) {
+                    const auto [fx_, fy_] = fountain(u.team);
+                    companions.push_back({u.id, u.companion, fx_, fy_, false, true});
+                }
+            }
             continue;
         }
         u.moving = false;

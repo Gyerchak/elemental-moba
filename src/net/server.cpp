@@ -275,7 +275,7 @@ void Server::run(std::stop_token stop) {
                             const TakenHit& h = rc.hits[i];
                             w.put(NetRecapHit{std::int32_t(rc.ms - h.ms), h.src, std::uint8_t(h.tag.from), h.tag.slot, h.sub,
                                               std::uint8_t(h.physical), h.tag.item, h.src_kind, h.src_extra, h.amount, h.shielded, h.cc, 0,
-                                              std::uint16_t(std::clamp(h.cc_ms / 10, 0, 65'535))});
+                                              std::uint16_t(std::clamp(h.cc_ms / 10, 0, 65'535)), h.pre, h.pre_pen, h.dtype, {}});
                         }
                         send(p.peer, w, true);
                     }

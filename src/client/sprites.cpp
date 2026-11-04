@@ -3,6 +3,7 @@
 #include "client/anim.hpp"
 
 #include <cmath>
+#include <filesystem>
 #include <fstream>
 #include <sstream>
 
@@ -40,6 +41,9 @@ const SpriteSheet* Sprites::get_dir(const std::string& dir) {
             }
         }
         s->tex = res_->texture(dir + "/sheet.png");
+        if (!s->tex && !s->anims.empty())  // [U-499] e.g. bigger than the GPU allows: say so (logs/models.txt) instead of failing silently
+            if (std::error_code ec; std::filesystem::create_directories("logs", ec), true)
+                if (std::ofstream lg("logs/models.txt", std::ios::app); lg) lg << dir << "/sheet.png could not be loaded: " << SDL_GetError() << '\n';
         if (!s->tex || s->anims.empty()) s.reset();
     }
     const SpriteSheet* p = s.get();

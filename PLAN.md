@@ -241,3 +241,17 @@ clang 22 and GCC 16 (`README.md` → Build / Play).
 - [x] Silence → LoL; own Chi Block / Disarm / Subdue [U-474]. LoL AP + magic pen [U-475]. Dota 2 module [U-476].
 - [x] Switchable Dota features, off by default [U-478]; LoL items only in versions/lol-mod with its own pack [U-478].
 - [x] Resource packs in order, first wins [U-479]. GitHub updated [U-477].
+
+## M24 — Round 21 (2026-11-04)
+- [x] Crash at ~6 min + glitches + lag: snapshot order fixed, end marker [U-487] (likely also U-489, U-490).
+- [x] Ping / FPS toggle, FPS limit [U-488 part]; CS on top, fire fuel / fire rage [U-493]; camera button [U-494].
+- [x] Companion free while coming, cancel, 3 min cooldown [U-491]; body + companion fetch, timers −3 s [U-495].
+- [x] Damage types + record [U-492]; Vulkan only [U-496]; map textures per match [U-497]; sky modifiers per kit element + Alt [U-498].
+- [x] Install scripts, SERVER.txt, Aatrox sheet ≤ 4096 px [U-499][U-500].
+- [ ] NEXT — graphics quality setting (Low = today; Medium / High = models rendered at 2× / 3× px, chosen per pack folder
+      models_hd/; make_models.py + lol_skin_make.py get a --px option) [U-488].
+- [ ] NEXT — smoother animations: render 2–3× more frames (FRAMES table / max_frames) for Medium / High; the client
+      already plays any frame count [U-488].
+- [ ] NEXT — "Alt expands everything": item tooltips, status chips, the stats panel (formula lines like the skill tooltip).
+- [ ] NEXT — damage record also in the post-game stats (pre / post / mitigated per champion).
+- [ ] CHECK in a real match: Taliyah W, the lag, the glitches after the U-487 fix; the router port forward for SERVER.txt.

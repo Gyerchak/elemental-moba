@@ -128,6 +128,8 @@ bool Settings::load(const std::string& path) {
         else if (k == "window") window = WindowMode(std::clamp(to_int(v, 0), 0, 2));
         else if (k == "confine_mouse") confine_mouse = b;
         else if (k == "vsync") vsync = b;
+        else if (k == "show_perf") show_perf = b;  // [U-488]
+        else if (k == "fps_limit") fps_limit = std::clamp(to_int(v, 0), 0, 1'000);
         else if (k == "dev_mode") dev_mode = b;
         else if (k == "hitbox_opacity") hitbox_opacity = std::clamp(to_int(v, 10), 0, 100);
         else if (k == "smooth_fog") smooth_fog = b;
@@ -282,7 +284,7 @@ void Settings::save(const std::string& path) const {
         << "\nauto_buy=" << auto_buy << "\nauto_level=" << auto_level << '\n';
     for (const auto& e : own_emotes) out << "own_emote=" << e << '\n';
     for (int i = 0; i < kActions; ++i) out << "key_" << kInfo[i].id << '=' << SDL_GetScancodeName(keys[std::size_t(i)]) << '\n';
-    out << "# ---- window\nwindow=" << int(window) << "\nconfine_mouse=" << confine_mouse << "\nvsync=" << vsync << '\n';
+    out << "# ---- window\nwindow=" << int(window) << "\nconfine_mouse=" << confine_mouse << "\nvsync=" << vsync << "\nshow_perf=" << show_perf << "\nfps_limit=" << fps_limit << '\n';
     out << "# ---- graphics\ndev_mode=" << dev_mode << "\nhitbox_opacity=" << hitbox_opacity << "\nsmooth_fog=" << smooth_fog
         << "\ndamage_numbers=" << damage_numbers << "\ncc_timers=" << cc_timers << "\nshow_paths=" << show_paths
         << "\nshow_rewards=" << show_rewards << "\nshow_names=" << show_names << "\ncolourblind=" << colourblind

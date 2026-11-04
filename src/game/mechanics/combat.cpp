@@ -112,12 +112,24 @@ void World::deal_damage(Unit* src, Unit& dst, std::int32_t points, SubElement su
     if (dst.is_structure() && !vulnerable(dst)) return;
     const Stats& as = src_stats ? *src_stats : (src ? src->stats : dst.stats);
     std::int64_t dmg = points;
+    last_pre_ = points, last_pre_pen_ = points;  // [U-492] pre-mitigation; pre-penetration below
+    if (dmg_type_ >= 1) {  // [U-492] TRUE / ABSOLUTE: no defensive stat counts
+        apply_hit(src, dst, std::int32_t(dmg * 100), sub, physical, is_auto);
+        return;
+    }
     if (physical) {  // [X-15] same formula with defence; no physical lethality [U-40]
         std::int64_t def = dst.stats.defence.total();
         if (dst.stats.range == Range::Melee && dst.kind == UnitKind::Champion) def = def * (100 + kMeleeDefenceBonusPct) / 100;
         dmg = dmg * 10'000 / (10'000 + std::max<std::int64_t>(0, def));
         if (is_auto) dmg = dota_block(dst, dmg);  // [U-476] damage block
+        last_pre_pen_ = std::int32_t(dmg);  // (no physical penetration)
     } else {
+        {  // [U-492] what it would have dealt without the attacker's penetration (elemental / magic, flat and %)
+            Stats nopen = as;
+            nopen.elemental_penetration = nopen.elemental_lethality = nopen.magic_pen = nopen.magic_pen_pct = 0;
+            last_pre_pen_ = std::int32_t(after_element_resist(std::int32_t(dota_magic_resist(elemental_damage(points, nopen, dst.stats), dst)),
+                                                              base_element(sub), dst.stats));
+        }
         dmg = elemental_damage(std::int32_t(dmg), as, dst.stats);  // (+ LoL magic pen [U-475])
         dmg = dota_magic_resist(dmg, dst);                         // [U-476] magic resistance %
         const std::int64_t before = dmg;
@@ -144,7 +156,7 @@ void World::apply_hit(Unit* src, Unit& dst, std::int32_t hund, SubElement sub, b
     if (!dst.alive || hund <= 0) return;
     // [U-286] wet + fire: the first fire hit (skill, autoattack or burn) loses 25 %, and the water is gone.
     // Lightning is not part of this: water conducts it (+25 %, effects.cpp).
-    if (fire_family(sub) && sub != SubElement::Lightning && dst.st.has(StatusKind::Wet)) {
+    if (fire_family(sub) && sub != SubElement::Lightning && dst.st.has(StatusKind::Wet) && dmg_type_ < 2) {  // ([U-492] absolute ignores it)
         hund = hund * (100 - elements::kWetVsFirePct) / 100;
         dry(dst);
         dst.dried_ms = now_ms;  // [U-344] this same hit cannot set it on fire
@@ -167,6 +179,7 @@ void World::apply_hit(Unit* src, Unit& dst, std::int32_t hund, SubElement sub, b
                                  std::uint8_t(src ? int(src->kind) : 255),
                                  std::uint8_t(!src ? 0 : src->kind == UnitKind::Minion ? int(src->mtype)
                                                      : src->kind == UnitKind::Champion ? src->champ : mob_name_id(*src))});
+            dst.taken.back().pre = last_pre_, dst.taken.back().pre_pen = last_pre_pen_, dst.taken.back().dtype = dmg_type_;  // [U-492]
     }
     if (src) {
         dst.last_hitter = src->id;
@@ -537,7 +550,8 @@ void World::on_kill(Unit* killer, Unit& dead) {
             if (k && k->team != Team::Neutral) kt = k->team;  // [U-383] the credited champion's team (also after a monster finished it)
             if (kt == Team::Neutral) kt = dead.team == Team::FireNation ? Team::EarthNation : Team::FireNation;
             ++dead.deaths;
-            dead.respawn_ms = now_ms + std::min<std::int64_t>(60'000, 8'000 + 2'000LL * dead.level);
+            // [U-495] −3 s: after the timer the companion still has to fetch the body
+            dead.respawn_ms = now_ms + std::max<std::int64_t>(1'000, std::min<std::int64_t>(60'000, 8'000 + 2'000LL * dead.level) - 3'000);
             if (kt != Team::Neutral) ++team_kills[std::size_t(kt)];
             std::vector<Unit*> helpers;
             for (const auto& [id, ms] : dead.assist_by)

@@ -231,7 +231,7 @@ std::int64_t World::edge_gap(const Unit& a, const Unit& b) const { return em::ed
 
 bool World::visible_to(Team t, const Unit& u) const {
     if (u.team == t || u.is_structure()) return true;
-    if (!u.alive || t == Team::Neutral) return false;
+    if ((!u.alive && u.kind != UnitKind::Champion) || t == Team::Neutral) return false;  // [U-495] a champion's body stays visible
     if (u.st.has(StatusKind::Invisible) && !true_sighted(t, u)) return false;  // [U-478]
     const VisionMap& v = vision[std::size_t(t)];
     // [U-140] one sample point of the hitbox on a seen cell = seen

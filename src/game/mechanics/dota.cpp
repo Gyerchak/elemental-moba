@@ -93,7 +93,8 @@ void World::dota_buyback(Unit& u) {
     if (u.gold < cost) return refuse(u, std::format("buyback costs {} gold", cost));
     u.gold -= cost;
     u.buyback_ready_ms = now_ms + 300'000;
-    u.respawn_ms = now_ms;  // (the respawn happens this tick)
+    std::erase_if(companions, [&](const Companion& c) { return c.owner == u.id; });  // (no body fetching)
+    respawn(u);  // [U-495] at once
 }
 
 // Glyph: the team's structures cannot be damaged for 5 s; 5 min cooldown (shared by the team).

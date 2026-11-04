@@ -3,6 +3,7 @@
 #include "game/versions.hpp"
 #include "client/app.hpp"
 #include <fstream>
+#include <cstdlib>
 #include <filesystem>
 
 #include <algorithm>
@@ -23,14 +24,15 @@ App::App(AppOptions o) : opt_(std::move(o)) {
     loc::load(set_.language);  // [U-239]
     if (!apply_version(set_.version).empty()) set_.version = kOfficialVersion;  // [U-95] own version (bad file → official)
     load_custom_champions(set_.custom_champions);  // [U-210] before any match — AFTER the version (they copy its numbers)
-    // [U-214] Vulkan renderer first; anything else only if this machine has no Vulkan
+    // [U-214][U-496] Vulkan renderer only
     const SDL_WindowFlags base = SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY;
     win_ = SDL_CreateWindow("elemental-moba", opt_.width, opt_.height, base | SDL_WINDOW_VULKAN);
     if (win_) ren_ = SDL_CreateRenderer(win_, "vulkan");
-    if (!ren_) {
-        if (win_) SDL_DestroyWindow(win_);
-        win_ = SDL_CreateWindow("elemental-moba", opt_.width, opt_.height, base);
-        ren_ = SDL_CreateRenderer(win_, nullptr);
+    if (!ren_) {  // [U-496] Vulkan ONLY (no fallback renderer): say why and stop
+        const std::string why = std::format("Elemental MOBA needs Vulkan (a Vulkan driver for your GPU).\n\nSDL: {}", SDL_GetError());
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Elemental MOBA — no Vulkan", why.c_str(), win_);
+        SDL_Log("%s", why.c_str());
+        std::exit(1);
     }
     renderer_name_ = ren_ ? SDL_GetRendererName(ren_) : "none";
     SDL_SetRenderVSync(ren_, set_.vsync ? 1 : 0);
@@ -218,6 +220,13 @@ int App::run() {
         }
         SDL_RenderPresent(ren_);
         gfx::end_frame_text();
+        if (set_.fps_limit > 0) {  // [U-488] FPS limit: wait out the rest of the frame
+            static auto next = clock::now();
+            next += std::chrono::nanoseconds(1'000'000'000LL / set_.fps_limit);
+            const auto now = clock::now();
+            if (next > now) SDL_DelayPrecise(std::uint64_t(std::chrono::duration_cast<std::chrono::nanoseconds>(next - now).count()));
+            else if (now - next > std::chrono::milliseconds(100)) next = now;
+        }
         if (const auto w3 = clock::now(); w3 - w0 > std::chrono::milliseconds(200)) {
             auto ms = [](auto d) { return std::chrono::duration<double, std::milli>(d).count(); };
             std::error_code ec;

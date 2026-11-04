@@ -413,6 +413,13 @@ std::string parse_text(const std::string& text, ChampionDef& out) {
             }
             else if (f == "inner") ok = num(sk.inner, 0, 2'000);
             else if (f == "ap") ok = num(sk.ap, 0, 1'000);        // [U-475] % of ability power
+            else if (f == "dmg_type") {  // [U-492] Normal / True / Absolute
+                if (v == "Normal") sk.dmg_type = 0;
+                else if (v == "True") sk.dmg_type = 1;
+                else if (v == "Absolute") sk.dmg_type = 2;
+                else return std::format("line {}: dmg_type = Normal / True / Absolute", n);
+            }
+            else if (f == "true_pct") ok = num(sk.true_pct, 0, 100);
             else if (f == "scepter_dmg_pct") ok = num(sk.scepter_dmg_pct, 0, 500);  // [U-478]
             else if (f == "scepter_cd_pct") ok = num(sk.scepter_cd_pct, 0, 90);
             else if (f == "dispel") ok = num(sk.dispel, 0, 2);   // [U-476] 1 basic, 2 strong

@@ -62,6 +62,7 @@ Any existing skill works too: `w = Fire Whip`.
   `sub` (element), `dmg dmg_rank ep ad bonus_ad`, `range width radius speed`, `cast_ms cd_ms cd_rank cost`,
   `dur_ms delay_ms tick_ms`, `cc cc_ms cc_val` (Stun Root Slow Silence ChiBlock Disarm Subdue Fear Hex Break
   DebuffImmune …), `knock`, `ap` (% of ability power), `dispel` (1 basic, 2 strong),
+  `dmg_type = Normal / True / Absolute` + `true_pct` (that % of the damage is true / absolute, the rest normal) [U-492],
   `hits = Minion SiegeMinion`. ChiBlock: `cc_val` = the elements (1 water, 2 earth, 4 fire, 8 air, add them; 0 = all).
 - **Shape** [U-462] — `geo = Circle / Ring / Line / Rect / Cone / Arc` (Auto = the kind's usual shape), `inner` = the
   hole of a Ring / Arc.
@@ -103,6 +104,9 @@ block_chance true_strike mana_break heal_amp` — 100 = 1 % for percentages. Ite
 | Fear | cannot act, runs straight away from the one who scared it |
 | Silence | no abilities at all (bending or not); autoattacks still work |
 | Ability power | skills deal + `ap` % of it |
+| True damage | ignores every defensive stat (defence, elemental defence, magic resistance, element resistances) |
+| Absolute damage | true damage that also ignores damage-reduction effects (damage block, the wet-vs-fire cut) |
+| Damage record | every hit keeps pre-mitigation, pre-penetration and post-mitigation damage (death recap) |
 | Silence-free kit rule | non-mages: every damaging skill scales with attack, bonus attack or ability power (`ad` / `bonus_ad` / `ap`) |
 | Self-healing (`self_heal`) | heals I give MYSELF (skills, passives, vamp, items) are stronger |
 | Heal & shield power (`heal_shield_power`) | heals and shields I give (to anyone) are stronger |

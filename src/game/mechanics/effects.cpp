@@ -88,7 +88,15 @@ void World::effect_hits(Effect& e) {
         if (owner && e.def)
             for (std::size_t sl = 0; sl < owner->skill.size(); ++sl)
                 if (owner->skill[sl] == e.def) dmg_tag_.slot = std::uint8_t(sl);
-        deal_damage(owner, o, dmg, e.sub, e.physical, false, &e.src);
+        if (e.def && e.def->dmg_type) {  // [U-492] this % as true / absolute damage, the rest normal
+            const std::int32_t part = dmg * std::clamp<int>(e.def->true_pct, 0, 100) / 100;
+            if (dmg - part > 0) deal_damage(owner, o, dmg - part, e.sub, e.physical, false, &e.src);
+            dmg_type_ = e.def->dmg_type;
+            deal_damage(owner, o, part, e.sub, e.physical, false, &e.src);
+            dmg_type_ = 0;
+        } else {
+            deal_damage(owner, o, dmg, e.sub, e.physical, false, &e.src);
+        }
         if (e.def && e.def->dispel && o.alive && o.team != e.team) dota_dispel(o, e.def->dispel >= 2, false);  // [U-476] strip buffs
         if (e.def && e.def->tether_ms > 0 && o.alive && owner && o.team != owner->team)  // [U-456] the chain holds on
             tethers.push_back({owner->id, o.id, o.ux(), o.uy(), e.def->tether_radius, e.def->pull, now_ms + e.def->tether_ms, e.def, dmg, e.sub, e.physical});

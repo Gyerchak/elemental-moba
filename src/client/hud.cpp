@@ -6,6 +6,7 @@
 #include <format>
 
 #include "client/game_view.hpp"
+#include "core/modifiers.hpp"
 #include "client/item_browser.hpp"
 #include "client/locale.hpp"
 #include "client/modifiers.hpp"
@@ -19,7 +20,7 @@ namespace {
 const char* kKeys[] = {"P", "Q", "W", "E", "R", "T", "Y", "G", "H"};  // [U-289] specials (F / G in the code) show as G / H
 std::string sec1(std::int64_t ms) { return std::format("{:.1f}", std::max<std::int64_t>(0, ms) / 1000.0); }
 const char* res_name(ResourceKind k) {
-    return k == ResourceKind::Fuel ? "calm flame" : k == ResourceKind::Rage ? "rage" : k == ResourceKind::Water ? "water" : k == ResourceKind::Energy ? "energy" : k == ResourceKind::Mana ? "mana" : "";
+    return k == ResourceKind::Fuel ? "fire fuel" : k == ResourceKind::Rage ? "fire rage" : k == ResourceKind::Water ? "water" : k == ResourceKind::Energy ? "energy" : k == ResourceKind::Mana ? "mana" : "";
 }
 const char* move_name(CastMove m) { return m == CastMove::Free ? "can move while casting" : m == CastMove::Slowed ? "slowed while casting" : "rooted while casting"; }
 const char* cc_name(StatusKind k) { return k == StatusKind::Count ? "" : status_name(int(k)); }
@@ -114,7 +115,32 @@ void GameView::draw_buffs(NetClient& net, float x, float y, double since) {
     const auto it = net.roster.find(net.my_unit);
     const Element el = it != net.roster.end() ? champions()[std::size_t(it->second.champ)].element : Element::None;
     const SkyState sky = WorldClock::at_ms(net.start_ms + net.cur.now_ms + std::int64_t(since * 1000));
-    for (ModView& m : env_modifiers(el, sky)) mods.push_back(std::move(m));
+    // [U-498] the sky changes every ELEMENT in my kit (the champion's, every skill's, a magic stance's): one chip per
+    // effect, its text for each of my elements; a kit without any element only gets the plain information chips
+    std::vector<Element> kit_el;
+    auto add_el = [&](Element e) {
+        if (e != Element::None && std::ranges::find(kit_el, e) == kit_el.end()) kit_el.push_back(e);
+    };
+    if (it != net.roster.end()) {
+        const ChampionDef& cdk = champions()[std::size_t(it->second.champ)];
+        add_el(cdk.element);
+        for (const SkillDef* sk : {&cdk.p, &cdk.w, &cdk.e, &cdk.r, &cdk.t, &cdk.y}) add_el(base_element(sk->sub));
+        if (const SkillDef* q = skill_of(net, int(Slot::Q))) add_el(base_element(q->sub));
+    }
+    for (int i = 0; i < me.nstatus && i < int(std::size(me.status)); ++i)  // a magic stance gained later counts too
+        if (me.status[i].kind == kModWireBase + std::uint8_t(ModKind::MagicStance)) add_el(base_element(SubElement(me.status[i].value)));
+    if (kit_el.empty()) kit_el.push_back(Element::None);
+    for (Element ke : kit_el)
+        for (ModView& m : env_modifiers(ke, sky)) {
+            auto same = std::ranges::find_if(mods, [&](const ModView& o) { return o.tag == m.tag; });
+            if (same == mods.end()) {
+                if (kit_el.size() > 1) m.detail = std::string(element_name(ke)) + ": " + m.detail;
+                mods.push_back(std::move(m));
+            } else if (!m.minor) {
+                same->detail += "  |  " + std::string(element_name(ke)) + ": " + m.detail;
+                same->minor = false;
+            }
+        }
     for (const DrawUnit& d : draw_)
         if (d.u.id == net.my_unit) {
             const int cx = int(d.x) / kCellUnits, cy = int(d.y) / kCellUnits;
@@ -152,14 +178,27 @@ void GameView::draw_buffs(NetClient& net, float x, float y, double since) {
         if (ui_ && hover(*ui_, bx, y, s, s)) hovered = &m, hx = bx;
         bx += s + 3;
     }
-    if (hovered) {  // tooltip: name, what it does, time left
-        const std::string t1 = hovered->name + (hovered->left_ms >= 0 ? std::format("  {} s", sec1(hovered->left_ms)) : "");
-        const float tw = std::max(text_w(t1), text_w(hovered->detail)) + 10;
-        const float tx = std::min(hx, view_.sw - tw - 4);
-        fill_rect(r_, tx, y - 34, tw, 30, {0, 0, 0, 235});
-        rect(r_, tx, y - 34, tw, 30, hovered->colour);
-        text(r_, tx + 5, y - 30, t1, {255, 255, 255});
-        text(r_, tx + 5, y - 17, hovered->detail, {210, 210, 220});
+    if (hovered) {  // tooltip: name, what it does, time left; [U-498] Alt = every sky number for each element of my kit
+        std::vector<std::string> L{hovered->name + (hovered->left_ms >= 0 ? std::format("  {} s", sec1(hovered->left_ms)) : ""), hovered->detail};
+        if (hovered->environment) {
+            if (SDL_GetModState() & SDL_KMOD_ALT) {
+                for (Element ke : kit_el) {
+                    const SkyBoost b = sky_boost(ke, sky);
+                    L.push_back(std::format("{}: power {:.1f}%  size {}%  width {}%  radius {}%  speed {}%  duration {}%  burns {}%  cooldown x{}%  XP {}%{}",
+                                            ke == Element::None ? "no element" : element_name(ke), b.power_pm() / 10.0, b.size_pct, b.width_pct,
+                                            b.radius_pct, b.speed_pct, b.dur_pct, b.dot_pct, b.cd_pct, b.xp_pct, b.muted ? "  MUTED" : ""));
+                }
+            } else {
+                L.push_back("hold Alt: every sky number for my elements");
+            }
+        }
+        float tw = 0;
+        for (const std::string& l : L) tw = std::max(tw, text_w(l));
+        tw += 10;
+        const float th = float(L.size()) * 13 + 4, tx = std::min(hx, view_.sw - tw - 4);
+        fill_rect(r_, tx, y - th - 4, tw, th, {0, 0, 0, 235});
+        rect(r_, tx, y - th - 4, tw, th, hovered->colour);
+        for (std::size_t k = 0; k < L.size(); ++k) text(r_, tx + 5, y - th + float(k) * 13, L[k], k == 0 ? Rgba{255, 255, 255} : Rgba{210, 210, 220});
     }
 }
 
@@ -575,6 +614,8 @@ void GameView::draw_bottom_panel(NetClient& net, double now_s, Ui& ui) {
         on_action(Action::ToggleAutoAttack, false, net);
     if (icon_button(ui, bx + 42, y0 + 86, 38, set_.quick_cast_all ? "QC on" : "QC off", key_name(Action::QuickCastAll), set_.quick_cast_all))  // [U-447]
         on_action(Action::QuickCastAll, false, net);
+    if (icon_button(ui, bx + 84, y0 + 86, 38, cam_lock_ ? "CAM on" : "CAM off", key_name(Action::CamLock), cam_lock_))  // [U-494] camera lock
+        on_action(Action::CamLock, false, net);
 
     // [U-478] switchable features (only when this match has them)
     if (net.features & kFeatGlyph) {
