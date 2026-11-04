@@ -24,17 +24,26 @@ App::App(AppOptions o) : opt_(std::move(o)) {
     loc::load(set_.language);  // [U-239]
     if (!apply_version(set_.version).empty()) set_.version = kOfficialVersion;  // [U-95] own version (bad file → official)
     load_custom_champions(set_.custom_champions);  // [U-210] before any match — AFTER the version (they copy its numbers)
-    // [U-214][U-496] Vulkan renderer only
+    // [U-214][U-496][U-501] VULKAN ONLY: SDL's GPU renderer locked to the Vulkan driver (it also runs our SPIR-V shaders)
     const SDL_WindowFlags base = SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY;
-    win_ = SDL_CreateWindow("elemental-moba", opt_.width, opt_.height, base | SDL_WINDOW_VULKAN);
-    if (win_) ren_ = SDL_CreateRenderer(win_, "vulkan");
+    SDL_SetHint(SDL_HINT_GPU_DRIVER, "vulkan");
+    win_ = SDL_CreateWindow("elemental-moba", opt_.width, opt_.height, base);
+    if (win_) ren_ = SDL_CreateRenderer(win_, "gpu");
+    if (ren_) {  // (never anything else than Vulkan under it)
+        auto* dev = static_cast<SDL_GPUDevice*>(SDL_GetPointerProperty(SDL_GetRendererProperties(ren_), SDL_PROP_RENDERER_GPU_DEVICE_POINTER, nullptr));
+        if (!dev || std::string_view(SDL_GetGPUDeviceDriver(dev)) != "vulkan") {
+            SDL_DestroyRenderer(ren_);
+            ren_ = nullptr;
+            SDL_SetError("the GPU driver is not Vulkan");
+        }
+    }
     if (!ren_) {  // [U-496] Vulkan ONLY (no fallback renderer): say why and stop
         const std::string why = std::format("Elemental MOBA needs Vulkan (a Vulkan driver for your GPU).\n\nSDL: {}", SDL_GetError());
         SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Elemental MOBA — no Vulkan", why.c_str(), win_);
         SDL_Log("%s", why.c_str());
         std::exit(1);
     }
-    renderer_name_ = ren_ ? SDL_GetRendererName(ren_) : "none";
+    renderer_name_ = "Vulkan";
     SDL_SetRenderVSync(ren_, set_.vsync ? 1 : 0);
     SDL_SetRenderDrawBlendMode(ren_, SDL_BLENDMODE_BLEND);
     gfx::init_text(ren_);  // [U-250] font text

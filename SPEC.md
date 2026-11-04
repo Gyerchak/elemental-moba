@@ -707,6 +707,7 @@ Additions outside the plan live in `ENGINE-EXTRAS.md`, never here.
 - [U-498] Sky power as a clear modifier per champion with elemental damage anywhere in the kit (also when gained later): moon for water, sun / comet for fire, the 60:00 event for every bender; Alt shows every modifier — any tooltip expands with Alt.
 - [U-499] Installation scripts for every system; custom skins / champions must work from the GitHub repo (the Aatrox skin did not load on the laptop).
 - [U-500] Host the server on the public IP (router: TOTOLINK) and put the address (IP:port) on GitHub as a .txt.
+- [U-501] Back to game development: more advanced graphics steps and a Vulkan-only graphics engine.
 
 ---
 *Hubert continues editing the plan later — new ideas get the next free `[U-xx]` number.*

@@ -67,21 +67,34 @@ void Sprites::draw(SDL_Renderer* r, const SpriteSheet& s, const std::string& ani
     const SpriteSheet::Anim* ap = s.find(anim);
     if (!ap) return;
     const SpriteSheet::Anim& a = *ap;
-    int f = int(std::max(0.0, t) * a.fps);
-    f = hold ? std::min(f, a.n - 1) : f % std::max(1, a.n);
+    const double pos = std::max(0.0, t) * a.fps;
+    int f = int(pos);
+    const float mix = float(pos - double(f));  // [U-501] how far towards the next frame
+    const int last = std::max(1, a.n);
+    int next = f + 1;
+    if (hold) f = std::min(f, last - 1), next = std::min(next, last - 1);
+    else f %= last, next %= last;
     const int row = s.dirs > 1 ? ((dir % s.dirs) + s.dirs) % s.dirs : 0;
-    // half a pixel inside the frame: the smooth filter must never read the NEIGHBOUR frame (thin lines / specks) [U-338]
-    // [U-486] wrapped sheets: frame i sits in block i / wrap (each block = `dirs` rows), column i % wrap
-    const int i = a.col + f, cx = s.wrap > 0 ? i % s.wrap : i, block = s.wrap > 0 ? i / s.wrap : 0;
-    const SDL_FRect src{float(cx * s.px) + 0.5f, float((block * s.dirs + row) * s.px) + 0.5f, float(s.px) - 1.f, float(s.px) - 1.f};
     const float size = s.ortho_m * kUnitsPerMetre * scale;  // the frame width on screen
     // [U-389] whole pixels: fractional positions made thin lines shimmer while moving / zoomed out
     const SDL_FRect dst{std::round(sx - size * s.ax), std::round(sy - size * s.ay), std::round(size), std::round(size)};
     if (!std::isfinite(dst.x) || !std::isfinite(dst.y) || !(size > 0) || size > 20'000.f || std::abs(dst.x) > 60'000.f || std::abs(dst.y) > 60'000.f)
         return;  // [U-467] a bad position must never become a screen-wide texture
+    auto frame_rect = [&](int fr) {
+        // half a pixel inside the frame: the smooth filter must never read the NEIGHBOUR frame (thin lines / specks) [U-338]
+        // [U-486] wrapped sheets: frame i sits in block i / wrap (each block = `dirs` rows), column i % wrap
+        const int i = a.col + fr, cx = s.wrap > 0 ? i % s.wrap : i, block = s.wrap > 0 ? i / s.wrap : 0;
+        return SDL_FRect{float(cx * s.px) + 0.5f, float((block * s.dirs + row) * s.px) + 0.5f, float(s.px) - 1.f, float(s.px) - 1.f};
+    };
     SDL_SetTextureColorMod(s.tex, tint.r, tint.g, tint.b);
     SDL_SetTextureAlphaMod(s.tex, tint.a);
+    const SDL_FRect src = frame_rect(f);
     SDL_RenderTexture(r, s.tex, &src, &dst);
+    if (smooth && next != f && mix > 0.02f) {  // [U-501] the next frame fades in over this one
+        const SDL_FRect src2 = frame_rect(next);
+        SDL_SetTextureAlphaMod(s.tex, std::uint8_t(float(tint.a) * mix));
+        SDL_RenderTexture(r, s.tex, &src2, &dst);
+    }
     SDL_SetTextureColorMod(s.tex, 255, 255, 255);
     SDL_SetTextureAlphaMod(s.tex, 255);
 }

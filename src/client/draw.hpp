@@ -77,6 +77,8 @@ struct View {
     [[nodiscard]] float ry(float r) const { return r * zoom * gy; }
 };
 
+// [U-501] a soft round light / shadow: fades out towards its edge; additive = glow, else a shadow / haze
+void soft_disc(SDL_Renderer* r, float x, float y, float rx, float ry, Rgba c, bool additive = false);
 void fill_ellipse(SDL_Renderer* r, float x, float y, float rx, float ry, Rgba c, int segments = 24);
 void ellipse(SDL_Renderer* r, float x, float y, float rx, float ry, Rgba c, int segments = 32);
 // a circle lying on the ground (an ellipse when the camera is tilted)

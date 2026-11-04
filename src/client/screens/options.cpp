@@ -93,6 +93,12 @@ void App::options(bool in_game) {
             toggle(tr("Crowd-control timers above units"), set_.cc_timers);
             toggle(tr("Path lines (mine and allies')"), set_.show_paths);
             toggle(tr("Tree and bush models"), set_.tree_models);
+            {  // [U-501] one switch for everything the graphics engine can add
+                constexpr const char* kQ[] = {"Low (no effects)", "Medium (smooth animation, soft light, colours)", "High (+ bloom glow)", "Ultra (+ sharpening, HD models)"};
+                if (button(ren_, ui_, x, y, 520, 26, std::format("{}: {}", tr("Graphics quality"), tr(kQ[std::clamp(set_.gfx_quality, 0, 3)])), false))
+                    set_.gfx_quality = (set_.gfx_quality + 1) % 4, changed = true;
+                y += 32;
+            }
             toggle(tr("Colourblind team colours"), set_.colourblind);
             // resource packs [U-97][U-197][U-478]: switch packs on, put them in order — like Minecraft, a file in a pack
             // higher in the list wins; "default" (and the game version's / map's packs) are always under them

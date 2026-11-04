@@ -42,6 +42,8 @@ Search everything outside the plan: `grep -rn "\[X-" .`
 
 Public test server: the address in `SERVER.txt` → in the game *Multiplayer → Direct connect*.
 
+Needs: **SDL 3.4 or newer** and a **Vulkan driver** (the game is Vulkan only; macOS probably cannot run it).
+
 ## Build
 
 Needs (already on this PC): CMake, Ninja, clang++ or g++ (C++23), `sdl3`, `sdl3_ttf`, `enet`.

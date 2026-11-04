@@ -13,6 +13,7 @@
 #include "client/draw.hpp"
 #include "client/modifiers.hpp"
 #include "client/sprites.hpp"
+#include "client/postfx.hpp"
 #include "client/item_browser.hpp"
 #include "client/net_client.hpp"
 #include "client/own_emotes.hpp"
@@ -180,6 +181,8 @@ private:
     };
     std::unordered_map<std::uint32_t, AnimMem> anim_mem_;
     std::unordered_map<std::uint32_t, double> fx_born_;
+    PostFx post_;              // [U-501] post-processing of the world
+    bool post_tried_ = false;
     // [U-459] the programmable skill look: per effect its recent path (trail) + what it leaves when it ends
     struct FxTrack {
         float x = 0, y = 0, r = 0;

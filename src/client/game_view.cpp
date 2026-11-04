@@ -781,7 +781,22 @@ void GameView::frame(NetClient& net, double now_s, Ui& ui) {
         fog_fade_t_ = -1;
         last_fog_ = now_s;
     }
+    // [U-501] Medium and up: the world goes through the shaders; the HUD and the aiming preview stay crisp on top
+    if (!post_tried_) post_tried_ = true, post_.init(r_);
+    Sprites::smooth = set_.gfx_quality >= 1;
+    const bool post_on = set_.gfx_quality >= 1 && post_.ready() && !set_.dev_mode;
+    if (post_on) post_.begin(w, h);
     draw_world(net, now_s);
+    if (post_on) {
+        const SkyState psky = WorldClock::at_ms(net.start_ms + cur.now_ms);
+        PostParams pp;
+        const float night = psky.is_day ? 0.f : 1.f;  // warm day, cool night
+        pp.tint[0] = 1.03f - 0.11f * night, pp.tint[1] = 1.0f - 0.05f * night, pp.tint[2] = 0.97f + 0.09f * night;
+        pp.contrast = 1.05f, pp.saturation = 1.10f, pp.vignette = set_.gfx_quality >= 2 ? 0.22f : 0.12f;
+        if (set_.gfx_quality >= 2) pp.bloom = set_.gfx_quality >= 3 ? 0.8f : 0.6f;
+        if (set_.gfx_quality >= 3) pp.sharpen = 0.35f;
+        post_.end(pp);
+    }
     play_sounds(net);
     draw_indicator(net);
     draw_hud(net, now_s, ui);
@@ -1091,8 +1106,13 @@ void GameView::draw_hud(NetClient& net, double now_s, Ui& ui) {
     const float bx0 = W - 480;
     fill_rect(r_, bx0, 0, 480, 64, {0, 0, 0, 160});
     text(r_, bx0 + 8, 6, std::format("{}   {} {} : {} {}", mmss(now_ms), tr("Fire"), cur.kills[0], cur.kills[1], tr("Earth")), {255, 255, 255}, 2);
-    for (const auto& s : cur.scores)  // [U-493] my CS at the top
-        if (s.id == net.my_unit) text(r_, bx0 + 300, 8, std::format("CS {}", s.cs), {230, 230, 160}, 1.5f);
+    {  // [U-493][U-488] right end of the chip row (free space): my CS, then ping + FPS
+        std::string right;
+        for (const auto& s : cur.scores)
+            if (s.id == net.my_unit) right = std::format("CS {}", s.cs);
+        if (set_.show_perf) right = std::format("{:.0f} ms   {:.0f} fps   {}", net.ping_ms, frame_ms_ > 0 ? 1000.0 / frame_ms_ : 0.0, right);
+        text(r_, bx0 + 472 - text_w(right), 46, right, {225, 225, 170});
+    }
     // [U-253] sky: clock, sight, the next event with a countdown, and every active sky effect as a chip.
     // Hover a chip → what it does to MY champion (numbers). Chips with a gold frame change my power.
     const NextEvent nx = next_sky_event(net.start_ms + now_ms);
@@ -1100,10 +1120,6 @@ void GameView::draw_hud(NetClient& net, double now_s, Ui& ui) {
                                       sky.minute_of_day % 60, tr("sight"), vision_range_pct(sky),
                                       nx.name.empty() ? std::string() : std::format("   {}: {} {}", tr("next"), nx.name, mmss(nx.in_ms))),
          {220, 220, 160});
-    if (set_.show_perf) {  // [U-389] right end of the clock line; [U-488] can be switched off
-        const std::string pf = std::format("{:.0f} ms  {:.0f} fps", net.ping_ms, frame_ms_ > 0 ? 1000.0 / frame_ms_ : 0.0);
-        text(r_, bx0 + 472 - text_w(pf), 10, pf, {150, 160, 180});
-    }
     {
         float cx = bx0 + 8;
         const ModView* hov = nullptr;

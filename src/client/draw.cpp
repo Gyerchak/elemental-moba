@@ -65,6 +65,35 @@ void circle(SDL_Renderer* r, float x, float y, float rad, Rgba c, int seg) {
     SDL_RenderLines(r, p.data(), int(p.size()));
 }
 
+void soft_disc(SDL_Renderer* r, float x, float y, float rx, float ry, Rgba c, bool additive) {
+    if (!sane(x, y, rx) || !sane(ry) || rx < 1 || ry < 1 || rx > 4'000.f || ry > 4'000.f) return;
+    static SDL_Texture* tex = nullptr;  // white, alpha = a smooth falloff; made once
+    static SDL_Renderer* owner = nullptr;
+    if (!tex || owner != r) {
+        constexpr int kS = 128;
+        SDL_Surface* s = SDL_CreateSurface(kS, kS, SDL_PIXELFORMAT_RGBA32);
+        if (!s) return;
+        for (int j = 0; j < kS; ++j)
+            for (int i = 0; i < kS; ++i) {
+                const float dx = (float(i) + 0.5f) / kS * 2 - 1, dy = (float(j) + 0.5f) / kS * 2 - 1;
+                const float q = std::max(0.f, 1.f - std::sqrt(dx * dx + dy * dy));
+                auto* px = static_cast<std::uint8_t*>(s->pixels) + std::size_t(j) * std::size_t(s->pitch) + std::size_t(i) * 4;
+                px[0] = px[1] = px[2] = 255;
+                px[3] = std::uint8_t(255.f * q * q * (3 - 2 * q));
+            }
+        tex = SDL_CreateTextureFromSurface(r, s);
+        SDL_DestroySurface(s);
+        owner = r;
+        if (!tex) return;
+        SDL_SetTextureScaleMode(tex, SDL_SCALEMODE_LINEAR);
+    }
+    SDL_SetTextureBlendMode(tex, additive ? SDL_BLENDMODE_ADD : SDL_BLENDMODE_BLEND);
+    SDL_SetTextureColorMod(tex, c.r, c.g, c.b);
+    SDL_SetTextureAlphaMod(tex, c.a);
+    const SDL_FRect d{x - rx, y - ry, rx * 2, ry * 2};
+    SDL_RenderTexture(r, tex, nullptr, &d);
+}
+
 void fill_ellipse(SDL_Renderer* r, float x, float y, float rx, float ry, Rgba c, int seg) {
     if (rx <= 0.3f || ry <= 0.2f) return;
     if (!sane(x, y, rx) || !sane(ry) || ry > kSaneLimit / 4) return;  // [U-467]

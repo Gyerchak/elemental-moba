@@ -112,6 +112,7 @@ struct Settings {
     bool minimap = true;
     bool show_chat = true;
     bool tree_models = true;               // [U-202]
+    int gfx_quality = 2;                   // [U-501] 0 Low (the old look), 1 Medium, 2 High, 3 Ultra
     // ---- skins / resource packs [U-97][U-98][U-197]
     std::string resource_pack = "default";
     bool show_other_skins = true;          // [U-98] default ON

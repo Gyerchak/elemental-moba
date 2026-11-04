@@ -449,6 +449,10 @@ void GameView::draw_units(NetClient& net, double now_s) {
             if (u.id == net.my_unit) outline_shape(r_, view_, body, {255, 230, 80, std::uint8_t(std::max<int>(ha, 60))}, 1.f);
             if (anim == AnimSlot::Swim) ground_ring(r_, view_, du.x, du.y, 50 + 10 * float(std::sin(now_s * 4)), {200, 230, 255, 160}, 24);
             if (sheet) {  // [U-258] the Blender model, as a sprite
+                if (set_.gfx_quality >= 1 && lift < 1) {  // [U-501] a soft shadow grounds the model
+                    const float sr = float(body_reach(body_by_index(u.body), u.size_pct)) * 1.7f;
+                    soft_disc(r_, view_.sx(du.x), view_.sy(du.y), view_.rx(sr), view_.ry(sr), {0, 0, 0, 120});
+                }
                 // [U-486] the animation KEY for what the unit does (client/anim.hpp); the sheet falls back / remaps it
                 std::string an = "idle";
                 double t = now_s;
@@ -940,6 +944,12 @@ void GameView::draw_fx_look(const net::NetFx& f, const Shape& s, std::uint32_t c
     const FxKind k = FxKind(f.kind);
     const Rgba c = hex(col);
     const float rad = float(std::max<int>({f.radius, f.width / 2, 8}));
+    if (set_.gfx_quality >= 1 && k != FxKind::Steam) {  // [U-501] every skill lights its surroundings (bloom picks up the bright core)
+        const bool small = k == FxKind::Bolt || k == FxKind::Auto || k == FxKind::TowerShot;
+        const float gr = rad * (small ? 3.f : k == FxKind::Field ? 1.2f : 1.7f);
+        const int ga = std::min(255, (small ? 190 : k == FxKind::Field ? 45 : 110) + f.vglow / 3);
+        soft_disc(r_, view_.sx(float(f.x)), view_.sy(float(f.y)), view_.rx(gr), view_.ry(gr), with_alpha(c, std::uint8_t(ga)), true);
+    }
     const std::uint8_t trail = f.vtrail ? f.vtrail : k == FxKind::Bolt || k == FxKind::Boulder ? 5 : 0;
     const std::uint8_t flash = f.vflash ? f.vflash : k == FxKind::Burst || k == FxKind::Bolt ? 1 : 0;
     auto [it, fresh] = fx_track_.try_emplace(f.id);
@@ -1033,6 +1043,15 @@ void GameView::draw_world(NetClient& net, double now_s) {
             ground_ring(r_, view_, du.x, du.y, 680 + 75, {255, 80, 60, 70}, 64);
     terrain_begin(net);  // [U-389] the terrain rows are drawn between the units (draw_units); cracks with them [U-438]
     draw_clouds(net);
+    if (set_.gfx_quality >= 1) {  // [U-501] warm pools of light (stronger at night), under the fog layer
+        const bool dark = !WorldClock::at_ms(net.start_ms + cur.now_ms).is_day;
+        int n = 0;
+        for (const auto& l : cur.lights) {
+            if (++n > 96) break;
+            const std::uint8_t a = std::uint8_t(std::min<int>(dark ? 80 : 26, 12 + l.strength / 2));
+            soft_disc(r_, view_.sx(float(l.x)), view_.sy(float(l.y)), view_.rx(float(l.radius)), view_.ry(float(l.radius)), {255, 190, 110, a}, true);
+        }
+    }
     draw_fx_marks(now_s);  // [U-459] scorch marks / impact rings of skills that ended
     // skills [U-131]: fluid body + exact edge
     for (const auto& f : fx_draw_) {

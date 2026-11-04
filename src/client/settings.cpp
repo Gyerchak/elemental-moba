@@ -142,6 +142,7 @@ bool Settings::load(const std::string& path) {
         else if (k == "minimap") minimap = b;
         else if (k == "show_chat") show_chat = b;
         else if (k == "tree_models") tree_models = b;
+        else if (k == "gfx_quality") gfx_quality = std::clamp(to_int(v, 2), 0, 3);  // [U-501]
         else if (k == "resource_pack") resource_pack = v;
         else if (k == "show_other_skins") show_other_skins = b;
         else if (k == "force_own_skins") force_own_skins = b;
@@ -288,7 +289,7 @@ void Settings::save(const std::string& path) const {
     out << "# ---- graphics\ndev_mode=" << dev_mode << "\nhitbox_opacity=" << hitbox_opacity << "\nsmooth_fog=" << smooth_fog
         << "\ndamage_numbers=" << damage_numbers << "\ncc_timers=" << cc_timers << "\nshow_paths=" << show_paths
         << "\nshow_rewards=" << show_rewards << "\nshow_names=" << show_names << "\ncolourblind=" << colourblind
-        << "\nminimap=" << minimap << "\nshow_chat=" << show_chat << "\ntree_models=" << tree_models << '\n';
+        << "\nminimap=" << minimap << "\nshow_chat=" << show_chat << "\ntree_models=" << tree_models << "\ngfx_quality=" << gfx_quality << '\n';
     out << "# ---- skins / resource packs\nresource_pack=" << resource_pack << "\nshow_other_skins=" << show_other_skins
         << "\nforce_own_skins=" << force_own_skins << "\nserver_skins_only=" << server_skins_only << '\n';
     out << "# ---- sound (0-100)\nvol_master=" << vol_master << "\nvol_music=" << vol_music << "\nvol_effects=" << vol_effects

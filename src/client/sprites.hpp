@@ -41,6 +41,7 @@ public:
     // dir 0…7 (0 = facing screen right, clockwise); t = seconds into the animation; hold = stop on the last frame.
     static void draw(SDL_Renderer* r, const SpriteSheet& s, const std::string& anim, double t, int dir, float sx, float sy,
                      float scale, gfx::Rgba tint = {}, bool hold = false);
+    static inline bool smooth = false;  // [U-501] blend each frame into the next (much smoother motion, any frame count)
 
 private:
     Resources* res_ = nullptr;
