@@ -265,3 +265,10 @@ clang 22 and GCC 16 (`README.md` → Build / Play).
       4. Real shadows from the sun direction; more than 8 model directions.
       5. Multi-page sheets, so converted League skins can use more pixels (now 100 px to fit 4096).
       6. A real 3D engine on SDL_GPU (a rewrite of the drawing; big).
+
+## M26 — Quality levels, effects panel, art models (2026-11-04)
+- [x] Quality = resolution only (original on top); Effects panel [U-502]; animated water + lava [U-502]; particles [U-503]; champion models from the art [U-504].
+- [ ] Rendering all 71 champions (tools/art/art_models.py, resumable; commits itself at the end).
+- [ ] True 3D: fetch image-to-3D weights (TRELLIS.2) → real side views. Needs Hubert's download; then a pipeline: art → mesh → auto-weights → our poses.
+- [ ] Same art treatment for monsters / minions / structures (they have no full-body art yet: ComfyUI first).
+- [ ] Softer map: coasts and walls are still blocky (cell by cell); blend neighbouring cells when painting the ground.
