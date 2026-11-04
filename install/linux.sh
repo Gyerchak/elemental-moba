@@ -16,8 +16,15 @@ echo "== 2/4 the game"
 SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd || echo .)"
 if [ -f "$SELF_DIR/../CMakeLists.txt" ] && grep -q elemental "$SELF_DIR/../CMakeLists.txt" 2>/dev/null; then GAME="$(cd "$SELF_DIR/.." && pwd)"
 else GAME="$HOME/elemental-moba"; fi
+REPO=https://github.com/Gyerchak/elemental-moba.git
 if [ -d "$GAME/.git" ]; then git -C "$GAME" pull --ff-only
-elif [ ! -f "$GAME/CMakeLists.txt" ]; then git clone https://github.com/Gyerchak/elemental-moba.git "$GAME"; fi
+elif [ -f "$GAME/CMakeLists.txt" ]; then
+  # a copy without git data (e.g. from a pendrive): bring its game files up to date; own files (Aatrox, settings) stay
+  git -C "$GAME" init -q -b main
+  git -C "$GAME" remote add origin "$REPO" 2>/dev/null || true
+  git -C "$GAME" fetch -q --depth 1 origin main
+  git -C "$GAME" reset -q --hard FETCH_HEAD
+else git clone "$REPO" "$GAME"; fi
 cd "$GAME"
 
 echo "== 3/4 own content (local files that are not on GitHub)"
