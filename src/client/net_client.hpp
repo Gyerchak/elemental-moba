@@ -127,6 +127,7 @@ public:
     };
     std::deque<PosFrame> pos_hist;
     bool have_snapshot = false;
+    std::uint32_t bad_snapshots = 0;  // [U-487] snapshots dropped (read out of step / end marker wrong)
     std::vector<LocalWave> waves;
     std::vector<TextLine> feed;
     std::vector<ChatLine> chat;        // all channels, newest last [U-182]

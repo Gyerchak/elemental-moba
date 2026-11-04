@@ -378,10 +378,13 @@ void NetClient::handle(const std::uint8_t* data, std::size_t n, double now_s) {
                 s.lights.resize(nl);
                 for (auto& l : s.lights) l = r.get<NetLight>();
             }
+            // [U-487] waves / hits / rewards are kept only if the whole snapshot checks out (end marker)
+            std::vector<NetWave> new_waves;
+            std::vector<NetHit> new_hits;
             const std::uint16_t nw = r.get<std::uint16_t>();
-            for (int i = 0; i < nw && !r.bad(); ++i) waves.push_back({r.get<NetWave>(), now_s});
+            for (int i = 0; i < nw && !r.bad(); ++i) new_waves.push_back(r.get<NetWave>());
             const std::uint16_t nh = r.get<std::uint16_t>();
-            for (int i = 0; i < nh && !r.bad(); ++i) hits.push_back({r.get<NetHit>(), now_s});
+            for (int i = 0; i < nh && !r.bad(); ++i) new_hits.push_back(r.get<NetHit>());
             s.paths.resize(r.get<std::uint8_t>());
             for (auto& p : s.paths) p = r.get<NetPath>();
             s.falcons.resize(r.get<std::uint8_t>());
@@ -414,8 +417,18 @@ void NetClient::handle(const std::uint8_t* data, std::size_t n, double now_s) {
             s.me = r.get<NetMe>();
             s.me.nstatus = std::min<std::uint8_t>(s.me.nstatus, std::uint8_t(std::size(s.me.status)));  // [U-383]
             const std::uint16_t nr = r.get<std::uint16_t>();
-            for (int i = 0; i < nr && !r.bad(); ++i) rewards.push_back({r.get<NetReward>(), now_s});
-            if (r.bad()) return;
+            std::vector<NetReward> new_rewards;
+            for (int i = 0; i < nr && !r.bad(); ++i) new_rewards.push_back(r.get<NetReward>());
+            if (r.bad() || r.get<std::uint32_t>() != kSnapshotEnd || r.bad()) {  // [U-487] out of step: drop it, keep the last good one
+                ++bad_snapshots;
+                return;
+            }
+            for (const NetWave& wv : new_waves) waves.push_back({wv, now_s});
+            for (const NetHit& h : new_hits) hits.push_back({h, now_s});
+            for (const NetReward& rw : new_rewards) rewards.push_back({rw, now_s});
+            // [U-487] never trust indices: an item number outside the list is "no item"
+            for (auto& it : s.me.items)
+                if (it >= std::int16_t(kItems.size())) it = -1;
             s.arrived = now_s;
             prev = have_snapshot ? std::move(cur) : s;
             cur = std::move(s);

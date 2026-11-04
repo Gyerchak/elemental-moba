@@ -690,6 +690,7 @@ Additions outside the plan live in `ENGINE-EXTRAS.md`, never here.
 - [U-484] LoL: self-healing % (heals only done by yourself) and heal & shield power % (mainly support items); LoL polymorph with the exact LoL combination. LoL-modified: buffing increase — EVERY buffing effect (heals, skill damage buffs, jungle buffs and their effects, shields / damage / on-hit / item buffs given to allies …).
 - [U-485] Add the Runeforge Aatrox mod (free to use) as an Aatrox skin.
 - [U-486] All of Aatrox's animations from the mod, and every animation kind configurable in the base game engine.
+- [U-487] Crash on both computers at ~6 min (LAN) + glitches + lag: the server wrote the wall part of a snapshot in another order than the client read it.
 
 ---
 *Hubert continues editing the plan later — new ideas get the next free `[U-xx]` number.*

@@ -344,7 +344,11 @@ void Server::send_snapshot(Player& p) {
             if (!vm.cell(x, y)) continue;
             wh.push_back({std::int16_t(x), std::int16_t(y), std::uint8_t(std::clamp(wc.hp * 100 / std::max(1, wc.max), 1, 99)), 0});
         }
+        // [U-487] the client reads: count + walls, THEN count + segments — written in that order (the counts used to come
+        // first, then segments, then walls: with damaged walls and no segment in sight everything after was read
+        // 2 bytes off → garbage items / scores / pings → the crash at ~6 min and screen glitches)
         w.put<std::uint16_t>(std::uint16_t(wh.size()));
+        for (const NetWallHp& n : wh) w.put(n);
         // [U-443] the segments my team made, or that it sees (any of their cells)
         std::vector<NetWallSeg> sg;
         for (const auto& [id, s] : W.segs) {
@@ -357,7 +361,6 @@ void Server::send_snapshot(Player& p) {
         }
         w.put<std::uint16_t>(std::uint16_t(sg.size()));
         for (const NetWallSeg& n : sg) w.put(n);
-        for (const NetWallHp& n : wh) w.put(n);
         std::vector<NetWallBreak> wb;  // [U-341] pieces that fell in the last second, where the team sees
         for (const WallBreak& b : W.wall_breaks)
             if (vm.cell(b.x, b.y) && wb.size() < 200) wb.push_back({b.x, b.y, b.dx, b.dy, b.kind, {}, b.ms});
@@ -574,6 +577,7 @@ void Server::send_snapshot(Player& p) {
     p.rewards_sent_ms = W.now_ms;
     w.put<std::uint16_t>(std::uint16_t(rw.size()));
     for (const NetReward& r : rw) w.put(r);
+    w.put<std::uint32_t>(kSnapshotEnd);  // [U-487] the client checks it: a snapshot read out of step is dropped
     send(p.peer, w, false);
     if (me->fail_ms > p.fail_sent_ms) {  // why my last order did nothing [X-103]
         p.fail_sent_ms = me->fail_ms;
