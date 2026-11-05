@@ -12,6 +12,12 @@ namespace em {
 void World::effect_hits(Effect& e) {
     Unit* owner = find(e.owner);
     const Shape sh = shape_of(e);
+    // [U-513] fire on mud: at once it is normal ground
+    if ((fire_family(e.sub) && e.sub != SubElement::Lightning) || e.sub == SubElement::Lava)
+        std::erase_if(clouds, [&](const Cloud& c) { return c.kind == CloudKind::Mud && touches(sh, Circle{c.x, c.y, c.radius}); });
+    const bool is_poly = geo_is_poly(Geo(e.geo));  // [U-510] exact polygon hit test
+    const Poly pl = is_poly ? fx_poly(e.kind, e.ux(), e.uy(), e.radius, e.width, e.length, e.dir, Geo(e.geo), e.def ? e.def->poly.data() : nullptr,
+                                      e.def ? e.def->npoly : 0) : Poly{};
     for (std::size_t i = 0; i < units.size(); ++i) {
         Unit& o = units[i];
         if (!o.alive || !targetable(o) || already_hit(e, o.id)) continue;
@@ -25,7 +31,7 @@ void World::effect_hits(Effect& e) {
         if (!ally_redirect && (e.ally ? o.team != e.team : o.team == e.team)) continue;
         if (o.is_structure() && (e.kind == FxKind::Field || e.kind == FxKind::Tornado)) continue;
         if (!reaches(e, o)) continue;  // [U-191][U-216] too high for this hitbox (flying, airborne, raised ground)
-        if (!touches(sh, hitbox(o))) continue;  // ONE rule: any touch = hit
+        if (is_poly ? !touches(pl, hitbox(o)) : !touches(sh, hitbox(o))) continue;  // ONE rule: any touch = hit
         if (e.inner > 0) {  // [U-462] Ring / Arc: a body completely inside the hole is not hit
             const std::int64_t in = std::int64_t(e.inner) - body_reach(*o.body, size_pct(o));
             if (in > 0 && dist2(o.ux(), o.uy(), e.ux(), e.uy()) < in * in) continue;
@@ -71,6 +77,11 @@ void World::effect_hits(Effect& e) {
                     break;
                 case SweetZone::Edge: sweet = caster ? along >= e.length * (100 - sz) / 100 : r >= e.radius * (100 - sz) / 100; break;
                 case SweetZone::Tip: sweet = e.travel_left <= e.travel_total * sz / 100; break;
+                case SweetZone::Band: {  // [U-510] custom: from sweet_from %, sweet_size % wide
+                    const std::int64_t base = caster ? e.length : e.radius, from = base * (e.def ? e.def->sweet_from : 0) / 100, at = caster ? along : r;
+                    sweet = at >= from && at <= from + base * sz / 100;
+                    break;
+                }
                 case SweetZone::Auto: break;
             }
             if (sweet) dmg = dmg * (100 + sweet_pct) / 100;
@@ -163,27 +174,57 @@ void World::effect_hits(Effect& e) {
     }
 }
 
+HitPose hit_pose(const SkillDef& d, std::int32_t q) {
+    const int n = std::min<int>(d.nkeys, int(d.keys.size()));
+    if (n <= 0) return {};
+    int b = 0;
+    while (b < n && d.keys[std::size_t(b)].at * 10 < q) ++b;
+    const SkillDef::HitKey& k1 = d.keys[std::size_t(std::min(b, n - 1))];
+    const SkillDef::HitKey& k0 = d.keys[std::size_t(std::max(b - 1, 0))];
+    const std::int64_t span = std::int64_t(k1.at - k0.at) * 10;
+    const std::int64_t f = span > 0 ? std::clamp<std::int64_t>(q - k0.at * 10, 0, span) * 1000 / span : 0;
+    auto mix = [&](std::int64_t a, std::int64_t c) { return std::int32_t(a + (c - a) * f / 1000); };
+    return {mix(k0.size, k1.size), mix(k0.len, k1.len), mix(k0.rot, k1.rot), mix(k0.fwd, k1.fwd)};
+}
+
+// [U-510] the hitbox changes with time: straight lines between the skill's keys, over its life or in a loop
+void World::animate_hitbox(Effect& e) {
+    const SkillDef& d = *e.def;
+    std::int64_t q = 0;  // 0 … 1000 of the life
+    if (d.key_loop_ms > 0) q = (now_ms - e.born_ms) % d.key_loop_ms * 1000 / d.key_loop_ms;
+    else if (e.travel_total > 0) q = std::int64_t(e.travel_total - std::max(0, e.travel_left)) * 1000 / e.travel_total;
+    else q = (now_ms - e.born_ms) * 1000 / std::max<std::int64_t>(1, e.end_ms - e.born_ms);
+    q = std::clamp<std::int64_t>(q, 0, 1000);
+    const HitPose pose = hit_pose(d, std::int32_t(q));
+    const std::int64_t size = pose.size, len = pose.len, rot = pose.rot, fwd = pose.fwd;
+    e.radius = std::int32_t(std::max<std::int64_t>(1, e.base_radius * size / 100));
+    e.width = std::int32_t(e.base_width * size / 100);
+    e.length = std::int32_t(e.base_length * len / 100);
+    e.dir = e.base_dir;
+    if (rot) {  // turn by a table direction: 64 steps per full circle
+        const Dir t = kDirs[std::size_t((rot * 64 / 360 % 64 + 64) % 64)];
+        e.dir = Dir{std::int32_t((std::int64_t(e.base_dir.x) * t.x - std::int64_t(e.base_dir.y) * t.y) / kOne),
+                    std::int32_t((std::int64_t(e.base_dir.x) * t.y + std::int64_t(e.base_dir.y) * t.x) / kOne)};
+    }
+    if (fwd != e.key_fwd) {
+        const std::int64_t step = fwd - e.key_fwd;
+        e.x += std::int32_t(e.base_dir.x * step / kOne * kSub);
+        e.y += std::int32_t(e.base_dir.y * step / kOne * kSub);
+        e.key_fwd = std::int32_t(fwd);
+    }
+}
+
 void World::step_effects() {
     fx.reserve(fx.size() + 256);  // scorch() / glow may add effects while we hold references
     const std::size_t n = fx.size();  // effects spawned this tick start next tick
     for (std::size_t i = 0; i < n; ++i) {
         Effect& e = fx[i];
         if (e.dead) continue;
+        if (e.def && e.def->nkeys) animate_hitbox(e);  // [U-510]
         if (now_ms >= e.end_ms) {
             // ([U-508] only one that never went off: a burst that hit nobody could hit a second time when it ended)
             if (e.kind == FxKind::Burst && e.nhit == 0 && e.next_tick_ms == 0 && now_ms >= e.arm_ms) effect_hits(e);
-            e.dead = true;
-            if (e.light > 0 && e.kind != FxKind::Lantern) {  // [U-116] light stays a moment after fire skills
-                Effect glow;
-                glow.kind = FxKind::Steam;
-                glow.team = e.team;
-                glow.x = e.x;
-                glow.y = e.y;
-                glow.radius = 1;
-                glow.light = e.light;
-                glow.end_ms = now_ms + 600;
-                fx_pending_.push_back(glow);  // [U-383] added after the loop (pushing into fx here moved `e`)
-            }
+            e.dead = true;  // ([U-514] its embers: World::step, when dead effects are dropped)
             continue;
         }
         // homing autoattacks / tower shots
@@ -230,6 +271,10 @@ void World::step_effects() {
             }
             e.x += std::int32_t(dx * sp / d);
             e.y += std::int32_t(dy * sp / d);
+            continue;
+        }
+        if (e.kind == FxKind::Cone && e.def && e.def->nkeys) {  // [U-510] a cone that changes with time goes on hitting what it reaches (once each)
+            effect_hits(e);
             continue;
         }
         if (e.kind == FxKind::Steam || e.kind == FxKind::Cone) continue;  // visual / already resolved
@@ -357,7 +402,10 @@ void World::step_effects() {
             }
             // [U-225] air that bends the environment blows steam / smoke / sand / snow clouds away
             if (e.def && e.def->env_bend && base_element(e.sub) == Element::Air)
-                std::erase_if(clouds, [&](const Cloud& cl) { return touches(shape_of(e), Circle{cl.x, cl.y, cl.radius}); });
+                std::erase_if(clouds, [&](const Cloud& cl) {  // ([U-516] clouds only: it also blew away puddles, ice, mud and portal arrivals)
+                    return (cl.kind == CloudKind::Steam || cl.kind == CloudKind::Smoke || cl.kind == CloudKind::Sand || cl.kind == CloudKind::Snow) &&
+                           touches(shape_of(e), Circle{cl.x, cl.y, cl.radius});
+                });
             // [U-293] ice (freezing) passing through steam: the steam around it falls as water (or ice, by the bender's choice)
             if (e.sub == SubElement::Ice && e.kind != FxKind::Steam)
                 condense_steam(e.ux(), e.uy(), std::max(48, e.radius), owner, owner && owner->source_ice);

@@ -7,6 +7,7 @@
 #include "game/match/layout.hpp"
 #include "game/match/maps.hpp"
 #include "game/mechanics/element_rules.hpp"
+#include "core/surface_rules.hpp"
 #include "game/world.hpp"
 
 namespace em {
@@ -213,7 +214,16 @@ void World::steam_cloud(std::int32_t x, std::int32_t y, std::int32_t radius, std
 
 // [U-241] clouds are their own objects (not cell edits): they block vision like walls for both teams
 void World::add_cloud(CloudKind k, std::int32_t x, std::int32_t y, std::int32_t radius, std::int64_t ms) {
-    clouds.push_back({x, y, std::max(24, radius), now_ms + ms, k});
+    // [U-516] a skill flying over lava or fire adds one every tick: one cloud per spot (they were stacking up to hundreds, and
+    // every cloud costs vision work each tick)
+    radius = std::max(24, radius);
+    for (Cloud& c : clouds)
+        if (c.kind == k && dist2(c.x, c.y, x, y) <= std::int64_t(std::min(c.radius, radius)) * std::min(c.radius, radius) / 4) {
+            c.radius = std::max(c.radius, radius), c.until_ms = std::max(c.until_ms, now_ms + ms);
+            return;
+        }
+    if (clouds.size() >= 400) clouds.erase(clouds.begin());
+    clouds.push_back({x, y, radius, now_ms + ms, k});
 }
 
 // [U-225][U-241] lava under water / Heat Draw: the lava stops at once and cools into plain stone ground
@@ -257,7 +267,7 @@ void World::burn_cell(int cx, int cy) {  // [U-14] burns now, regrows later (bus
         c.set_skill_fog(SenseBlock::None);
         regrow = elements::kTreeRegrowMs;  // [U-227] 1 game day
         add_cloud(CloudKind::Smoke, cx * kCellUnits + 16, cy * kCellUnits + 16, 40, elements::kSmokeMs);  // [U-241]
-        glows.push_back({{cx * kCellUnits + 16, cy * kCellUnits + 16, 140, 95}, now_ms + elements::kTreeFireMs});  // [U-256] it burns a while
+        add_glow(cx * kCellUnits + 16, cy * kCellUnits + 16, 140, 95, elements::kTreeFireMs);  // [U-256] it burns a while
     }
     if (c.bush() == Bush::Alive) {
         c.set_bush(Bush::Burned);
@@ -355,6 +365,12 @@ void World::lava_melts_walls() {
 }
 
 void World::step_terrain() {
+    for (Cloud& c : clouds)  // [U-513] a puddle dries into the ground: it leaves mud (on earth; not when it was taken as a source)
+        if (c.kind == CloudKind::Puddle && !c.used && c.until_ms <= now_ms) {
+            const int cx = c.x / kCellUnits, cy = c.y / kCellUnits;
+            if (Grid::in_bounds(cx, cy) && earth_bendable(grid.at(cx, cy).surface()) && grid.at(cx, cy).surface() != Surface::Water)
+                c.kind = CloudKind::Mud, c.until_ms = now_ms + elements::kMudMs;
+        }
     std::erase_if(clouds, [&](const Cloud& c) { return c.until_ms <= now_ms; });
     lava_melts_walls();
     step_elevation();  // [U-440]
@@ -427,7 +443,7 @@ void World::drop_rock(std::int32_t x, std::int32_t y, bool magma) {
     c.set_skill_fog(SenseBlock::Full);
     set_cell(cx, cy, c);
     add_wall_cell(cx, cy, Wall::Stone);
-    if (magma) glows.push_back({{x, y, 96, 80}, now_ms + 3'000});
+    if (magma) add_glow(x, y, 96, 80, 3'000);
 }
 
 // [U-440] raised ground in layers: 1 + 1 = 2 where two raises overlap; each layer ends on its own time
@@ -460,8 +476,17 @@ void World::step_elevation() {
     cell_public_ = false;
 }
 
+bool World::mud_at(std::int32_t x, std::int32_t y) const {
+    for (const Cloud& p : clouds)
+        if (p.kind == CloudKind::Mud && dist2(p.x, p.y, x, y) <= std::int64_t(p.radius) * p.radius) return true;
+    return false;
+}
+
 bool World::rock_source_at(std::int32_t x, std::int32_t y) const {
     const int cx = x / kCellUnits, cy = y / kCellUnits;
+    // [U-513] earth from mud (fully) and from under shallow water (it keeps its look of shallow water)
+    if (x >= 0 && y >= 0 && (mud_at(x, y) || (Grid::in_bounds(cx, cy) && grid.at(cx, cy).surface() == Surface::Water && grid.at(cx, cy).wall() == Wall::None)))
+        return true;
     return x >= 0 && y >= 0 && Grid::in_bounds(cx, cy) && grid.at(cx, cy).wall() == Wall::Stone && !protected_cell(cx, cy) &&
            cx >= 3 && cy >= 3 && cx < kGridSize - 3 && cy < kGridSize - 3;
 }
@@ -596,7 +621,7 @@ int World::big_water_near(const Unit& u, std::size_t* patch) const {
     const std::int64_t reach = std::int64_t(r) * kCellUnits;
     for (std::size_t i = 0; i < clouds.size(); ++i) {
         const Cloud& p = clouds[i];
-        if ((p.kind == CloudKind::Puddle || p.kind == CloudKind::IcePatch) &&
+        if ((p.kind == CloudKind::Puddle || p.kind == CloudKind::IcePatch || p.kind == CloudKind::Mud) &&
             dist2(p.x, p.y, u.ux(), u.uy()) <= (reach + p.radius) * (reach + p.radius)) {
             if (patch) *patch = i;
             return 2;
@@ -607,7 +632,7 @@ int World::big_water_near(const Unit& u, std::size_t* patch) const {
 
 void World::use_water_source(const Unit& u) {
     std::size_t i = 0;
-    if (big_water_near(u, &i) == 2) clouds[i].until_ms = now_ms;
+    if (big_water_near(u, &i) == 2) clouds[i].until_ms = now_ms, clouds[i].used = true;
 }
 
 // [U-339][U-340] what kind of water is at this point (game units)
@@ -622,9 +647,10 @@ World::WaterSource World::water_source_at(std::int32_t x, std::int32_t y, std::s
     }
     for (std::size_t i = 0; i < clouds.size(); ++i) {
         const Cloud& p = clouds[i];
-        if ((p.kind == CloudKind::Puddle || p.kind == CloudKind::IcePatch) && dist2(p.x, p.y, x, y) <= std::int64_t(p.radius) * p.radius) {
+        if ((p.kind == CloudKind::Puddle || p.kind == CloudKind::IcePatch || p.kind == CloudKind::Mud) &&
+            dist2(p.x, p.y, x, y) <= std::int64_t(p.radius) * p.radius) {
             if (patch) *patch = i;
-            return WaterSource::Patch;
+            return p.kind == CloudKind::Mud ? WaterSource::Mud : WaterSource::Patch;
         }
     }
     return WaterSource::None;
@@ -657,7 +683,7 @@ void World::take_from_source(const Unit& u, std::int32_t sx, std::int32_t sy) {
     (void)u;
     std::size_t i = 0;
     switch (water_source_at(sx, sy, &i)) {
-        case WaterSource::Patch: clouds[i].until_ms = now_ms; break;  // used up
+        case WaterSource::Patch: case WaterSource::Mud: clouds[i].until_ms = now_ms, clouds[i].used = true; break;  // used up
         case WaterSource::IceWall: damage_wall(sx / kCellUnits, sy / kCellUnits, elements::kIceWallMeltPerUse); break;  // melts a bit
         default: break;  // rivers / seas / glaciers never run out
     }
@@ -668,11 +694,11 @@ int World::draw_from_water_source(const Unit& u, SubElement& sub) {
     if (sub != SubElement::Water && sub != SubElement::Ice) return 0;
     const std::int64_t reach = std::int64_t(elements::kWaterSourceCells) * kCellUnits;
     for (Cloud& p : clouds) {
-        if (p.kind != CloudKind::Puddle && p.kind != CloudKind::IcePatch) continue;
+        if (p.kind != CloudKind::Puddle && p.kind != CloudKind::IcePatch && p.kind != CloudKind::Mud) continue;
         if (dist2(p.x, p.y, u.ux(), u.uy()) > (reach + p.radius) * (reach + p.radius)) continue;
-        p.until_ms = now_ms;  // used up
+        p.until_ms = now_ms, p.used = true;  // used up
         sub = u.source_ice ? SubElement::Ice : SubElement::Water;  // the bender's chosen form
-        return elements::kWaterSourceBonusPct;
+        return p.kind == CloudKind::Mud ? elements::kWaterSourceBonusPct * elements::kMudWaterPct / 100 : elements::kWaterSourceBonusPct;  // [U-513]
     }
     return 0;
 }

@@ -16,11 +16,18 @@ namespace em {
 //   Circle  radius around its point          Ring  radius, minus a hole of `inner` in the middle
 //   Line    from the caster: range × width   Rect  around its point: 2 × radius long (along the aim) × width
 //   Cone    from the caster, widening        Arc   a cone with a hole of `inner` at the caster
-enum class Geo : std::uint8_t { Auto, Circle, Ring, Line, Rect, Cone, Arc };
+//   [U-510] exact polygons: Square 2 × radius wide; Diamond, Hexagon, Star fit in `radius`; Ellipse radius long × width wide;
+//   Triangle: tip towards the aim (a Cone skill: tip at the caster, range long, width at the far side); Custom: SkillDef::poly
+enum class Geo : std::uint8_t { Auto, Circle, Ring, Line, Rect, Cone, Arc, Square, Triangle, Ellipse, Diamond, Hexagon, Star, Custom };
+[[nodiscard]] constexpr bool geo_is_poly(Geo g) { return g >= Geo::Square; }
 // [U-461] Where the sweet spot is (+sweet_pct damage): Auto = by kind (blasts / fields: Centre 40, cones: Edge 25,
 // projectiles: Tip 20). Centre = the middle sweet_size % of the shape; Edge = its outer sweet_size %; Tip = the last
-// sweet_size % of a projectile's flight.
-enum class SweetZone : std::uint8_t { Auto, Centre, Edge, Tip };
+// sweet_size % of a projectile's flight. [U-510] Band = custom: from sweet_from % of the shape, sweet_size % wide.
+enum class SweetZone : std::uint8_t { Auto, Centre, Edge, Tip, Band };
+// [U-510] what a skill relies on near the caster (SkillDef::needs, all marked ones must be there within needs_range):
+inline constexpr std::uint16_t kNeedEarth = 1, kNeedWater = 2, kNeedMud = 4, kNeedRock = 8, kNeedIce = 16, kNeedLava = 32, kNeedTree = 64,
+                               kNeedNight = 128, kNeedDay = 256, kNeedMetal = 512, kNeedFire = 1024;
+inline constexpr std::string_view kNeedNames[] = {"Earth", "Water", "Mud", "Rock", "Ice", "Lava", "Tree", "Night", "Day", "Metal", "Fire"};
 
 // What a skill does in the world. One behaviour = one code path in sim_skills.cpp.
 enum class SkillKind : std::uint8_t {
@@ -221,6 +228,10 @@ struct SkillDef {
         std::uint8_t flash = 0;     // bit 1 = a flash where it starts, bit 2 = a flash where it ends (impact)
         std::uint8_t particles = 0; // sparks on the shape per frame
         std::uint16_t mark_ms = 0;  // a mark left on the ground this long after it ends
+        // [U-510] a picture on the exact hitbox (always its size): skills/<sheet> in the resource pack, `frames` side by side.
+        // mode 0: loops at fps; 1: plays once over the skill's life; 2: loops and grows from 0 to its full size over the life
+        std::string_view sheet{};
+        std::uint8_t frames = 1, fps = 12, mode = 0;
     } vis{};
     // [U-402] mouse control while the cast key is HELD: 1 = steer — the projectile turns towards the cursor (turn
     // speed steer_turn, Q14 per tick); 2 = draw — the wall follows the mouse path, raised when the key is released
@@ -236,7 +247,24 @@ struct SkillDef {
     std::int16_t proc_pct_max_hp = 0, proc_heal_pct = 0, proc_heal_max_hp = 0, proc_hp_pct = 30;
     std::int32_t proc_shield = 0;
     StatusKind proc_cc = StatusKind::Count;
-    std::int32_t proc_cc_ms = 0;    // [U-406] Boulder: lift the stone right beside the caster (not at the cursor)  // [U-388] segments in a line wall (0 = from the width; metal: 1 — metal is rare)
+    std::int32_t proc_cc_ms = 0;
+    // ---- [U-510] the champion maker
+    // The hitbox changes with time: up to 6 keys over the skill's life (a projectile: its flight), straight lines between them.
+    struct HitKey {
+        std::uint8_t at = 0;       // % of the life
+        std::int16_t size = 100;   // % of radius and width
+        std::int16_t len = 100;    // % of length
+        std::int16_t rot = 0;      // degrees turned
+        std::int16_t fwd = 0;      // units moved along the aim
+    };
+    std::array<HitKey, 6> keys{};
+    std::uint8_t nkeys = 0;
+    std::int32_t key_loop_ms = 0;  // > 0: the keys repeat with this period instead of following the life
+    std::int16_t sweet_from = 0;   // SweetZone::Band: where it starts, % of the shape
+    std::array<std::int8_t, 24> poly{};  // Geo::Custom: forward, side pairs in % of radius (at most 12 corners)
+    std::uint8_t npoly = 0;
+    std::uint16_t needs = 0;       // kNeed… bits
+    std::int16_t needs_range = 240;    // [U-406] Boulder: lift the stone right beside the caster (not at the cursor)  // [U-388] segments in a line wall (0 = from the width; metal: 1 — metal is rare)
 };
 
 // [U-340] does this skill ask for a source first?
@@ -332,6 +360,7 @@ struct ChampionDef {
     std::int32_t str = 0, agi = 0, intel = 0, str_lvl = 0, agi_lvl = 0, int_lvl = 0;
     // [U-478] own talents (feature Talents) at levels 10 / 15 / 20 / 25, left / right; key Count = the default one
     std::array<std::array<SkillDef::Learned, 2>, 4> talents{};
+    std::int32_t model_size = 0;                        // [U-510][U-517] +model and hitbox size (100 = 1 %)
     std::uint32_t colour = 0xffffff;
     Role role = Role::Mage;                             // [U-180]
     bool auto_projectile = true;                        // [U-186] ranged autos fly as projectiles (melee: never)

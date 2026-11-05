@@ -96,6 +96,11 @@ inline void ground_ring(SDL_Renderer* r, const View& v, float wx, float wy, floa
 // Filled union of circles + the exact outer edge (only arc parts not inside another circle) [U-131].
 void fill_shape(SDL_Renderer* r, const View& v, const Shape& s, Rgba fill);
 void outline_shape(SDL_Renderer* r, const View& v, const Shape& s, Rgba edge, float thickness = 1.5f);
+// [U-510] an exact polygon lying on the ground
+void fill_poly(SDL_Renderer* r, const View& v, const Poly& p, Rgba fill);
+void outline_poly(SDL_Renderer* r, const View& v, const Poly& p, Rgba edge, float thickness = 1.5f);
+// [U-510] a picture lying on the ground: centred at (wx, wy), half_fwd along the direction, half_side across it; frame `f` of `n` side by side
+void ground_picture(SDL_Renderer* r, const View& v, SDL_Texture* t, float wx, float wy, float dx, float dy, float half_fwd, float half_side, int f, int n, Rgba tint = {});
 
 // ---- tiny immediate-mode UI
 struct Ui {

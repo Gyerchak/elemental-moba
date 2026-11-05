@@ -44,6 +44,7 @@ enum class CmdKind : std::uint8_t {
     Buyback,        // [U-478] dead: pay to come back now (feature Buyback)
     Glyph,          // [U-478] my team's structures invulnerable for 5 s (feature Glyph)
     Talent,         // [U-478] slot = tier × 2 + side (0 left, 1 right) (feature Talents)
+    PracticeSize,   // [U-517] practice tool: slot = skill (255 = the model), x = change in %, y = 1: back to normal
 };
 
 // [U-407] travel companions (see struct Companion)
@@ -213,6 +214,8 @@ struct Unit {
     std::int64_t transform_until = 0;   // [U-456] a Transform skill is active …
     std::int16_t transform_attack_pct = 0, transform_heal_pct = 0;  // … with these
     std::int64_t lotus_until = 0;
+    std::array<std::int16_t, 12> practice_size{};  // [U-517] practice tool: +% of each skill's size
+    std::int32_t practice_model = 0;               // [U-517] practice tool: +model size (100 = 1 %)
     std::int64_t flask_until = 0;  // [U-81] immortal heal window
     std::int32_t flask_revive = 0; // revive heals left
     std::int64_t flask_next_ms = 0;
@@ -340,6 +343,9 @@ struct Effect {
     Stats src;                      // caster stats (pen, CC amplify)
     std::int32_t power_pct = 100;
     std::int32_t base_height = 0;   // [U-216] ground height where it was cast
+    // [U-510] the hitbox keys work from these
+    std::int32_t base_radius = 0, base_width = 0, base_length = 0, key_fwd = 0;
+    Dir base_dir;
 
     [[nodiscard]] std::int32_t ux() const { return x / kSub; }
     [[nodiscard]] std::int32_t uy() const { return y / kSub; }
@@ -349,9 +355,9 @@ struct LightOut {
     std::int32_t x = 0, y = 0, radius = 0;
     std::uint8_t strength = 100;
 };
-struct TimedLight {  // [U-256] afterglow of fire skills, burning trees
+struct TimedLight {  // [U-256] afterglow of fire skills, burning trees; [U-514] fades out slowly like embers
     LightOut l;
-    std::int64_t until = 0;
+    std::int64_t until = 0, born = 0;
 };
 struct WaveOut {
     SenseWave w;
@@ -575,7 +581,7 @@ public:
     [[nodiscard]] int big_water_near(const Unit& u, std::size_t* patch = nullptr) const;
     void use_water_source(const Unit& u);  // a puddle / ice patch used for an ice wall is gone
     // [U-339][U-340] water as numbers
-    enum class WaterSource : std::uint8_t { None, Lasting, Patch, IceWall };  // river / sea / glacier, puddle / ice patch, ice wall
+    enum class WaterSource : std::uint8_t { None, Lasting, Patch, IceWall, Mud };  // [U-513] Mud = half a source  // river / sea / glacier, puddle / ice patch, ice wall
     [[nodiscard]] WaterSource water_source_at(std::int32_t x, std::int32_t y, std::size_t* patch = nullptr) const;
     // a water skill has its water: a chosen source in reach, or one near the caster (then it costs no carried water)
     [[nodiscard]] bool water_sourced(const Unit& u, const SkillDef& d, std::int32_t sx, std::int32_t sy) const;
@@ -583,6 +589,10 @@ public:
     // [U-398] water moved away from a lasting source: shallow water → wet ground, deep → shallow, for ms
     void drain_water(std::int32_t x, std::int32_t y, std::int32_t radius, std::int32_t ms);
     // [U-378] a rock to bend (lift a rock, then throw it): any stone wall cell — a map rock, a bent wall, a thrown rock
+    [[nodiscard]] bool mud_at(std::int32_t x, std::int32_t y) const;  // [U-513]
+    [[nodiscard]] bool only_mud_source(const Unit& u, std::int32_t sx, std::int32_t sy) const;  // [U-513] bent from mud: half the water
+    [[nodiscard]] std::string_view missing_need(const Unit& u, const SkillDef& d) const;  // [U-510] what the skill relies on and is not here
+    void animate_hitbox(Effect& e);  // [U-510] SkillDef::keys
     [[nodiscard]] bool rock_source_at(std::int32_t x, std::int32_t y) const;  // a puddle is used up, an ice wall melts a bit
     [[nodiscard]] static bool water_skill(const SkillDef& d) { return base_element(d.sub) == Element::Water; }
     [[nodiscard]] bool elevated(const Unit& u) const;       // flying or riding water → melee / ground can't hit
@@ -756,6 +766,7 @@ public:
     void dota_neutral_drop(Unit& killer, const Unit& monster);
     [[nodiscard]] bool true_sighted(Team t, const Unit& u) const;
     void reveal(Unit& u) { u.st.remove(StatusKind::Invisible); }
+    void add_glow(std::int32_t x, std::int32_t y, std::int32_t radius, std::uint8_t strength, std::int64_t ms);  // [U-514]
     void attack_on_the_move(Unit& u);
     void start_cast(Unit& u, const Order& o);
     void finish_cast(Unit& u);
@@ -843,10 +854,17 @@ void flood_water(const Grid& g, int sx, int sy, std::vector<std::uint8_t>& mark,
 [[nodiscard]] bool from_caster(FxKind kind, Geo geo);  // Line / Cone / Arc start at the caster
 // the sweet part of a shape as circles (empty for Tip: that is a moment of the flight, drawn by the preview)
 [[nodiscard]] Shape sweet_shape(FxKind kind, Geo geo, SweetZone z, int size, std::int32_t x, std::int32_t y, std::int32_t radius,
-                                std::int32_t width, std::int32_t length, Dir dir);
+                                std::int32_t width, std::int32_t length, Dir dir, int from = 0);
+// [U-510] the exact outline of a polygon shape (Geo::Square …); pts = Geo::Custom's forward, side pairs in % of the radius
+[[nodiscard]] Poly fx_poly(FxKind kind, std::int32_t x, std::int32_t y, std::int32_t radius, std::int32_t width, std::int32_t length, Dir dir, Geo geo,
+                           const std::int8_t* pts = nullptr, int npts = 0);
+// [U-510] where a skill's hitbox keys are at this moment (q = 0 … 1000 of its life); also used by the champion maker's preview
+struct HitPose { std::int32_t size = 100, len = 100, rot = 0, fwd = 0; };
+[[nodiscard]] HitPose hit_pose(const SkillDef& d, std::int32_t q);
 // Body table for the network (index ↔ BodyDef).
 [[nodiscard]] const BodyDef& body_by_index(int i);
-[[nodiscard]] int body_index(const BodyDef* b);
+[[nodiscard]] int body_index(const BodyDef* b);  // −1: not one of the standard bodies
+[[nodiscard]] int unit_body_index(const Unit& u);  // [U-510]
 [[nodiscard]] inline std::int64_t dist_units(const Unit& a, std::int32_t x, std::int32_t y) {
     return isqrt(dist2(a.ux(), a.uy(), x, y));
 }

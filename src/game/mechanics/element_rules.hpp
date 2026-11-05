@@ -17,6 +17,8 @@ inline constexpr std::int32_t kLightningVsIronPct = 25;    // +25 % to iron-armo
 // ---- fire [U-241][U-244]
 inline constexpr std::int32_t kAirEmpowersFirePct = 25;    // fire through an air zone: +25 % size and damage
 inline constexpr std::int64_t kBurningGroundMs = 3'000;    // fire hitting the ground keeps burning
+inline constexpr std::int64_t kFireEmberMs = 3'500;        // [U-514] what a fire skill leaves on the ground fades out in this time
+inline constexpr std::size_t kMaxGlows = 160;              // [U-514] embers on the map at once (the oldest gives way)
 inline constexpr std::int64_t kTreeFireMs = 6'000;         // [U-256] a burning tree lights its area this long
 inline constexpr std::int32_t kBurningGroundDps = 1'200;   // hundredths of HP per second
 inline constexpr std::int32_t kFireCastLight = 160;        // light while casting a fire skill
@@ -31,6 +33,10 @@ inline constexpr std::int64_t kSmokeMs = 6'000;            // smoke over a burni
 inline constexpr std::int64_t kSteamMs = 3'000;            // steam from water on fire / lava
 inline constexpr std::int32_t kHeatDrawFuel = 2'000;       // Heat Draw gives this much fuel (hundredths)
 inline constexpr std::int64_t kPuddleMs = 8'000;           // [U-292] steam cooled by Heat Draw lies as water this long
+// [U-513] mud: a puddle that dries by itself on earth leaves mud this long. As a water source it gives half of what water on
+// the ground gives (bonus, range bonus, half the water cost is still paid); earth and mud come from it in full.
+inline constexpr std::int64_t kMudMs = 15'000;
+inline constexpr std::int32_t kMudWaterPct = 50;
 inline constexpr std::int64_t kWetWhileOnWaterMs = 150;    // [U-292] on shallow water / a puddle: wet only while standing there
 inline constexpr std::int32_t kIcePatchSlowPct = 20;       // [U-293] an ice patch is slippery: −20 % move speed while on it
 inline constexpr std::int32_t kWaterSourceBonusPct = 15;   // [U-293] a waterbender bending from a puddle / ice patch

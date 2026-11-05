@@ -26,9 +26,14 @@ public:
     static constexpr int kMinutesPerDay = 24 * 60;
     static constexpr int kDayStart = 6 * 60, kDayEnd = 18 * 60;
     static constexpr int kMoonCycleDays = 30;                // [U-32]
-    static constexpr int kFullMoonAge = kMoonCycleDays / 2;  // day 15 = 30:00 real
-    static constexpr int kEclipseDays[] = {12, 17};          // [U-35] 25:00 and 35:00 = noon
-    static constexpr std::int64_t kCometMs = 30 * 60'000;    // [U-34][U-266] the comet starts at 30:00
+    static constexpr int kFullMoonAge = kMoonCycleDays / 2;  // 30 min after the new moon: 55:00 real
+    // [U-515] the match starts at the beginning of the night (18:00)
+    static constexpr int kStartMinute = 18 * 60;
+    // [U-515] the exact new moon is at 25:00 real (sunrise); that day's sun is eclipsed: 25:00-26:00, darkest at noon 25:30.
+    // An eclipse needs a new moon, so the next one comes a whole moon cycle later (85:00).
+    static constexpr std::int64_t kNewMoonMs = 25 * 60'000;
+    static constexpr std::int64_t kMoonCycleMs = 60 * 60'000;
+    static constexpr std::int64_t kCometMs = 29 * 60'000;    // [U-34][U-266][U-515] the comet starts at 29:00
     static constexpr std::int64_t kAlignStartMs = 60 * 60'000;  // [U-128] late game
     static constexpr std::int64_t kAlignEndMs = 66 * 60'000;    // [U-33] 3 game days
 
@@ -43,23 +48,24 @@ public:
     [[nodiscard]] static constexpr SkyState at_ms(std::int64_t ms) {
         SkyState s;
         s.real_ms = ms;
-        const std::int64_t game_min = ms * kGameMinutesPerRealSecond / 1000;  // starts at 00:00 [U-31]
+        const std::int64_t game_min = kStartMinute + ms * kGameMinutesPerRealSecond / 1000;  // [U-515]
         s.game_day = int(game_min / kMinutesPerDay);
         s.minute_of_day = int(game_min % kMinutesPerDay);
-        s.second_of_day = int(ms * kGameMinutesPerRealSecond * 60 / 1000 % (std::int64_t(kMinutesPerDay) * 60));
+        s.second_of_day = int((std::int64_t(kStartMinute) * 60 + ms * kGameMinutesPerRealSecond * 60 / 1000) % (std::int64_t(kMinutesPerDay) * 60));
         s.is_day = s.minute_of_day >= kDayStart && s.minute_of_day < kDayEnd;
 
-        s.moon_age_days = s.game_day % kMoonCycleDays;
-        // Triangle 0 % → 100 % → 0 %, smooth over game minutes.
+        // Triangle 0 % → 100 % → 0 %, smooth over game minutes. Age 0 starts exactly at the new moon [U-515]
         const std::int64_t cycle_min = std::int64_t(kMoonCycleDays) * kMinutesPerDay;
         const std::int64_t half = cycle_min / 2;
-        const std::int64_t age_min = game_min % cycle_min;
+        const std::int64_t new_moon_min = kStartMinute + kNewMoonMs * kGameMinutesPerRealSecond / 1000;
+        const std::int64_t age_min = ((game_min - new_moon_min) % cycle_min + cycle_min) % cycle_min;
+        s.moon_age_days = int(age_min / kMinutesPerDay);
         const std::int64_t from_full = age_min > half ? age_min - half : half - age_min;
         s.moon_light_pct = int(100 - from_full * 100 / half);
         s.full_moon = s.moon_age_days == kFullMoonAge;
         s.new_moon = s.moon_age_days == 0;
 
-        for (int d : kEclipseDays) s.solar_eclipse |= s.is_day && s.game_day == d;
+        s.solar_eclipse = s.is_day && s.new_moon;  // [U-515] only a new moon can cover the sun
         s.comet_landed = ms >= kCometMs;
         s.planetary_alignment = ms >= kAlignStartMs && ms < kAlignEndMs;
         return s;
@@ -92,11 +98,13 @@ inline constexpr int kDuskStartS = 15 * 3600 + 1800, kNightFullS = 21 * 3600 + 1
         return 1000 - smooth1000(std::int64_t(sec - kDuskStartS) * 1000 / (kNightFullS - kDuskStartS));
     return 0;
 }
+// [U-515] real time of noon of a game day (game day 0 is the 6 h from the 18:00 start to midnight)
+[[nodiscard]] constexpr std::int64_t eclipse_noon_ms(int game_day) { return std::int64_t(game_day) * 120'000 - 30'000; }
 [[nodiscard]] constexpr int vision_range_pct(const SkyState& s) {
     const std::int64_t night = kNightVisionMinPct + (kNightVisionMaxPct - kNightVisionMinPct) * s.moon_light_pct / 100;
     std::int64_t pct = night + (100 - night) * sunlight1000(s.second_of_day) / 1000;
     if (s.solar_eclipse) {  // V-curve: 100 % of the normal light at the edges → new-moon dark in the middle
-        const std::int64_t mid = std::int64_t(s.game_day) * 120'000 + 60'000;
+        const std::int64_t mid = eclipse_noon_ms(s.game_day);
         const std::int64_t d = s.real_ms > mid ? s.real_ms - mid : mid - s.real_ms;
         const std::int64_t f = d >= 30'000 ? 1000 : d * 1000 / 30'000;
         pct = kNightVisionMinPct + (pct - kNightVisionMinPct) * f / 1000;
@@ -104,22 +112,22 @@ inline constexpr int kDuskStartS = 15 * 3600 + 1800, kNightFullS = 21 * 3600 + 1
     return int(pct);
 }
 
-// Compile-time checks against the plan.
-static_assert(vision_range_pct(WorldClock::at_ms(0)) == kNightVisionMinPct);            // new moon night
-static_assert(vision_range_pct(WorldClock::at_ms(30 * 60'000)) == kNightVisionMaxPct);  // full moon night
-static_assert(!WorldClock::at_ms(0).is_day && WorldClock::at_ms(0).new_moon);       // [U-31]
-static_assert(WorldClock::at_ms(30 * 60'000).full_moon);                            // [U-32]
-static_assert(WorldClock::at_ms(30 * 60'000).moon_light_pct == 100);
-static_assert(WorldClock::at_ms(25 * 60'000).solar_eclipse);                        // [U-35]
-static_assert(WorldClock::at_ms(35 * 60'000).solar_eclipse);
-static_assert(!WorldClock::at_ms(25 * 60'000 + 31'000).solar_eclipse);              // ends at sunset
+// Compile-time checks against the plan. Real minutes: 0:00 = 18:00, 0:30 = midnight, 1:00 = 06:00, 1:30 = noon.
+static_assert(WorldClock::at_ms(0).minute_of_day == 18 * 60 && !WorldClock::at_ms(0).is_day);   // [U-515] the night begins
+static_assert(WorldClock::at_ms(60'000).minute_of_day == 6 * 60);                               // 1 min = 12 h [U-30]
+static_assert(WorldClock::at_ms(25 * 60'000).new_moon && WorldClock::at_ms(25 * 60'000).moon_light_pct == 0);  // [U-515] exactly
+static_assert(!WorldClock::at_ms(25 * 60'000 - 1'000).new_moon);
+static_assert(WorldClock::at_ms(25 * 60'000).solar_eclipse && WorldClock::at_ms(25 * 60'000 + 59'000).solar_eclipse);
+static_assert(!WorldClock::at_ms(25 * 60'000 - 1'000).solar_eclipse && !WorldClock::at_ms(26 * 60'000).solar_eclipse);
+static_assert(!WorldClock::at_ms(35 * 60'000).solar_eclipse);
+static_assert(vision_range_pct(WorldClock::at_ms(25 * 60'000 + 30'000)) == kNightVisionMinPct);  // eclipse middle = noon
+static_assert(!WorldClock::at_ms(29 * 60'000 - 1).comet_landed && WorldClock::at_ms(29 * 60'000).comet_landed);  // [U-515]
+static_assert(WorldClock::at_ms(55 * 60'000).full_moon && WorldClock::at_ms(55 * 60'000).moon_light_pct == 100);
 static_assert(WorldClock::at_ms(60 * 60'000).planetary_alignment && !WorldClock::at_ms(66 * 60'000).planetary_alignment);  // [U-128]
-static_assert(WorldClock::at_ms(60'000).minute_of_day == 12 * 60);                  // 1 min = 12 h [U-30]
-// [U-153] smooth: noon full, 18:00 still fairly bright, 21:30 dark, 07:00 half-way up
-static_assert(vision_range_pct(WorldClock::at_ms(60'000)) == 100);                   // 12:00
-static_assert(vision_range_pct(WorldClock::at_ms(42'500)) == 100);                   // 08:30
-static_assert(vision_range_pct(WorldClock::at_ms(90'000)) > 60 && vision_range_pct(WorldClock::at_ms(90'000)) < 100);  // 18:00
-static_assert(vision_range_pct(WorldClock::at_ms(107'500)) < 15);                   // 21:30, new-moon week: dark
-static_assert(vision_range_pct(WorldClock::at_ms(25 * 60'000)) == kNightVisionMinPct);   // eclipse middle
+// [U-153] smooth: noon full, 18:00 still fairly bright, 21:30 before the new moon dark, 08:30 full
+static_assert(vision_range_pct(WorldClock::at_ms(90'000)) == 100);                                       // 12:00
+static_assert(vision_range_pct(WorldClock::at_ms(72'500)) == 100);                                       // 08:30
+static_assert(vision_range_pct(WorldClock::at_ms(120'000)) > 60 && vision_range_pct(WorldClock::at_ms(120'000)) < 100);  // 18:00
+static_assert(vision_range_pct(WorldClock::at_ms(25 * 60'000 - 42'500)) < 15);                           // 21:30
 
 }  // namespace em

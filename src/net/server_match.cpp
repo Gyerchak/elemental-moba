@@ -179,7 +179,7 @@ void Server::send_snapshot(Player& p) {
         n.team = std::uint8_t(u.team);
         n.champ = u.champ;
         n.mtype = std::uint8_t(u.mtype);
-        n.body = std::uint8_t(body_index(u.body));
+        n.body = std::uint8_t(unit_body_index(u));
         n.alive = u.alive;
         n.x = u.ux();
         n.y = u.uy();
@@ -228,6 +228,7 @@ void Server::send_snapshot(Player& p) {
     for (const NetUnit& n : us) w.put(n);
     // effects in normal vision [U-141]
     std::vector<NetFx> fs;
+    std::vector<NetFxPoly> fpolys;  // [U-510]
     for (const Effect& e : W.fx) {
         if (e.dead || !W.visible_to(team, e)) continue;
         if (e.kind == FxKind::Steam && e.radius <= 1) continue;
@@ -254,11 +255,30 @@ void Server::send_snapshot(Player& p) {
         if (e.def) {  // [U-459]
             const SkillDef::Visual& v = e.def->vis;
             n.vcol = v.colour, n.vfill = v.fill, n.vglow = v.glow, n.vtrail = v.trail, n.vflash = v.flash, n.vpart = v.particles, n.vmark_ms = v.mark_ms;
+            n.sfrom = e.def->sweet_from;  // [U-510]
+            if (e.geo == std::uint8_t(Geo::Custom)) {
+                NetFxPoly fp{};
+                fp.id = e.id, fp.n = e.def->npoly;
+                for (std::size_t q = 0; q < e.def->npoly && q < std::size(fp.pts); ++q) fp.pts[q] = e.def->poly[q];
+                fpolys.push_back(fp);
+            }
+            const std::int64_t life = e.travel_total > 0 ? std::int64_t(e.travel_total - std::max(0, e.travel_left)) * 255 / e.travel_total
+                                                         : (W.now_ms - e.born_ms) * 255 / std::max<std::int64_t>(1, e.end_ms - e.born_ms);
+            n.life = std::uint8_t(std::clamp<std::int64_t>(life, 0, 255));
+            n.vchamp = -1;
+            if (const Unit* ow = W.find(e.owner); ow && ow->kind == UnitKind::Champion && ow->champ >= 0) {
+                const ChampionDef& cd = champions()[std::size_t(ow->champ)];
+                const SkillDef* const list[] = {&cd.p, &cd.w, &cd.e, &cd.r, &cd.t, &cd.y};
+                for (std::uint8_t q = 0; q < 6; ++q)
+                    if (list[q] == e.def || (list[q]->name == e.def->name && !e.def->name.empty())) n.vchamp = std::int16_t(ow->champ), n.vslot = q;
+            }
         }
         fs.push_back(n);
     }
     w.put<std::uint16_t>(std::uint16_t(fs.size()));
     for (const NetFx& n : fs) w.put(n);
+    w.put<std::uint16_t>(std::uint16_t(fpolys.size()));
+    for (const NetFxPoly& n : fpolys) w.put(n);
     {  // [U-456] chains this team can see (either end visible)
         std::vector<NetTether> ts;
         for (const Tether& t : W.tethers) {

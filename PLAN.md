@@ -280,3 +280,8 @@ clang 22 and GCC 16 (`README.md` → Build / Play).
 - [ ] Polish: machine draft in lang/pl.txt, needs a human read
 - [ ] Vulkan validation rerun on this build
 - Still open: TRELLIS weights (user download), monster / minion art, softer map coasts
+
+## M28 — Champion maker, server app, mud, sky (2026-11-05)
+- [x] em_champion_maker [U-510]; em_server [U-511]; mud [U-513]; fire lights [U-514]; sky [U-515]; practice sizes [U-517]
+- [ ] Polish: tool and server text machine draft; Polish voices still espeak-ng until a Piper Polish voice is installed [U-512]
+- Open idea: the maker builds a 3D model from a picture (tools/art/art_models.py) with one button

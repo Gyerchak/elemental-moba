@@ -8,6 +8,19 @@
 
 namespace em {
 
+// [U-514] one ember per spot: a new one close to an old one renews it instead of stacking
+void World::add_glow(std::int32_t x, std::int32_t y, std::int32_t radius, std::uint8_t strength, std::int64_t ms) {
+    if (radius <= 0 || ms <= 0) return;
+    for (TimedLight& g : glows)
+        if (dist2(g.l.x, g.l.y, x, y) <= 48 * 48) {
+            g.l.radius = std::max(g.l.radius, radius), g.l.strength = std::max(g.l.strength, strength);
+            g.until = std::max(g.until, now_ms + ms), g.born = now_ms;
+            return;
+        }
+    if (glows.size() >= elements::kMaxGlows) glows.erase(glows.begin());
+    glows.push_back({{x, y, radius, strength}, now_ms + ms, now_ms});
+}
+
 void World::step_lights() {
     lights_tick = tick;
     lights.clear();
@@ -36,8 +49,14 @@ void World::step_lights() {
             lights.push_back({u.ux(), u.uy(), elements::kFireCastLight, 100});
     }
     // [U-256] afterglows + burning trees
+    // [U-514] remaining fire on the ground: it shrinks and dims slowly, faster at the very end
     std::erase_if(glows, [&](const TimedLight& g) { return g.until <= now_ms; });
-    for (const TimedLight& g : glows) lights.push_back(g.l);
+    for (const TimedLight& g : glows) {
+        const std::int64_t life = std::max<std::int64_t>(1, g.until - g.born), left = g.until - now_ms;
+        const std::int64_t q = left * 100 / life;                                  // 100 new … 0 gone
+        const std::int64_t eased = q * (200 - q) / 100;                            // stays bright first, fades at the end
+        lights.push_back({g.l.x, g.l.y, std::int32_t(g.l.radius * (45 + 55 * eased / 100) / 100), std::uint8_t(g.l.strength * eased / 100)});
+    }
     // [U-256] magma glows (scanned every 2 s: magma changes slowly)
     if (now_ms - lava_lights_ms_ >= 2'000) {
         lava_lights_ms_ = now_ms;

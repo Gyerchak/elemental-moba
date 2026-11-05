@@ -285,6 +285,19 @@ void GameView::draw_clouds(NetClient& net) {
             ground_ring(r_, view_, float(c.x), float(c.y), 90.f + 20.f * pulse, {230, 245, 255, 220}, 40);
             continue;
         }
+        if (c.kind == 7) {  // [U-513] mud: dark wet earth, lumps and a dull shine (its own look, not a puddle)
+            const float cr = float(c.radius);
+            ground_fill(r_, view_, float(c.x), float(c.y), cr, {74, 54, 34, 215}, 28);
+            ground_ring(r_, view_, float(c.x), float(c.y), cr, {48, 34, 20, 235}, 28);
+            for (int k = 0; k < 7; ++k) {  // lumps (their places follow from the patch, so they never jump)
+                const std::uint32_t h = std::uint32_t(c.x * 31 + c.y * 17 + k * 97);
+                const float a = float(h % 628) / 100.f, rr = cr * (0.2f + float(h / 7 % 60) / 100.f);
+                ground_fill(r_, view_, float(c.x) + std::cos(a) * rr, float(c.y) + std::sin(a) * rr, cr * (0.1f + float(h / 11 % 12) / 100.f),
+                            k % 2 ? Rgba{98, 72, 46, 230} : Rgba{56, 40, 25, 230}, 12);
+            }
+            ground_fill(r_, view_, float(c.x) - cr * 0.3f, float(c.y) - cr * 0.25f, cr * 0.2f, {170, 150, 120, 45}, 14);
+            continue;
+        }
         if (c.kind == 5) {  // [U-293] an ice patch: white-blue, with cracks of light
             ground_fill(r_, view_, float(c.x), float(c.y), float(c.radius), {200, 235, 255, 150}, 28);
             ground_ring(r_, view_, float(c.x), float(c.y), float(c.radius), {240, 250, 255, 200}, 28);
@@ -1123,21 +1136,54 @@ void GameView::draw_world(NetClient& net, double now_s) {
         if (f.combo == std::uint8_t(Combo::Firestorm)) col = hex(0xff7a20);
         const FxKind k = FxKind(f.kind);
         if (k == FxKind::Steam) continue;
+        const std::int8_t* corners_pts = nullptr;  // [U-510] Geo::Custom
+        int corners_n = 0;
+        if (Geo(f.geo) == Geo::Custom)
+            for (const net::NetFxPoly& fp : cur.fx_polys)
+                if (fp.id == f.id) corners_pts = fp.pts, corners_n = fp.n;
         if (f.vcol) col = hex(f.vcol);  // [U-459] the skill's own colour
         if (k == FxKind::Burst && !f.armed) {  // telegraph: exact edge only (+ where the sweet spot will be [U-461])
-            outline_shape(r_, view_, s, with_alpha(col, 230), 2);
+            if (geo_is_poly(Geo(f.geo))) outline_poly(r_, view_, fx_poly(k, f.x, f.y, f.radius, f.width, f.length, {f.dx, f.dy}, Geo(f.geo), corners_pts, corners_n), with_alpha(col, 230), 2);  // [U-510]
+            else outline_shape(r_, view_, s, with_alpha(col, 230), 2);
             if (f.spct > 0)
-                if (const Shape sw = sweet_shape(k, Geo(f.geo), SweetZone(f.szone), f.ssize, f.x, f.y, f.radius, f.width, f.length, {f.dx, f.dy}); !sw.empty())
+                if (const Shape sw = sweet_shape(k, Geo(f.geo), SweetZone(f.szone), f.ssize, f.x, f.y, f.radius, f.width, f.length, {f.dx, f.dy}, f.sfrom); !sw.empty())
                     outline_shape(r_, view_, sw, {255, 120, 230, 220}, 1.5f);
             continue;
         }
         const std::uint8_t a = f.vfill ? f.vfill : k == FxKind::Field ? 70 : k == FxKind::Tornado ? 90 : k == FxKind::Heal ? 80 : 150;
         draw_fx_look(f, s, std::uint32_t(col.r) << 16 | std::uint32_t(col.g) << 8 | col.b, now_s);  // [U-459] glow / trail / sparks: under the body
-        fill_shape(r_, view_, s, with_alpha(col, a));
-        outline_shape(r_, view_, s, mixc(col, {255, 255, 255, 255}, 40), 1.5f);
+        // [U-510] the skill's own picture: always the size of the hitbox, looping, once over its life, or growing with it
+        bool pictured = false;
+        if (f.vchamp >= 0 && std::size_t(f.vchamp) < champions().size()) {
+            const ChampionDef& cd = champions()[std::size_t(f.vchamp)];
+            const SkillDef* const list[] = {&cd.p, &cd.w, &cd.e, &cd.r, &cd.t, &cd.y};
+            const SkillDef::Visual& pv = list[std::min<int>(f.vslot, 5)]->vis;
+            if (!pv.sheet.empty())
+                if (SDL_Texture* pic = res_.texture("skills/" + std::string(pv.sheet))) {
+                    const float life = float(f.life) / 255.f;
+                    const int frame = pv.mode == 1 ? int(life * float(pv.frames)) : int(now_s * double(pv.fps));
+                    const float grow = pv.mode == 2 ? life : 1.f;
+                    const float dl = std::max(1.f, std::hypot(float(f.dx), float(f.dy)));
+                    const float ddx = float(f.dx) / dl, ddy = float(f.dy) / dl;
+                    const bool line_shape = from_caster(k, Geo(f.geo));
+                    const float hf = (line_shape ? float(f.length) / 2 : float(f.radius)) * grow;
+                    const float hs = (f.width > 0 ? float(f.width) / 2 : float(f.radius)) * grow;
+                    const float off = line_shape ? float(f.length) / 2 : 0.f;
+                    ground_picture(r_, view_, pic, float(f.x) + ddx * off, float(f.y) + ddy * off, ddx, ddy, hf, hs, frame, pv.frames);
+                    pictured = true;
+                }
+        }
+        if (geo_is_poly(Geo(f.geo))) {  // [U-510] an exact polygon
+            const Poly pl = fx_poly(k, f.x, f.y, f.radius, f.width, f.length, {f.dx, f.dy}, Geo(f.geo), corners_pts, corners_n);
+            if (!pictured) fill_poly(r_, view_, pl, with_alpha(col, a));
+            outline_poly(r_, view_, pl, mixc(col, {255, 255, 255, 255}, 40), 1.5f);
+        } else {
+            if (!pictured) fill_shape(r_, view_, s, with_alpha(col, a));
+            outline_shape(r_, view_, s, mixc(col, {255, 255, 255, 255}, 40), 1.5f);
+        }
         if (f.inner > 0) ground_ring(r_, view_, float(f.x), float(f.y), float(f.inner), {0, 0, 0, 120}, 40);  // [U-462] the hole
         if (f.spct > 0) {  // [U-461] the sweet spot of this skill, on its real hitbox
-            const Shape sw = sweet_shape(k, Geo(f.geo), SweetZone(f.szone), f.ssize, f.x, f.y, f.radius, f.width, f.length, {f.dx, f.dy});
+            const Shape sw = sweet_shape(k, Geo(f.geo), SweetZone(f.szone), f.ssize, f.x, f.y, f.radius, f.width, f.length, {f.dx, f.dy}, f.sfrom);
             if (!sw.empty()) {
                 fill_shape(r_, view_, sw, {255, 80, 220, 70});
                 outline_shape(r_, view_, sw, {255, 120, 230, 220}, 1.5f);

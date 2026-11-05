@@ -251,6 +251,44 @@ enum class Flow : std::uint8_t { Water, Fire, Earth, Air, Plain };
     return s;
 }
 
+// ---------------------------------------------------------------- [U-510] exact polygons
+struct Poly {
+    std::array<std::int32_t, 24> x{}, y{};
+    std::uint8_t n = 0;
+    constexpr void add(std::int32_t px, std::int32_t py) {
+        if (n < 24) x[n] = px, y[n] = py, ++n;
+    }
+};
+[[nodiscard]] constexpr bool contains(const Poly& p, std::int32_t px, std::int32_t py) {
+    bool in = false;
+    for (int i = 0, j = p.n - 1; i < p.n; j = i++) {
+        if ((p.y[i] > py) == (p.y[j] > py)) continue;
+        const std::int64_t cross = std::int64_t(p.x[j] - p.x[i]) * (py - p.y[i]);
+        const std::int64_t dy = p.y[j] - p.y[i];
+        if (dy > 0 ? (px - p.x[i]) * dy < cross : (px - p.x[i]) * dy > cross) in = !in;
+    }
+    return in;
+}
+// A circle touches the polygon: its centre is inside, or an edge is within its radius.
+[[nodiscard]] constexpr bool touches(const Poly& p, const Circle& c) {
+    if (p.n < 3) return false;
+    if (contains(p, c.x, c.y)) return true;
+    for (int i = 0, j = p.n - 1; i < p.n; j = i++) {
+        const std::int64_t ex = p.x[i] - p.x[j], ey = p.y[i] - p.y[j], cx = c.x - p.x[j], cy = c.y - p.y[j];
+        const std::int64_t len2 = ex * ex + ey * ey;
+        const std::int64_t dot = cx * ex + cy * ey;
+        const std::int64_t qx = len2 == 0 || dot <= 0 ? 0 : dot >= len2 ? ex : ex * dot / len2;
+        const std::int64_t qy = len2 == 0 || dot <= 0 ? 0 : dot >= len2 ? ey : ey * dot / len2;
+        if ((cx - qx) * (cx - qx) + (cy - qy) * (cy - qy) <= std::int64_t(c.r) * c.r) return true;
+    }
+    return false;
+}
+[[nodiscard]] constexpr bool touches(const Poly& p, const Shape& s) {
+    for (int i = 0; i < s.n; ++i)
+        if (touches(p, s.c[i])) return true;
+    return false;
+}
+
 // ---------------------------------------------------------------- bushes [U-140][X-78]
 // Hidden only if EVERY sample point of every body circle is on a brush cell.
 // Samples: centre + 12 points on the edge of each circle.

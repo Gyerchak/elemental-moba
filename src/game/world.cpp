@@ -42,6 +42,7 @@ Effect& World::spawn_fx(Effect e) {
     e.seed = e.id * 2'654'435'761u;
     e.born_ms = now_ms;
     e.travel_total = e.travel_left;
+    e.base_radius = e.radius, e.base_width = e.width, e.base_length = e.length, e.base_dir = e.dir;  // [U-510]
     if (const Unit* o = find(e.owner)) e.base_height = ground_height(o->ux(), o->uy());  // [U-216]
     fx.push_back(e);
     return fx.back();
@@ -104,6 +105,10 @@ Shape World::hitbox(const Unit& u) const {
 
 Shape fx_shape(FxKind kind, std::int32_t ux, std::int32_t uy, std::int32_t radius, std::int32_t width,
                std::int32_t length, Dir dir, Flow flow, std::uint32_t seed, std::uint32_t t, std::uint8_t geo, std::int32_t inner) {
+    if (geo_is_poly(Geo(geo))) {  // [U-510] the rough size of a polygon (other skills meeting it, vision); hits use fx_poly
+        if (Geo(geo) == Geo::Triangle && kind == FxKind::Cone) return fluid_cone(ux, uy, dir, length, width, Flow::Plain, 0, 0);
+        return fluid_blob(ux, uy, std::max(8, radius), Flow::Plain, seed, 0);
+    }
     switch (Geo(geo)) {  // [U-462] a chosen shape rule first
         case Geo::Circle: return fluid_blob(ux, uy, radius, flow, seed, t);
         case Geo::Ring: return ring_shape(ux, uy, radius, inner);
@@ -113,7 +118,7 @@ Shape fx_shape(FxKind kind, std::int32_t ux, std::int32_t uy, std::int32_t radiu
             return fluid_line(ux - dir.x * radius / kOne, uy - dir.y * radius / kOne, dir, std::max(1, 2 * radius), std::max(8, w), flow, seed, t);
         }
         case Geo::Cone: case Geo::Arc: return fluid_cone(ux, uy, dir, length, width, flow, seed, t);
-        case Geo::Auto: break;
+        default: break;
     }
     switch (kind) {
         case FxKind::Bolt:
@@ -144,7 +149,53 @@ Shape World::shape_of(const Effect& e) const {
 }
 
 // ---------------------------------------------------------------- [U-461] sweet spots
-bool from_caster(FxKind kind, Geo geo) { return geo == Geo::Line || geo == Geo::Cone || geo == Geo::Arc || (geo == Geo::Auto && kind == FxKind::Cone); }
+bool from_caster(FxKind kind, Geo geo) {
+    return geo == Geo::Line || geo == Geo::Cone || geo == Geo::Arc || ((geo == Geo::Auto || geo == Geo::Triangle) && kind == FxKind::Cone);
+}
+Poly fx_poly(FxKind kind, std::int32_t x, std::int32_t y, std::int32_t radius, std::int32_t width, std::int32_t length, Dir dir, Geo geo,
+             const std::int8_t* pts, int npts) {
+    Poly p;
+    const std::int32_t r = std::max(4, radius);
+    auto at = [&](std::int64_t fwd, std::int64_t side) { p.add(x + rot_x(dir, std::int32_t(fwd), std::int32_t(side)), y + rot_y(dir, std::int32_t(fwd), std::int32_t(side))); };
+    auto around = [&](int n, std::int64_t rad, int start) {
+        for (int i = 0; i < n; ++i) {
+            const Dir d = kDirs[std::size_t(start + i * 64 / n) & 63];
+            at(rad * d.x / kOne, rad * d.y / kOne);
+        }
+    };
+    switch (geo) {
+        case Geo::Square: at(r, -r), at(r, r), at(-r, r), at(-r, -r); break;
+        case Geo::Diamond: around(4, r, 0); break;
+        case Geo::Hexagon: around(6, r, 0); break;
+        case Geo::Star:
+            for (int i = 0; i < 10; ++i) {
+                const Dir d = kDirs[std::size_t(i * 64 / 10) & 63];
+                const std::int64_t rad = i % 2 ? r * 45 / 100 : r;
+                at(rad * d.x / kOne, rad * d.y / kOne);
+            }
+            break;
+        case Geo::Ellipse: {
+            const std::int64_t side = width > 0 ? width / 2 : r;
+            for (int i = 0; i < 16; ++i) {
+                const Dir d = kDirs[std::size_t(i * 4) & 63];
+                at(std::int64_t(r) * d.x / kOne, side * d.y / kOne);
+            }
+            break;
+        }
+        case Geo::Triangle:
+            if (kind == FxKind::Cone) {  // tip at the caster, the wide side away
+                at(0, 0), at(std::max(8, length), std::max(8, width) / 2), at(std::max(8, length), -std::max(8, width) / 2);
+            } else {
+                at(r, 0), at(-r / 2, r * 87 / 100), at(-r / 2, -r * 87 / 100);
+            }
+            break;
+        case Geo::Custom:
+            for (int i = 0; pts && i + 1 < npts; i += 2) at(std::int64_t(r) * pts[i] / 100, std::int64_t(r) * pts[i + 1] / 100);
+            break;
+        default: break;
+    }
+    return p;
+}
 SweetZone sweet_zone_for(FxKind kind, Geo geo, SweetZone z) {
     if (z != SweetZone::Auto) return z;
     if (from_caster(kind, geo)) return SweetZone::Edge;
@@ -152,17 +203,17 @@ SweetZone sweet_zone_for(FxKind kind, Geo geo, SweetZone z) {
 }
 int sweet_size_for(SweetZone z, int size) {
     if (size > 0) return std::min(size, 100);
-    return z == SweetZone::Edge ? 25 : z == SweetZone::Tip ? 20 : 40;
+    return z == SweetZone::Edge || z == SweetZone::Band ? 25 : z == SweetZone::Tip ? 20 : 40;
 }
 Shape sweet_shape(FxKind kind, Geo geo, SweetZone z, int size, std::int32_t x, std::int32_t y, std::int32_t radius, std::int32_t width,
-                  std::int32_t length, Dir dir) {
+                  std::int32_t length, Dir dir, int band_from) {
     z = sweet_zone_for(kind, geo, z);
     const std::int32_t s = sweet_size_for(z, size);
     Shape out;
     if (z == SweetZone::Tip) return out;
     if (from_caster(kind, geo)) {
         const bool cone = geo != Geo::Line;
-        const std::int32_t from = z == SweetZone::Edge ? length * (100 - s) / 100 : length * (100 - s) / 200, len = length * s / 100;
+        const std::int32_t from = z == SweetZone::Band ? length * band_from / 100 : z == SweetZone::Edge ? length * (100 - s) / 100 : length * (100 - s) / 200, len = length * s / 100;
         if (!cone) return fluid_line(x + dir.x * from / kOne, y + dir.y * from / kOne, dir, std::max(1, len), std::max(8, width), Flow::Plain, 0, 0);
         // a cone: one row of circles across the band (the cone's width there)
         const std::int32_t along = from + len / 2, w = width * (20 + 80 * along / std::max(1, length)) / 100;
@@ -184,6 +235,7 @@ Shape sweet_shape(FxKind kind, Geo geo, SweetZone z, int size, std::int32_t x, s
         }
         return out;
     }
+    if (z == SweetZone::Band) return ring_shape(x, y, radius * std::min(100, band_from + s) / 100, radius * band_from / 100);  // [U-510]
     if (z == SweetZone::Centre) {
         out.add({x, y, std::max(6, radius * s / 100)});
         return out;
@@ -195,11 +247,19 @@ namespace {
 constexpr const BodyDef* kBodies[] = {&kHumanoidBody, &kSlimBody, &kBroadBody, &kMinionBody,
                                       &kBeastBody,    &kTowerBody, &kNexusBody};
 }
-const BodyDef& body_by_index(int i) { return *kBodies[std::size_t(std::clamp(i, 0, int(std::size(kBodies)) - 1))]; }
+// [U-510] 100 + champion: that champion's own hitbox (own champions; both sides know it from the same .champ text)
+int unit_body_index(const Unit& u) {
+    if (u.kind == UnitKind::Champion && u.champ >= 0 && body_index(u.body) < 0) return 100 + u.champ;
+    return std::max(0, body_index(u.body));
+}
+const BodyDef& body_by_index(int i) {
+    if (i >= 100 && i - 100 < int(champions().size())) return *champions()[std::size_t(i - 100)].body;  // [U-510]
+    return *kBodies[std::size_t(std::clamp(i, 0, int(std::size(kBodies)) - 1))];
+}
 int body_index(const BodyDef* b) {
     for (int i = 0; i < int(std::size(kBodies)); ++i)
         if (kBodies[i] == b) return i;
-    return 0;
+    return -1;
 }
 
 bool World::targetable(const Unit& u) const { return u.alive && u.untargetable_until <= now_ms; }
@@ -274,6 +334,10 @@ ResolvedAbility World::resolved(const Unit& u, Slot s) const {
     // [U-464] skill power for every skill + the power of its kind (arcane / martial); elemental = elemental power
     b.power_pct += (u.stats.skill_amp + (d->arcane ? u.stats.arcane_power : skill_sub(u, *d) == SubElement::Physical ? u.stats.martial_power : 0)) / 100;
     const std::uint32_t rank = std::max<std::uint32_t>(1, u.ab[std::size_t(s)].rank);
+    if (const std::int32_t grow = u.practice_size[std::size_t(s) % u.practice_size.size()]; grow) {  // [U-517] grows from the existing shape
+        b.width_pct += grow, b.radius_pct += grow;
+        if (d->kind == SkillKind::Cone || d->geo == Geo::Line || d->geo == Geo::Arc || d->geo == Geo::Cone) b.size_pct += grow;
+    }
     return resolve(to_ability(*d, s), ScaleCtx{.stats = u.stats, .rank = rank, .level = std::uint32_t(u.level),
                                                .power_pct = b.power_pct, .size_pct = b.size_pct + extra,
                                                .width_pct = b.width_pct + extra, .radius_pct = b.radius_pct + extra,
@@ -403,11 +467,13 @@ bool World::can_cast_now(const Unit& u, Slot s, std::string* why, std::int32_t s
     if (water_skill(*d) && u.water_max > 0 && !water_free && u.water < elements::kAvatarWaterCost)
         return no("not enough water: bend it from a source (river, sea, pole ice, a puddle, an ice wall)");
     if (const std::string_view w = nothing_to_act_on(u, *d, sx, sy); !w.empty()) return no(w.data());  // [U-426]
+    if (const std::string_view w = missing_need(u, *d); !w.empty()) return no(w.data());                 // [U-510]
     if (u.st.has(StatusKind::Swimming) && d->kind != SkillKind::WaterSpout && d->kind != SkillKind::IcePath)
         return no("swimming: no spells (only water mobility skills)");  // [U-188]
     const bool recast = d->casts > 1 && a.mc.casts_used > 0 && a.mc.casts_used < d->casts && now_ms <= a.mc.window_end_ms;
     if (!recast && a.cd_end_ms > now_ms && !u.no_cooldowns) return no("cooldown");
-    const std::int64_t cost = water_free && u.stats.resource == ResourceKind::Water ? 0 : resolved(u, s).cost * 100;
+    const std::int64_t cost = water_free && u.stats.resource == ResourceKind::Water ? (only_mud_source(u, sx, sy) ? resolved(u, s).cost * elements::kMudWaterPct : 0)
+                                                                                     : resolved(u, s).cost * 100;  // [U-513] from mud: half
     if (u.stats.resource == ResourceKind::Water && cost > u.res_max)
         return no("costs more water than you carry: bend it from a source (river, sea, pole ice, a puddle, an ice wall)");
     const bool free_fuel = u.stats.resource == ResourceKind::Fuel && unlimited_fuel(sky);  // [U-138]
@@ -415,6 +481,51 @@ bool World::can_cast_now(const Unit& u, Slot s, std::string* why, std::int32_t s
     const std::int64_t life = u.stats.resource == ResourceKind::Fuel ? std::max<std::int64_t>(0, u.hp - 100) / kLifePerFuel : 0;
     if (cost > 0 && !free_fuel && u.stats.resource != ResourceKind::Rage && u.res + life < cost) return no("not enough resource");
     return true;
+}
+
+// [U-513] the water comes from mud: at the chosen source, or (none chosen) the patch close by is mud
+bool World::only_mud_source(const Unit& u, std::int32_t sx, std::int32_t sy) const {
+    if (sx >= 0) return water_source_at(sx, sy) == WaterSource::Mud;
+    std::size_t i = 0;
+    return big_water_near(u, &i) == 2 && clouds[i].kind == CloudKind::Mud;
+}
+
+// [U-510] what the skill relies on and is not here (empty = fine)
+std::string_view World::missing_need(const Unit& u, const SkillDef& d) const {
+    if (!d.needs) return {};
+    const std::int32_t range = std::max<std::int32_t>(d.needs_range, 32);
+    const int r = range / kCellUnits + 1, cx = u.ux() / kCellUnits, cy = u.uy() / kCellUnits;
+    auto near_cell = [&](auto&& pred) {
+        for (int y = cy - r; y <= cy + r; ++y)
+            for (int x = cx - r; x <= cx + r; ++x)
+                if (Grid::in_bounds(x, y) && (x - cx) * (x - cx) + (y - cy) * (y - cy) <= r * r && pred(grid.at(x, y))) return true;
+        return false;
+    };
+    auto near_cloud = [&](CloudKind k) {
+        return std::ranges::any_of(clouds, [&](const Cloud& p) { return p.kind == k && dist2(p.x, p.y, u.ux(), u.uy()) <= std::int64_t(range + p.radius) * (range + p.radius); });
+    };
+    if (d.needs & kNeedEarth) {
+        const bool under = Grid::in_bounds(cx, cy) && earth_bendable(grid.at(cx, cy).surface());
+        if (!under && !near_cloud(CloudKind::Mud)) return "needs earth under your feet";
+    }
+    if ((d.needs & kNeedWater) && big_water_near(u) == 0 && !near_cell([](Cell c) { return c.surface() == Surface::Water || c.surface() == Surface::DeepWater; }))
+        return "needs water nearby";
+    if ((d.needs & kNeedMud) && !near_cloud(CloudKind::Mud) && !near_cell([](Cell c) { return c.surface() == Surface::Water; }))
+        return "needs mud or shallow water nearby";
+    if ((d.needs & kNeedRock) && !near_cell([](Cell c) { return c.wall() == Wall::Stone; })) return "needs a rock or stone wall nearby";
+    if ((d.needs & kNeedIce) && !near_cloud(CloudKind::IcePatch) && !near_cell([](Cell c) { return c.wall() == Wall::Ice || c.surface() == Surface::Glacier; }))
+        return "needs ice nearby";
+    if ((d.needs & kNeedLava) && !near_cell([](Cell c) { return c.surface() == Surface::Magma; })) return "needs lava nearby";
+    if ((d.needs & kNeedTree) && !near_cell([](Cell c) { return c.tree() == Tree::Alive; })) return "needs a tree nearby";
+    if ((d.needs & kNeedMetal) && !near_cell([](Cell c) { return c.wall() == Wall::Metal || c.surface() == Surface::Metal; })) return "needs metal nearby";
+    if ((d.needs & kNeedNight) && sky.is_day) return "only at night";
+    if ((d.needs & kNeedDay) && !sky.is_day) return "only by day";
+    if (d.needs & kNeedFire) {
+        const bool fire = std::ranges::any_of(glows, [&](const TimedLight& g) { return dist2(g.l.x, g.l.y, u.ux(), u.uy()) <= std::int64_t(range) * range; }) ||
+                          std::ranges::any_of(fx, [&](const Effect& e) { return !e.dead && e.light > 0 && fire_family(e.sub) && dist2(e.ux(), e.uy(), u.ux(), u.uy()) <= std::int64_t(range) * range; });
+        if (!fire) return "needs fire nearby";
+    }
+    return {};
 }
 
 bool World::can_target(const Unit& caster, const SkillDef& d, const Unit& t) const {
@@ -525,6 +636,7 @@ void World::recompute_stats(Unit& u) {
         if (it >= 0 && kItems[std::size_t(it)].scepter && feature(kFeatScepter)) u.scepter = true;
     if (u.lotus_until > now_ms) s.cast_speed += kLotusCastSpeed * std::max(0, 10'000 + s.buff_power) / 10'000;  // [X-46][U-114] ([U-484] buff power)
     if (u.tmp_size_until > now_ms) s.model_size += u.tmp_size;     // [U-129]
+    s.model_size += d.model_size + u.practice_model;               // [U-510][U-517]
     if (u.transform_until > now_ms) {  // [U-456] the form: + attack %, + healing received % [U-481] (every source)
         s.attack.bonus += s.attack.base * u.transform_attack_pct / 100;
         s.heal_amp += u.transform_heal_pct * 100;
@@ -637,6 +749,16 @@ void World::command(std::uint32_t id, const Cmd& c) {
             return;
         case CmdKind::CheatNoCooldowns:
             if (cfg.practice) u.no_cooldowns = !u.no_cooldowns;
+            return;
+        case CmdKind::PracticeSize:  // [U-517]
+            if (cfg.practice) {
+                if (c.slot == 255) u.practice_model = c.y ? 0 : std::clamp(u.practice_model + c.x * 100, -5'000, 20'000);
+                else if (c.slot < u.practice_size.size()) {
+                    std::int16_t& g = u.practice_size[c.slot];
+                    g = c.y ? std::int16_t(0) : std::int16_t(std::clamp(g + c.x, -80, 400));
+                }
+                recompute_stats(u);
+            }
             return;
         case CmdKind::SetAutoAttack:  // [U-158]
             u.auto_attack = c.slot != 0;
@@ -860,9 +982,12 @@ void World::step() {
     lap(9);
 
     // drop dead effects and dead non-champions (after a short corpse time)
-    for (const Effect& e : fx)  // [U-256] fire skills with light_ms keep glowing after they end
-        if (e.dead && e.light > 0 && e.def && e.def->light_ms > 0 && e.kind != FxKind::Lantern)
-            glows.push_back({{e.ux(), e.uy(), e.light, 80}, now_ms + e.def->light_ms});
+    // [U-256][U-514] every fire skill leaves embers where it ended, however it ended. (The old afterglow was an effect that
+    // made a new afterglow when it ended: the light never went out, and the effects piled up.)
+    for (const Effect& e : fx)
+        if (e.dead && e.light > 0 && e.kind != FxKind::Lantern)
+            add_glow(e.ux(), e.uy(), e.def && e.def->light_ms > 0 ? e.light : e.light * 3 / 4, 80,
+                     e.def && e.def->light_ms > 0 ? e.def->light_ms : elements::kFireEmberMs);
     std::erase_if(fx, [](const Effect& e) { return e.dead; });
     for (const Effect& p : fx_pending_) spawn_fx(p);  // [U-383] with real ids / seeds
     fx_pending_.clear();

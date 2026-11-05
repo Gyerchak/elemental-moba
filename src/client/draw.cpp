@@ -395,3 +395,45 @@ bool text_field(SDL_Renderer* r, Ui& ui, int id, float x, float y, float w, std:
 }
 
 }  // namespace em::gfx
+
+namespace em::gfx {
+
+void fill_poly(SDL_Renderer* r, const View& v, const Poly& p, Rgba fill) {
+    if (p.n < 3) return;
+    float cx = 0, cy = 0;
+    for (int i = 0; i < p.n; ++i) cx += float(p.x[std::size_t(i)]), cy += float(p.y[std::size_t(i)]);
+    cx /= float(p.n), cy /= float(p.n);
+    const SDL_FColor col{float(fill.r) / 255.f, float(fill.g) / 255.f, float(fill.b) / 255.f, float(fill.a) / 255.f};
+    SDL_Vertex vs[25];
+    int idx[72];
+    vs[0] = {{v.sx(cx), v.sy(cy)}, col, {0, 0}};
+    for (int i = 0; i < p.n; ++i) vs[i + 1] = {{v.sx(float(p.x[std::size_t(i)])), v.sy(float(p.y[std::size_t(i)]))}, col, {0, 0}};
+    for (int i = 0; i < p.n; ++i) idx[i * 3] = 0, idx[i * 3 + 1] = i + 1, idx[i * 3 + 2] = (i + 1) % p.n + 1;
+    SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
+    SDL_RenderGeometry(r, nullptr, vs, p.n + 1, idx, p.n * 3);
+}
+
+void outline_poly(SDL_Renderer* r, const View& v, const Poly& p, Rgba edge, float thickness) {
+    for (int i = 0, j = p.n - 1; i < p.n; j = i++) {
+        const float x0 = v.sx(float(p.x[std::size_t(j)])), y0 = v.sy(float(p.y[std::size_t(j)])), x1 = v.sx(float(p.x[std::size_t(i)])), y1 = v.sy(float(p.y[std::size_t(i)]));
+        line(r, x0, y0, x1, y1, edge);
+        if (thickness > 1.2f) line(r, x0, y0 + 1, x1, y1 + 1, edge), line(r, x0 + 1, y0, x1 + 1, y1, edge);
+    }
+}
+
+void ground_picture(SDL_Renderer* r, const View& v, SDL_Texture* t, float wx, float wy, float dx, float dy, float half_fwd, float half_side, int f, int n, Rgba tint) {
+    if (!t || half_fwd <= 0 || half_side <= 0) return;
+    n = n > 0 ? n : 1;
+    f = ((f % n) + n) % n;
+    const float u0 = float(f) / float(n), u1 = float(f + 1) / float(n);
+    const float sx_ = -dy, sy_ = dx;  // across the direction
+    const SDL_FColor col{float(tint.r) / 255.f, float(tint.g) / 255.f, float(tint.b) / 255.f, float(tint.a) / 255.f};
+    auto vert = [&](float fw, float sd, float uu, float vv) {
+        return SDL_Vertex{{v.sx(wx + dx * fw + sx_ * sd), v.sy(wy + dy * fw + sy_ * sd)}, col, {uu, vv}};
+    };
+    const SDL_Vertex vs[4] = {vert(half_fwd, -half_side, u1, 0), vert(half_fwd, half_side, u1, 1), vert(-half_fwd, half_side, u0, 1), vert(-half_fwd, -half_side, u0, 0)};
+    const int idx[6] = {0, 1, 2, 0, 2, 3};
+    SDL_RenderGeometry(r, t, vs, 4, idx, 6);
+}
+
+}  // namespace em::gfx

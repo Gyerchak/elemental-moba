@@ -34,7 +34,7 @@ void Server::load_custom_champions() {
         files.push_back({e.path().filename().string(), std::string((std::istreambuf_iterator<char>(in)), {})});
     }
     std::ranges::sort(files);
-    std::erase_if(files, [](const auto& f) { return f.second.size() > 16'000; });  // [U-383][U-425] the .champ limit (sent whole)
+    std::erase_if(files, [](const auto& f) { return f.second.size() > 64'000; });  // [U-383][U-425] the .champ limit (sent whole)
     auto name_of = [](const std::string& text) {
         ChampionDef d;
         return parse_champion_text(text, d).empty() ? std::string(d.name) : std::string();

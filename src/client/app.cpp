@@ -10,6 +10,7 @@
 #include <chrono>
 #include <format>
 #include <random>
+#include "game/match/maps.hpp"
 
 #include "client/custom_champions.hpp"
 #include "client/locale.hpp"
@@ -28,6 +29,8 @@ App::App(AppOptions o) : opt_(std::move(o)) {
     if (opt_.effects >= 0) set_.apply_fx_preset(std::min(opt_.effects, 3));
     loc::load(set_.language);  // [U-239]
     if (!apply_version(set_.version).empty()) set_.version = kOfficialVersion;  // [U-95] own version (bad file → official)
+    if (!opt_.practice_file.empty() && std::ranges::find(set_.custom_champions, opt_.practice_file) == set_.custom_champions.end())
+        set_.custom_champions.push_back(opt_.practice_file);  // [U-510] the champion maker's test run (saved too, so it stays on)
     load_custom_champions(set_.custom_champions);  // [U-210] before any match — AFTER the version (they copy its numbers)
     // [U-214][U-496][U-501] VULKAN ONLY: SDL's GPU renderer locked to the Vulkan driver (it also runs our SPIR-V shaders)
     const SDL_WindowFlags base = SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY;
@@ -161,6 +164,19 @@ int App::run() {
             return 1;
         }
         connect_local(c.port);
+    }
+    if (!opt_.practice_file.empty() && opt_.autotest_s == 0) {  // [U-510] straight into practice
+        net::ServerConfig c;
+        c.version = set_.version;
+        c.port = std::uint16_t(7790 + std::random_device{}() % 200);
+        c.practice = true;
+        c.ruleset = std::uint8_t(set_.ruleset);
+        c.map = std::clamp(set_.map, 0, int(maps().size()) - 1);
+        c.loopback_only = true;
+        c.host_secret = secret_;
+        std::string err;
+        if (start_server(c, &err)) connect_local(c.port);
+        else status_ = err;
     }
     while (!quit_) {
         ui_.clicked = ui_.rclicked = ui_.backspace = ui_.enter = false;

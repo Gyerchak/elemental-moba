@@ -716,6 +716,14 @@ Additions outside the plan live in `ENGINE-EXTRAS.md`, never here.
 - [U-507] Practice tool only: developer view on Ctrl+Shift+D + a small DEV square next to the AA / QC / CAM squares.
 - [U-508] Bug hunt: graphics, effects, interactions, systems, skills, statuses; a knock-up animation; everything in the engine; Polish for everything not translated; push.
 - [U-509] Halny router (http://192.168.33.1): look for the public IP option and switch it on.
+- [U-510] **Champion maker app:** base hitbox (tied to the model), skill generator with every way to change a skill: shapes (square, rectangle, circle, round shapes, triangle, cone, anything), change with time, sweet spots (edges / centre / custom), type, element or other modifier, crowd control, projectile or not, ALL mechanics of all champions and systems. Test-load a model from files, pick its animations, sounds, effects and view them. Very easy, simple, intuitive. Set all stats and key places easily. Output goes to the custom champions. Very detailed hitbox animation even in the most basic skillshots. Skill graphics match the hitbox size; loop or scale gradually with the cast time and skill length. Wall, resource and terrain reliant skills selectable intuitively. In the build next to everything else; also opens from the game's start menu.
+- [U-511] **Separate server exe:** hosts only, without the game and without joining as a player, with all existing server settings, connected to them; its own language setting.
+- [U-512] Polish locale covers EVERYTHING, also the tool and the server. Voices get their own language version (may be made locally, replacing existing ones).
+- [U-513] **MUD:** own graphic; forms when water on the ground dries into the ground (water source down to 50 %). Mud gives: water (50 % less than water on ground), earth (fully accessible), MUD (a resource for both water and earth benders). Shallow water is a source of water, earth and mud and keeps its shallow water look. Fire on mud instantly turns it into normal ground.
+- [U-514] **Fire lights bug:** they often last far too long and chaotically. They must imitate the remaining fire on the ground that slowly disappears, giving some more vision where there is little.
+- [U-515] **Time:** new moon exactly at 25:00 so the eclipse is realistic; the game starts at the beginning of the night; the comet moves to 29:00.
+- [U-516] Bug hunt in both graphic systems and the engine, skill code, each graphic and animation that could cause game-wide glitches, skills that could cause lag or bugs: fix without changing already set logic. Then push everything.
+- [U-517] **Practice tool sizes:** `_` (minus) makes smaller, `+` makes bigger, for skills and for the model: temporarily (just to check how it turns out) and saved as a setting, an easy way to grow a skill gradually from its existing shape.
 
 ---
 *Hubert continues editing the plan later — new ideas get the next free `[U-xx]` number.*

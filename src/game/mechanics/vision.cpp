@@ -9,7 +9,7 @@ namespace em {
 void cloud_mask(std::span<const Cloud> clouds, std::vector<std::uint8_t>& out) {
     out.assign(std::size_t(kGridSize) * kGridSize, 0);
     for (const Cloud& c : clouds) {
-        if (c.kind == CloudKind::Puddle || c.kind == CloudKind::IcePatch || c.kind == CloudKind::Arrival) continue;  // [U-292][U-293] on the ground: you see over it
+        if (c.kind == CloudKind::Puddle || c.kind == CloudKind::IcePatch || c.kind == CloudKind::Arrival || c.kind == CloudKind::Mud) continue;  // [U-292][U-293] on the ground: you see over it
         const int r = c.radius / kCellUnits, cx = c.x / kCellUnits, cy = c.y / kCellUnits;
         for (int y = cy - r; y <= cy + r; ++y)
             for (int x = cx - r; x <= cx + r; ++x)

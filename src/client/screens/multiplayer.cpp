@@ -8,6 +8,7 @@
 #include "client/app.hpp"
 #include "game/match/maps.hpp"
 #include "client/locale.hpp"
+#include "client/tool_shell.hpp"
 
 namespace em {
 
@@ -223,6 +224,10 @@ void App::host(bool dedicated) {
         else connect_local(c.port);
     }
     if (button(ren_, ui_, x + 320, y, 200, 40, tr("Back"))) go(back_);
+    if (dedicated && button(ren_, ui_, x + 530, y, 240, 40, tr("Server app (no game)"))) {  // [U-511] the separate program
+        std::string err;
+        if (!tool::open_program("em_server", &err)) status_ = err;
+    }
     if (!status_.empty()) text(ren_, x, y + 56, status_, {255, 160, 120}, 1.5f);
     {  // [U-506] my address, ready to copy
         const std::string mine = std::format("{}:{}", lan_address(), port_);

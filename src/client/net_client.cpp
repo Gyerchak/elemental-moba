@@ -370,6 +370,8 @@ void NetClient::handle(const std::uint8_t* data, std::size_t n, double now_s) {
             }
             s.fx.resize(r.get<std::uint16_t>());
             for (auto& f : s.fx) f = r.get<NetFx>();
+            s.fx_polys.resize(r.get<std::uint16_t>());
+            for (auto& f : s.fx_polys) f = r.get<NetFxPoly>();
             s.tethers.resize(r.get<std::uint16_t>());
             for (auto& t : s.tethers) t = r.get<NetTether>();
             if (const std::uint16_t nl = r.get<std::uint16_t>(); nl == 0xffff) {  // [U-280] lights unchanged: keep the last ones

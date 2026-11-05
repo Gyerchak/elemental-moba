@@ -27,6 +27,7 @@ RATE = 22050
 PIPER_MODEL = Path.home() / ".local/share/piper-voices/en/en_US/ryan/high/en_US-ryan-high.onnx"
 
 ANNOUNCE = {  # id: (English, Polish)
+    "awakened": ("A non-bender awakens!", "Nie-mag budzi się!"),
     "first_blood": ("First blood!", "Pierwsza krew!"),
     "enemy_slain": ("An enemy has been slain.", "Wróg został zabity."),
     "ally_slain": ("An ally has been slain.", "Sojusznik został zabity."),
@@ -95,16 +96,31 @@ def announcer(s):
     return out / max(1e-3, np.abs(out).max()) * 0.9
 
 
-def voices():
+def polish_model():
+    """[U-512] a real Polish voice when one is installed (Piper: pl_PL-*.onnx in ~/.local/share/piper-voices/pl/), else espeak-ng."""
+    found = sorted((Path.home() / ".local/share/piper-voices/pl").glob("**/*.onnx"))
+    return found[0] if found else None
+
+
+def voices(only=None):
+    """only: None = both languages, "pl" / "en" = just that one (make_sounds.py --voices pl)"""
     tmp = Path(tempfile.mkdtemp())
+    pl_model = polish_model()
+    print("Polish voice:", pl_model or "espeak-ng (robotic): install a Piper Polish voice for a better one", flush=True)
     for vid, (en, pl) in ANNOUNCE.items():
-        f = tmp / "en.wav"
-        subprocess.run(["piper-tts", "--model", str(PIPER_MODEL), "--output_file", str(f)], input=en.encode(), check=True,
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        save(SND / "en" / "announce" / f"{vid}.wav", announcer(load(f)))
-        g = tmp / "pl.wav"
-        subprocess.run(["espeak-ng", "-v", "pl", "-s", "150", "-p", "35", "-w", str(g), pl], check=True)
-        save(SND / "pl" / "announce" / f"{vid}.wav", announcer(load(g)))
+        if only != "pl":
+            f = tmp / "en.wav"
+            subprocess.run(["piper-tts", "--model", str(PIPER_MODEL), "--output_file", str(f)], input=en.encode(), check=True,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            save(SND / "en" / "announce" / f"{vid}.wav", announcer(load(f)))
+        if only != "en":
+            g = tmp / "pl.wav"
+            if pl_model:
+                subprocess.run(["piper-tts", "--model", str(pl_model), "--output_file", str(g)], input=pl.encode(), check=True,
+                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            else:  # a deeper male variant, a bit slower: less thin than the default voice
+                subprocess.run(["espeak-ng", "-v", "pl+m3", "-s", "138", "-p", "38", "-g", "2", "-w", str(g), pl], check=True)
+            save(SND / "pl" / "announce" / f"{vid}.wav", announcer(load(g)))
         print("voice", vid, flush=True)
 
 
@@ -305,6 +321,10 @@ def effects():
 
 
 if __name__ == "__main__":
+    if "--voices" in sys.argv:  # [U-512] only the voices: --voices pl / --voices en / --voices all
+        which = sys.argv[sys.argv.index("--voices") + 1] if len(sys.argv) > sys.argv.index("--voices") + 1 else "all"
+        voices(None if which == "all" else which)
+        sys.exit(0)
     effects()
     if "--effects-only" not in sys.argv:  # the voices take a while (piper-tts)
         voices()

@@ -57,7 +57,10 @@ cmake --build build
 
 ```sh
 ./build/elemental_moba                      # menu: practice, join, host match, host server, settings
-./build/elemental_moba --server --port 7777 # dedicated headless server, 128 Hz, pick timer 90 s, ranked
+./build/em_champion_maker                   # make champions: skills, shapes, hitbox over time, model, sounds (also in the game menu)
+./build/em_server                           # only the server, with a window for every setting (kept in server.cfg)
+./build/em_server --nogui --port 7777       # the same without any window, for a machine without a screen
+./build/elemental_moba --server --port 7777 # dedicated headless server, 128 Hz, pick timer 90 s, ranked (reads server.cfg too)
 #   options: --pick-seconds N (0 = off) · --unranked (no MMR / LP) · --no-matchmaking
 ```
 

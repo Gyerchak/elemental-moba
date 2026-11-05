@@ -118,6 +118,11 @@ constexpr SpecialRow kSpecialRows[] = {
                       .width = 80, .speed = 900, .cast_ms = 200, .cd_ms = 11'000, .cost = 50, .cc = C::Slow, .cc_ms = 1'000, .cc_val = 30,
                       .move = CastMove::Free, .desc = "A stream that follows your cursor while you hold the key (you can walk meanwhile)",
                       .control = 1}},
+    // [U-513] mud: the one resource both water and earth benders can use
+    {Element::Water, {.name = "Mud Sling", .kind = K::Bolt, .sub = S::Mud, .dmg = 90, .dmg_rank = 35, .ep = 45, .range = 850, .width = 100, .speed = 1'200, .cast_ms = 250,
+                      .cd_ms = 16'000, .cost = 40, .cc = C::Slow, .cc_ms = 1'500, .cc_val = 35, .desc = "Needs mud or shallow water close by: throws mud, slows", .needs = kNeedMud}},
+    {Element::Earth, {.name = "Mud Hurl", .kind = K::Bolt, .sub = S::Mud, .dmg = 90, .dmg_rank = 35, .ep = 45, .range = 850, .width = 100, .speed = 1'200, .cast_ms = 250,
+                      .cd_ms = 16'000, .cost = 40, .cc = C::Slow, .cc_ms = 1'500, .cc_val = 35, .desc = "Needs mud or shallow water close by: throws mud, slows", .needs = kNeedMud}},
 };
 
 }  // namespace em::data

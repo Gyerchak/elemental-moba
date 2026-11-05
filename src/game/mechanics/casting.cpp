@@ -27,8 +27,10 @@ void World::finish_cast(Unit& u) {
     ResolvedAbility r = resolved(u, s);
     // [U-339] water as numbers: from a source = no carried water; the Avatar pays from its small pool
     const bool water_free = water_skill(d) && water_sourced(u, d, u.cast.sx, u.cast.sy);
-    if (water_free && u.stats.resource == ResourceKind::Water) r.cost = 0;
+    const bool from_mud = water_free && only_mud_source(u, u.cast.sx, u.cast.sy);  // [U-513] half a source: half the water is still paid
+    if (water_free && u.stats.resource == ResourceKind::Water) r.cost = from_mud ? r.cost * elements::kMudWaterPct / 100 : 0;
     if (water_skill(d) && u.water_max > 0 && !water_free) u.water = std::max(0, u.water - elements::kAvatarWaterCost);
+    if (from_mud && u.water_max > 0) u.water = std::max(0, u.water - elements::kAvatarWaterCost * elements::kMudWaterPct / 100);
     // pay [U-60..U-64]; comet = free fuel [U-138]
     const bool free_fuel = u.stats.resource == ResourceKind::Fuel && unlimited_fuel(sky);
     const std::int32_t cost = std::int32_t(r.cost * 100);
@@ -113,7 +115,9 @@ void World::cast_skill(Unit& u, Slot slot, std::int32_t tx, std::int32_t ty, std
                            dist2(u.cast.sx, u.cast.sy, u.ux(), u.uy()) <=
                                std::int64_t(d.range + elements::kSourceReachCells * kCellUnits) * (d.range + elements::kSourceReachCells * kCellUnits);
     const bool starts_at_source = (from_source && (d.kind == SkillKind::Bolt || d.kind == SkillKind::Wave || d.kind == SkillKind::Cone)) || from_rock;
-    if (from_source || from_rock) r.range = r.range * elements::kSourceRangePct / 100;
+    const bool mud_water = from_source && water_source_at(u.cast.sx, u.cast.sy) == WaterSource::Mud;  // [U-513]
+    if (from_source || from_rock)
+        r.range = r.range * (mud_water ? 100 + (elements::kSourceRangePct - 100) * elements::kMudWaterPct / 100 : elements::kSourceRangePct) / 100;
     std::int32_t ox = starts_at_source ? u.cast.sx : u.ux(), oy = starts_at_source ? u.cast.sy : u.uy();
     if (from_rock) {  // the rock leaves its place (the whole segment / rock breaks) and flies from just beyond it
         const Dir rd = dir_of(std::int64_t(tx) - ox, std::int64_t(ty) - oy);
@@ -172,7 +176,7 @@ void World::cast_skill(Unit& u, Slot slot, std::int32_t tx, std::int32_t ty, std
     if (from_source && champions()[std::size_t(u.champ)].element == Element::Water) {  // [U-340] the chosen source, form chosen
         e.sub = u.source_ice ? SubElement::Ice : SubElement::Water;
         e.flow = flow_of(e.sub);
-        e.damage = e.damage * (100 + elements::kWaterSourceBonusPct) / 100;
+        e.damage = e.damage * (100 + (mud_water ? elements::kWaterSourceBonusPct * elements::kMudWaterPct / 100 : elements::kWaterSourceBonusPct)) / 100;
     } else if (const int wb = draw_from_water_source(u, e.sub); wb > 0) {  // [U-293] a puddle / ice patch as the source (form chosen)
         e.flow = flow_of(e.sub);
         e.damage = e.damage * (100 + wb) / 100;
@@ -189,6 +193,7 @@ void World::cast_skill(Unit& u, Slot slot, std::int32_t tx, std::int32_t ty, std
     e.tick_ms = d.tick_ms;
     e.light = std::int32_t(r.light_radius);
     if (e.light > 0) e.light_until = 0;  // set when the effect ends
+    if (e.geo != std::uint8_t(Geo::Auto)) e.width = std::int32_t(r.width), e.length = std::int32_t(r.range);  // [U-462][U-510] a chosen shape uses its own numbers at every kind
     const std::int32_t speed_sub = std::int32_t(std::max<std::int64_t>(1, r.speed) * kSub / cfg.tick_hz);
     switch (kind) {
         case SkillKind::Bolt:
@@ -261,7 +266,7 @@ void World::cast_skill(Unit& u, Slot slot, std::int32_t tx, std::int32_t ty, std
             e.kind = FxKind::Cone;
             e.length = std::int32_t(r.range);
             e.width = std::int32_t(r.width);
-            e.end_ms = now_ms + 250;
+            e.end_ms = now_ms + (d.nkeys && dur_ms > 0 ? dur_ms : 250);  // [U-510] a cone with keys lasts as long as it is set to
             Effect& f = spawn_fx(e);
             effect_hits(f);
             scorch(f);  // [U-227][U-244]
@@ -530,7 +535,7 @@ void World::cast_skill(Unit& u, Slot slot, std::int32_t tx, std::int32_t ty, std
             const std::int32_t life = dur_ms > 0 ? dur_ms : std::int32_t(elements::kPuddleMs);
             std::size_t pi = 0;
             switch (from_source ? water_source_at(u.cast.sx, u.cast.sy, &pi) : WaterSource::None) {
-                case WaterSource::Patch: clouds[pi].until_ms = now_ms; break;                               // the puddle moves
+                case WaterSource::Patch: case WaterSource::Mud: clouds[pi].until_ms = now_ms, clouds[pi].used = true; break;                               // the puddle moves
                 case WaterSource::Lasting: drain_water(u.cast.sx, u.cast.sy, rad, life); break;              // the river gives it
                 case WaterSource::IceWall: damage_wall(u.cast.sx / kCellUnits, u.cast.sy / kCellUnits, rad); break;  // melted off
                 default: break;  // from carried water (paid as the skill's cost)

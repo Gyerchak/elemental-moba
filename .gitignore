@@ -17,4 +17,6 @@ resourcepacks/default/champions/aatrox/
 resourcepacks/default/champions/taliyah/
 resourcepacks/default/models/aatrox/
 logs/
-
+server.cfg
+resourcepacks/_maker/
+tools.cfg

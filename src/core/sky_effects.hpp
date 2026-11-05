@@ -38,7 +38,7 @@ inline constexpr int kCometMoonFactor = 2;  // [U-377] comet (fire) = 2 × full 
 
 // [U-124] 0 ms before/after the eclipse middle → 100 %, middle → 0 %, linear between.
 [[nodiscard]] constexpr std::int64_t eclipse_mid_ms(const SkyState& s) {
-    return std::int64_t(s.game_day) * 120'000 + 60'000;  // noon of that game day
+    return eclipse_noon_ms(s.game_day);  // noon of that game day [U-515]
 }
 [[nodiscard]] constexpr int eclipse_factor_pct(const SkyState& s) {
     if (!s.solar_eclipse) return 100;
@@ -109,24 +109,24 @@ inline constexpr int kNoonFuelBonusPct = 30;
 // [U-78] Bloodbending special skill only during full moon.
 [[nodiscard]] constexpr bool bloodbending_allowed(const SkyState& s) { return s.full_moon; }
 
-// Checks. Eclipse #1 24:30–25:30, middle 25:00. The comet lands at 30:00 [U-266].
+// Checks [U-515]: eclipse 25:00-26:00, middle 25:30 (noon). The comet lands at 29:00.
 constexpr SkyState sky_at_s(int sec) { return WorldClock::at_ms(std::int64_t(sec) * 1000); }
-static_assert(eclipse_factor_pct(sky_at_s(24 * 60 + 30)) == 100 && eclipse_factor_pct(sky_at_s(24 * 60 + 45)) == 50);
-static_assert(eclipse_factor_pct(sky_at_s(25 * 60)) == 0 && eclipse_factor_pct(sky_at_s(25 * 60 + 15)) == 50);
-static_assert(element_power_pct(Element::Fire, sky_at_s(25 * 60)) == 0 && sky_boost(Element::Fire, sky_at_s(25 * 60)).muted);
-static_assert(sky_boost(Element::Fire, sky_at_s(24 * 60 + 57)).muted && !sky_boost(Element::Fire, sky_at_s(25 * 60 + 3)).muted);
-static_assert(!sky_boost(Element::Water, sky_at_s(25 * 60)).muted);
-// 25:15: half eclipse × (100 + 5 day) = 52 %. 31:00 (day): 105 % + comet 100 % = 2050 ‰ [U-377].
-static_assert(element_power_pct(Element::Fire, sky_at_s(25 * 60 + 15)) == 52);
+static_assert(eclipse_factor_pct(sky_at_s(25 * 60)) == 100 && eclipse_factor_pct(sky_at_s(25 * 60 + 15)) == 50);
+static_assert(eclipse_factor_pct(sky_at_s(25 * 60 + 30)) == 0 && eclipse_factor_pct(sky_at_s(25 * 60 + 45)) == 50);
+static_assert(element_power_pct(Element::Fire, sky_at_s(25 * 60 + 30)) == 0 && sky_boost(Element::Fire, sky_at_s(25 * 60 + 30)).muted);
+static_assert(sky_boost(Element::Fire, sky_at_s(25 * 60 + 27)).muted && !sky_boost(Element::Fire, sky_at_s(25 * 60 + 33)).muted);
+static_assert(!sky_boost(Element::Water, sky_at_s(25 * 60 + 30)).muted);
+// 25:45: half eclipse × (100 + 5 day) = 52 %. 31:00 (day): 105 % + comet 100 % = 2050 ‰ [U-377].
+static_assert(element_power_pct(Element::Fire, sky_at_s(25 * 60 + 45)) == 52);
 static_assert(sky_boost(Element::Fire, sky_at_s(31 * 60)).power_pm() == 2'050 && sky_boost(Element::Fire, sky_at_s(31 * 60)).size_pct == 150);
 // [U-370] full moon (100 % phase): 1000 + 5 × 100 = 1500 ‰ = +50 %, cooldowns × 0.90; new moon: +0 %
-static_assert(sky_boost(Element::Water, sky_at_s(30 * 60)).power_pm() == 1'500 && sky_boost(Element::Water, sky_at_s(30 * 60)).cd_pct == 90);
-static_assert(sky_boost(Element::Water, sky_at_s(0)).power_pm() == 1'000);
+static_assert(sky_boost(Element::Water, sky_at_s(55 * 60)).power_pm() == 1'500 && sky_boost(Element::Water, sky_at_s(55 * 60)).cd_pct == 90);
+static_assert(sky_boost(Element::Water, sky_at_s(25 * 60)).power_pm() == 1'000);
 static_assert(moon_power_pm(37) == 185);  // 37 % phase → +18.5 %
 static_assert(sky_boost(Element::Earth, sky_at_s(61 * 60)).power_pct == 125 && sky_boost(Element::Earth, sky_at_s(61 * 60)).dot_pct == 125);
 static_assert(sky_boost(Element::None, sky_at_s(61 * 60)).power_pct == 100);  // non-benders: no alignment
-static_assert(fuel_regen_pct(sky_at_s(60)) == 130 && fuel_regen_pct(sky_at_s(30)) == 100);  // noon / sunrise
-static_assert(fuel_regen_pct(sky_at_s(45)) == 115 && fuel_regen_pct(sky_at_s(0)) == 100);   // 09:00 / night
-static_assert(unlimited_fuel(sky_at_s(31 * 60)) && !unlimited_fuel(sky_at_s(34 * 60)) && !unlimited_fuel(sky_at_s(29 * 60)));
+static_assert(fuel_regen_pct(sky_at_s(90)) == 130 && fuel_regen_pct(sky_at_s(60)) == 100);  // noon / sunrise
+static_assert(fuel_regen_pct(sky_at_s(75)) == 115 && fuel_regen_pct(sky_at_s(0)) == 100);   // 09:00 / night
+static_assert(unlimited_fuel(sky_at_s(30 * 60)) && !unlimited_fuel(sky_at_s(33 * 60)) && !unlimited_fuel(sky_at_s(28 * 60)));
 
 }  // namespace em

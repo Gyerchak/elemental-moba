@@ -28,7 +28,7 @@ def strings_from_sources():
     out = set()
     pats = [r'\btrf?\("((?:[^"\\]|\\.)*)"', r'\bhint\("((?:[^"\\]|\\.)*)"', r'\brefuse\(u, "((?:[^"\\]|\\.)*)"', r'\brefuse\(u, std::format\("((?:[^"\\]|\\.)*)"',
             r'\bno\("((?:[^"\\]|\\.)*)"', r'return "((?:[^"\\]|\\.)*)";  ?//']
-    files = [*ROOT.glob("src/client/**/*.cpp"), *ROOT.glob("src/client/**/*.hpp"), *ROOT.glob("src/game/**/*.cpp")]
+    files = [*ROOT.glob("src/client/**/*.cpp"), *ROOT.glob("src/client/**/*.hpp"), *ROOT.glob("src/game/**/*.cpp"), *ROOT.glob("src/apps/*.cpp")]
     for f in files:
         t = f.read_text(errors="replace")
         for p in pats:
@@ -40,6 +40,13 @@ def strings_from_sources():
         for block in re.findall(r"(?:const char\*|std::string_view) k\w+\[\w*\] = \{(.*?)\};", f.read_text(errors="replace"), re.S):
             out |= set(re.findall(r'"((?:[^"\\]|\\.)*)"', block))
     out |= set(re.findall(r'return "((?:[^"\\]|\\.)*)"', (ROOT / "src/client/skill_text.cpp").read_text(errors="replace")))
+    # [U-512] the small apps: their tables hold every label and tip
+    for f in ROOT.glob("src/apps/*.cpp"):
+        for lit in re.findall(r'"((?:[^"\\]|\\.)*)"', f.read_text(errors="replace")):
+            if (" " in lit or lit[:1].isupper()) and "/" not in lit and "\\" not in lit and not lit.startswith(("#", "--", "SDL")) and "." not in lit.split(" ")[0][1:]:
+                out.add(lit)
+    out |= set(re.findall(r'return "(needs [^"]*|only [^"]*)"', (ROOT / "src/game/world.cpp").read_text(errors="replace")))
+    out |= {"Earth", "Water", "Mud", "Rock", "Ice", "Lava", "Tree", "Night", "Day", "Metal", "Fire"}
     return out
 
 

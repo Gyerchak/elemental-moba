@@ -79,7 +79,7 @@ std::vector<std::string> Resources::packs() const {
     std::vector<std::string> out;
     std::error_code ec;
     for (const auto& e : fs::directory_iterator("resourcepacks", ec))
-        if (e.is_directory() && !e.path().filename().string().starts_with("map_")) out.push_back(e.path().filename().string());  // (map packs belong to their map [U-420])
+        if (e.is_directory() && !e.path().filename().string().starts_with("map_") && !e.path().filename().string().starts_with("_")) out.push_back(e.path().filename().string());  // (map packs belong to their map [U-420])
     std::ranges::sort(out);
     return out;
 }

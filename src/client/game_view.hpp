@@ -150,6 +150,11 @@ private:
     int attack_move_ = 0;       // 0 off, 1 anything (D), 2 closest champion only (A) [X-98]
     std::string hint_;
     double hint_t_ = -10;
+    // [U-517] practice tool: temporary sizes, saved on request
+    std::array<std::int16_t, 12> size_pct_{};
+    int model_pct_ = 0, size_slot_ = 1;
+    void save_practice_sizes(NetClient& net);
+    [[nodiscard]] std::string key_of_slot(int slot) const;
     void hint(std::string h);
     bool show_shop_ = false, show_score_ = false, chat_open_ = false;
     std::string chat_text_;

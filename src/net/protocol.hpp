@@ -16,7 +16,8 @@
 
 namespace em::net {
 
-inline constexpr std::uint16_t kProtocol = 22;  // 22: companion cooldown on the HUD [U-508]  // 21: damage types + record, companion / body [U-491..U-495]  // 20: snapshot wall order fixed + end marker [U-487]  // 19: animation info (stage, form, dash) [U-486]  // 18: heal / shield / buff power, polymorph, setup per version [U-483][U-484]  // 17: healing received [U-481]  // 16: switchable Dota features, version mods [U-478]  // 15: LoL AP / magic pen, Dota attributes + statuses [U-474..U-476]  // 14: crits, skill powers, sweet spots + shapes [U-461..U-471]  // 13: cast stages, chains, skill visuals, proc + recast timers [U-456..U-459]  // 12: maps, lobby owner / queue, charges [U-420..U-433]  // 11: rule sets, own emotes [U-414][U-416]  // 7: ten item slots [U-322]; 8: cast sources [U-340]; 9: camps, jungle buffs [U-364..U-366]; 10: bounties, companions [U-407][U-413]
+inline constexpr std::uint16_t kProtocol = 23;  // 23: mud, polygon skills, skill pictures [U-510][U-513]
+//  // 22: companion cooldown on the HUD [U-508]  // 21: damage types + record, companion / body [U-491..U-495]  // 20: snapshot wall order fixed + end marker [U-487]  // 19: animation info (stage, form, dash) [U-486]  // 18: heal / shield / buff power, polymorph, setup per version [U-483][U-484]  // 17: healing received [U-481]  // 16: switchable Dota features, version mods [U-478]  // 15: LoL AP / magic pen, Dota attributes + statuses [U-474..U-476]  // 14: crits, skill powers, sweet spots + shapes [U-461..U-471]  // 13: cast stages, chains, skill visuals, proc + recast timers [U-456..U-459]  // 12: maps, lobby owner / queue, charges [U-420..U-433]  // 11: rule sets, own emotes [U-414][U-416]  // 7: ten item slots [U-322]; 8: cast sources [U-340]; 9: camps, jungle buffs [U-364..U-366]; 10: bounties, companions [U-407][U-413]
 inline constexpr std::uint32_t kSnapshotEnd = 0x5EA1ED07;  // [U-487] last 4 bytes of every snapshot
 inline constexpr std::string_view kVersion = "official-0.1";  // [U-95][X-14]
 inline constexpr std::uint16_t kDefaultPort = 7777;
@@ -266,7 +267,17 @@ struct NetFx {
     std::uint8_t vfill, vglow, vtrail, vflash, vpart, vpad;
     std::uint16_t vmark_ms;
     std::uint8_t geo, szone, ssize, spct;  // [U-461][U-462] shape rule, sweet zone / size, sweet % (0 = none)
-    std::int16_t inner, pad2;
+    std::int16_t inner, sfrom;                  // [U-510] sfrom: where a custom sweet band starts, %
+    std::uint8_t life, pad4;                    // life 0 … 255 of the skill
+    std::int16_t vchamp;                        // [U-510] whose skill (−1 none): its picture and sound come from that champion's slot
+    std::uint8_t vslot, pad3;
+};
+
+// [U-510] the corners of a Geo::Custom skill (few skills: sent apart, so every other effect stays small)
+struct NetFxPoly {
+    std::uint32_t id;
+    std::int8_t pts[24];
+    std::uint8_t n, pad[3];
 };
 
 // [U-456] a chain between a caster and an enemy: pulled to the anchor if still inside the circle when it ends

@@ -32,12 +32,13 @@ inline constexpr std::int32_t kBodySense = 160;     // [X-101] units seen / felt
 // Puddle [U-292]: water lying on the ground (cooled steam). It is NOT a cloud for the eyes — it never blocks vision.
 // IcePatch [U-293]: frozen water on the ground (slippery), also never blocks vision.
 // Arrival [U-350]: the light at the far portal while someone channels towards it (never blocks vision).
-enum class CloudKind : std::uint8_t { Steam, Smoke, Sand, Snow, Puddle, IcePatch, Arrival };
+enum class CloudKind : std::uint8_t { Steam, Smoke, Sand, Snow, Puddle, IcePatch, Arrival, Mud };  // [U-513] Mud: a puddle drying into the ground
 struct Cloud {
     std::int32_t x = 0, y = 0, radius = 0;  // game units
     std::int64_t until_ms = 0;
     CloudKind kind = CloudKind::Steam;
     std::uint32_t owner = 0;  // who made it (portal arrivals end with the channel)
+    bool used = false;        // [U-513] taken as a source: it is gone (a puddle only turns to mud when it dries by itself)
 };
 // cells covered by any cloud (512 × 512, 1 = blocked)
 void cloud_mask(std::span<const Cloud> clouds, std::vector<std::uint8_t>& out);

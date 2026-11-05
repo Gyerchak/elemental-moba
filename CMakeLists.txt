@@ -30,8 +30,20 @@ add_library(em_net STATIC ${EM_NET_SRC} src/client/net_client.cpp)
 target_link_libraries(em_net PUBLIC em_game PkgConfig::ENET)
 file(GLOB_RECURSE EM_CLIENT_SRC CONFIGURE_DEPENDS src/client/*.cpp)
 list(FILTER EM_CLIENT_SRC EXCLUDE REGEX "net_client\\.cpp$")
+# [U-510][U-511] what the game, the champion maker and the server app share
+set(EM_UI_SRC src/client/draw.cpp src/client/locale.cpp src/client/tool_shell.cpp src/client/sprites.cpp src/client/resources.cpp
+    src/client/audio.cpp src/client/settings.cpp src/client/custom_champions.cpp)
+list(FILTER EM_CLIENT_SRC EXCLUDE REGEX "/(draw|locale|tool_shell|sprites|resources|audio|settings|custom_champions)\\.cpp$")
+add_library(em_ui STATIC ${EM_UI_SRC})
+target_link_libraries(em_ui PUBLIC em_game PkgConfig::SDL3 PkgConfig::SDL3TTF)
 add_executable(elemental_moba src/main.cpp ${EM_CLIENT_SRC})
-target_link_libraries(elemental_moba PRIVATE em_net PkgConfig::SDL3 PkgConfig::SDL3TTF)
+target_link_libraries(elemental_moba PRIVATE em_ui em_net)
+# [U-510] the champion maker
+add_executable(em_champion_maker src/apps/champion_maker.cpp)
+target_link_libraries(em_champion_maker PRIVATE em_ui)
+# [U-511] the server only: without the game, without joining as a player
+add_executable(em_server src/apps/server_app.cpp)
+target_link_libraries(em_server PRIVATE em_ui em_net)
 
 # [U-197] generates the placeholder default resource pack (run once: ./build/make_default_pack)
 add_executable(make_default_pack tools/make_default_pack.cpp)

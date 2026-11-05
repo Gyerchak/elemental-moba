@@ -78,7 +78,7 @@ void Server::receive(int pid, Reader& r) {
             if (!world_ || !p.unit) break;
             const Cmd c = r.get<Cmd>();
             if (r.bad()) break;
-            if (!cfg_.practice && (c.kind == CmdKind::CheatGold || c.kind == CmdKind::CheatLevel || c.kind == CmdKind::CheatNoCooldowns))
+            if (!cfg_.practice && (c.kind == CmdKind::CheatGold || c.kind == CmdKind::CheatLevel || c.kind == CmdKind::CheatNoCooldowns || c.kind == CmdKind::PracticeSize))
                 break;  // [X-24]
             world_->command(p.unit, c);
             break;

@@ -18,6 +18,7 @@
 
 #include "client/app.hpp"
 #include "net/server.hpp"
+#include "net/server_config.hpp"
 
 namespace {
 std::stop_source g_stop;
@@ -53,11 +54,13 @@ int main(int argc, char** argv) {
     std::atexit(enet_deinitialize);
     em::net::ServerConfig scfg;
     em::AppOptions opt;
+    for (int i = 1; i < argc; ++i)  // [U-511] the server app's settings count here too; options below override them
+        if (std::string_view(argv[i]) == "--server") em::net::load_server_cfg(scfg);
     bool dedicated = false;
     for (int i = 1; i < argc; ++i) {
         const std::string a = argv[i];
         auto next = [&] { return i + 1 < argc ? std::string(argv[++i]) : std::string(); };
-        if (a == "--server") dedicated = true, scfg.pick_seconds = 90;  // [U-276] dedicated: lobby timer on
+        if (a == "--server") dedicated = true, scfg.pick_seconds = std::filesystem::exists(em::net::kServerCfgFile) ? scfg.pick_seconds : 90;  // [U-276] dedicated: lobby timer on
         else if (a == "--pick-seconds") scfg.pick_seconds = std::atoi(next().c_str());
         else if (a == "--map") scfg.map = std::max(0, em::map_index(next()));        // [U-420] e.g. --map twisted_grove
         else if (a == "--queue") scfg.queue_mode = true;                              // [U-423] matchmaking queue
@@ -72,6 +75,7 @@ int main(int argc, char** argv) {
         else if (a == "--autotest") opt.autotest_s = std::atoi(next().c_str());
         else if (a == "--shot") opt.shot = next();
         else if (a == "--lang") opt.lang = next();  // [U-508] this run only
+        else if (a == "--practice-with") opt.practice_file = next();  // [U-510] the champion maker's test button
         else if (a == "--quality") opt.quality = std::atoi(next().c_str());  // [U-502] this run only: 0 … 3
         else if (a == "--effects") opt.effects = std::atoi(next().c_str());  // this run only: 0 none … 3 high
         else if (a == "--shots") opt.shots = std::max(1, std::atoi(next().c_str()));  // [U-446]

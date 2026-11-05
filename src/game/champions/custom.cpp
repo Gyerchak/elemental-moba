@@ -19,6 +19,7 @@ namespace em {
 
 namespace {
 std::deque<std::string> g_strings;  // keeps names alive (ChampionDef stores string_view)
+std::deque<BodyDef> g_bodies;       // [U-510] own hitboxes (ChampionDef stores a pointer)
 
 std::string trim(std::string s) {
     while (!s.empty() && (s.back() == ' ' || s.back() == '\t' || s.back() == '\r')) s.pop_back();
@@ -31,14 +32,16 @@ std::string trim(std::string s) {
 constexpr std::string_view kKinds[] = {"None", "Bolt", "Wave", "Burst", "Field", "Cone", "Dash", "Wall", "Pillar", "Tornado", "Shield",
                                        "Heal", "Haste", "Blink", "Lantern", "WindSense", "Flight", "SelfFreeze", "Bloodbend", "Boulder",
                                        "Passive", "WaterSpout", "IcePath", "Redirect", "AvatarState", "MagicStance", "StonePush", "Transform", "MoveWater"};
-constexpr std::string_view kGeos[] = {"Auto", "Circle", "Ring", "Line", "Rect", "Cone", "Arc"};  // [U-462]
-constexpr std::string_view kZones[] = {"Auto", "Centre", "Edge", "Tip"};                       // [U-461]
+constexpr std::string_view kGeos[] = {"Auto", "Circle", "Ring", "Line", "Rect", "Cone", "Arc", "Square", "Triangle", "Ellipse", "Diamond", "Hexagon", "Star", "Custom"};  // [U-462][U-510]
+constexpr std::string_view kZones[] = {"Auto", "Centre", "Edge", "Tip", "Band"};               // [U-461][U-510]
 constexpr std::string_view kSubs[] = {"Water", "Ice", "Wood", "Blood", "Mud", "Steam", "Air", "Earth", "Lava", "Metal", "EarthArmor",
                                       "MetalArmor", "Fire", "BlueFire", "Lightning", "Combustion", "Physical"};
 constexpr std::string_view kStatuses[] = {"Stun", "Root", "Slow", "Silence", "Mute", "Airborne", "Frozen", "Blind", "Burn", "Shield",
                                           "Haste", "Flying", "Bloodbound", "Channel", "Swimming", "WaterRide", "Redirect", "Wet", "Grievous", "Fear", "Disarm", "Subdue", "Hex", "Break", "DebuffImmune", "Polymorph", "Invisible", "None"};
 // [U-474] "ChiBlock" = the chi block status (its wire / enum name is Mute)
 int status_index(std::string_view v);
+constexpr std::string_view kPassives[] = {"None", "InnerFlame", "Static", "Rooted", "MetalSkin", "Molten", "Tide", "Frostbite", "LightFeet", "MistForm",
+                                          "ChiFlow", "SeismicSense", "HeatSense", "FireInHand", "Lantern", "WindSense", "ElementalCycle"};
 constexpr std::string_view kElements[] = {"Water", "Earth", "Fire", "Air", "None"};
 constexpr std::string_view kResources[] = {"Water", "Fuel", "None", "Ammo", "Energy", "Rage", "Mana"};
 constexpr std::string_view kRoles[] = {"Mage", "Marksman", "Fighter", "Tank", "Assassin", "Support"};
@@ -114,6 +117,27 @@ const std::vector<SkillDef>& skill_templates() {
             s.stages[1] = {.kind = SkillKind::Cone, .range = 450, .width = 340, .dmg_pct = 125, .geo = Geo::Cone};
             s.stages[2] = {.kind = SkillKind::Burst, .range = 220, .radius = 200, .dmg_pct = 150, .geo = Geo::Circle, .sweet_zone = SweetZone::Centre};
         });
+        // [U-510][U-513] more shapes and mud
+        add("@square_slam", "A square slam at a point", [](SkillDef& s) { s.kind = SkillKind::Burst, s.geo = Geo::Square, s.range = 700, s.radius = 180, s.delay_ms = 400; });
+        add("@triangle_fan", "A straight-edged fan from you, the far side widest", [](SkillDef& s) { s.kind = SkillKind::Cone, s.geo = Geo::Triangle, s.range = 500, s.width = 380; });
+        add("@star_field", "A star on the ground that hurts every half second", [](SkillDef& s) {
+            s.kind = SkillKind::Field, s.geo = Geo::Star, s.range = 800, s.radius = 260, s.dmg = 20, s.dmg_rank = 10, s.dur_ms = 3'000, s.tick_ms = 500;
+        });
+        add("@ellipse_blast", "A long oval blast along your aim", [](SkillDef& s) { s.kind = SkillKind::Burst, s.geo = Geo::Ellipse, s.range = 700, s.radius = 280, s.width = 200, s.delay_ms = 500; });
+        add("@growing_bolt", "A projectile that grows as it flies", [](SkillDef& s) {
+            s.kind = SkillKind::Bolt, s.range = 1'000, s.width = 90, s.speed = 1'300, s.pierce = true, s.nkeys = 2;
+            s.keys[0] = {.at = 0, .size = 40, .len = 40};
+            s.keys[1] = {.at = 100, .size = 200, .len = 200};
+        });
+        add("@sweeping_line", "A line from you that turns while it lasts", [](SkillDef& s) {
+            s.kind = SkillKind::Cone, s.geo = Geo::Line, s.range = 550, s.width = 90, s.dur_ms = 800, s.nkeys = 2;
+            s.keys[0] = {.at = 0, .rot = -60};
+            s.keys[1] = {.at = 100, .rot = 60};
+        });
+        add("@mud_shot", "Throws mud that slows: needs mud or shallow water close by", [](SkillDef& s) {
+            s.kind = SkillKind::Bolt, s.sub = SubElement::Mud, s.range = 800, s.width = 90, s.speed = 1'200, s.cc = StatusKind::Slow, s.cc_ms = 1'500,
+            s.cc_val = 30, s.needs = kNeedMud;
+        });
         return v;
     }();
     return t;
@@ -137,10 +161,10 @@ const SkillDef* find_skill(std::string_view name) {
 
 // Parses one file into `out`; returns "" when everything is fine, else the reason.
 std::string parse_text(const std::string& text, ChampionDef& out) {
-    if (text.size() > 16'000) return "the file is too big (max 16 000 bytes)";
+    if (text.size() > 64'000) return "the file is too big (max 64 000 bytes)";
     std::istringstream in(text.starts_with("\xEF\xBB\xBF") ? text.substr(3) : text);  // a UTF-8 BOM from an editor
     std::string line, name;
-    bool has_base = false;
+    bool has_base = false, custom_body_active = false;
     int n = 0;
     while (std::getline(in, line)) {
         ++n;
@@ -236,6 +260,27 @@ std::string parse_text(const std::string& text, ChampionDef& out) {
         else if (k == "intelligence_per_level") ok = decimal(out.int_lvl);
         else if (k == "crits") {  // [U-463] its autoattacks can crit (crit stats shown)
             out.crits = v == "1" || v == "yes";
+        } else if (k == "model_size") {  // [U-510][U-517] +% model and hitbox size
+            std::int32_t x = out.model_size / 100;
+            ok = number(x, 1);
+            out.model_size = std::clamp(x, -50, 300) * 100;
+        } else if (k == "body") {  // [U-510] the base hitbox
+            constexpr std::string_view kNames[] = {"Humanoid", "Slim", "Broad", "Beast"};
+            const int e = enum_of(kNames, v);
+            if (e < 0) return std::format("line {}: body = Humanoid / Slim / Broad / Beast", n);
+            out.body = e == 0 ? &kHumanoidBody : e == 1 ? &kSlimBody : e == 2 ? &kBroadBody : &kBeastBody;
+        } else if (k.starts_with("body.part") && k.size() == 10 && k[9] >= '1' && k[9] <= '6') {  // body.part1 = fwd side radius swing
+            std::istringstream ws{std::string(v)};
+            int fw = 0, sd = 0, rd = 0, sw = 0;
+            if (!(ws >> fw >> sd >> rd)) return std::format("line {}: write forward side radius [swing]", n);
+            ws >> sw;
+            const std::size_t part = std::size_t(k[9] - '1');
+            BodyDef b = custom_body_active ? g_bodies.back() : BodyDef{};
+            b.parts[part] = {std::int16_t(std::clamp(fw, -300, 300)), std::int16_t(std::clamp(sd, -300, 300)), std::int16_t(std::clamp(rd, 2, 300)), std::int16_t(std::clamp(sw, -40, 40))};
+            b.n = std::uint8_t(std::max<int>(b.n, int(part) + 1));
+            if (!custom_body_active) g_bodies.push_back(b), custom_body_active = true;
+            else g_bodies.back() = b;
+            out.body = &g_bodies.back();
         } else if (k == "resource_max") ok = number(out.res_max, 100);
         else if (k == "resource_regen") ok = number(out.res_regen, 100);
         else if (k == "hp_per_level") ok = number(out.hp_lvl, 100);
@@ -449,6 +494,58 @@ std::string parse_text(const std::string& text, ChampionDef& out) {
             else if (f == "vis.flash") ok = num(sk.vis.flash, 0, 1);
             else if (f == "vis.particles") ok = num(sk.vis.particles, 0, 40);
             else if (f == "vis.mark_ms") ok = num(sk.vis.mark_ms, 0, 30'000);
+            else if (f == "vis.sheet") sk.vis.sheet = keep(v);  // [U-510] a picture on the hitbox: skills/<file>
+            else if (f == "vis.frames") ok = num(sk.vis.frames, 1, 64);
+            else if (f == "vis.fps") ok = num(sk.vis.fps, 1, 60);
+            else if (f == "vis.mode") ok = num(sk.vis.mode, 0, 2);
+            else if (f == "sweet_from") ok = num(sk.sweet_from, 0, 100);       // [U-510]
+            else if (f == "key_loop_ms") ok = num(sk.key_loop_ms, 0, 60'000);
+            else if (f.size() == 4 && f.starts_with("key") && f[3] >= '1' && f[3] <= '6') {  // w.key1 = at size length turn forward
+                std::istringstream ws{std::string(v)};
+                int at = 0, size = 100, len = 100, rot = 0, fwd = 0;
+                if (!(ws >> at >> size)) return std::format("line {}: write at% size% [length%] [turn] [forward]", n);
+                len = size;
+                ws >> len >> rot >> fwd;
+                const std::size_t ki = std::size_t(f[3] - '1');
+                sk.keys[ki] = {std::uint8_t(std::clamp(at, 0, 100)), std::int16_t(std::clamp(size, 0, 1000)), std::int16_t(std::clamp(len, 0, 1000)),
+                               std::int16_t(std::clamp(rot, -3600, 3600)), std::int16_t(std::clamp(fwd, -3000, 3000))};
+                sk.nkeys = std::uint8_t(std::max<int>(sk.nkeys, int(ki) + 1));
+            }
+            else if (f == "poly") {  // w.poly = 100,0 40,60 -80,60 … (forward,side in % of the radius, at most 12 corners)
+                std::istringstream ws{std::string(v)};
+                std::string pt;
+                sk.npoly = 0;
+                while (ws >> pt && sk.npoly + 1 < sk.poly.size()) {
+                    const auto cm = pt.find(',');
+                    if (cm == std::string::npos) return std::format("line {}: corners are forward,side", n);
+                    sk.poly[sk.npoly++] = std::int8_t(std::clamp(std::atoi(pt.c_str()), -127, 127));
+                    sk.poly[sk.npoly++] = std::int8_t(std::clamp(std::atoi(pt.c_str() + cm + 1), -127, 127));
+                }
+            }
+            else if (f == "needs") {  // [U-510] what it relies on: needs = Mud Earth … (kNeedNames)
+                sk.needs = 0;
+                std::string word;
+                std::istringstream ws{std::string(v)};
+                while (ws >> word) {
+                    const int e = enum_of(kNeedNames, word);
+                    if (e < 0) return std::format("line {}: unknown need '{}' (Earth Water Mud Rock Ice Lava Tree Night Day Metal Fire)", n, word);
+                    sk.needs |= std::uint16_t(1u << e);
+                }
+            }
+            else if (f == "needs_range") ok = num(sk.needs_range, 32, 3'000);
+            else if (f == "light_ms") ok = num(sk.light_ms, 0, 60'000);
+            else if (f == "reach_height") ok = num(sk.reach_height, -1, 2'000);
+            else if (f == "destroys_trees") ok = num(sk.destroys_trees, -1, 1);
+            else if (f == "burns_ground") ok = num(sk.burns_ground, -1, 1);
+            else if (f == "air_use") ok = num(sk.air_use, 0, 255);
+            else if (f == "interrupt") ok = num(sk.interrupt, 0, 65'535);
+            else if (f == "stop_on") ok = num(sk.stop_on, 0, 65'535);
+            else if (f == "pass_on_kill") ok = num(sk.pass_on_kill, 0, 65'535);
+            else if (f == "passive") {  // [U-510] an always-on passive of this skill
+                const int e = enum_of(kPassives, v);
+                if (e < 0) return std::format("line {}: unknown passive '{}'", n, v);
+                sk.passive = PassiveId(e);
+            }
             else if (f == "self_root_ms") ok = num(sk.self_root_ms, -1, 5'000);  // [U-434]
             else if (f == "charges") ok = num(sk.charges, 0, 9);               // [U-433]
             else if (f == "charge_ms") ok = num(sk.charge_ms, 0, 600'000);
@@ -532,5 +629,11 @@ std::string parse_text(const std::string& text, ChampionDef& out) {
 }  // namespace
 
 std::string parse_champion_text(const std::string& text, ChampionDef& out) { return parse_text(text, out); }
+
+std::vector<std::pair<std::string_view, std::string_view>> skill_template_list() {
+    std::vector<std::pair<std::string_view, std::string_view>> out;
+    for (const SkillDef& s : skill_templates()) out.push_back({s.name, s.desc});
+    return out;
+}
 
 }  // namespace em

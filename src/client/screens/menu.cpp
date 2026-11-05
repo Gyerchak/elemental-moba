@@ -6,6 +6,7 @@
 #include "client/app.hpp"
 #include "game/match/maps.hpp"
 #include "client/locale.hpp"
+#include "client/tool_shell.hpp"
 
 namespace em {
 
@@ -56,6 +57,11 @@ void App::menu() {
     if (button(ren_, ui_, rx, ry, bw, bh, tr("Loadout setups (runes, trees, keystones)"))) back_ = Screen::Menu, go(Screen::Setups);  // [U-178]
     ry += bh + gap;
     if (button(ren_, ui_, rx, ry, bw, bh, tr("Champions (all numbers)"))) back_ = Screen::Menu, go(Screen::ChampionInfo);  // [U-187]
+    ry += bh + gap;
+    if (button(ren_, ui_, rx, ry, bw, bh, tr("Champion maker"))) {  // [U-510]
+        std::string err;
+        if (!tool::open_program("em_champion_maker", &err)) status_ = err;
+    }
     ry += bh + gap;
     if (button(ren_, ui_, rx, ry, bw, bh, tr("Own champions"))) back_ = Screen::Menu, go(Screen::CustomChampions);  // [U-210]
     ry += bh + gap;

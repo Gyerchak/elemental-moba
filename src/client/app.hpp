@@ -37,6 +37,7 @@ struct AppOptions {
     bool windowed = false;     // force a window (tests / two screens)
     int quality = -1, effects = -1;  // [U-502] --quality / --effects: this run only
     std::string lang;                 // [U-508] --lang: this run only
+    std::string practice_file;        // [U-510] --practice-with <file.champ>: straight into practice with this own champion
     int shots = 1;             // [U-446] autotest: this many screenshots, one per frame
     bool shot_select = false;  // autotest: screenshot of champion select (loadout open) instead of the match, then quit
 };

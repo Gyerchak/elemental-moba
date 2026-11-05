@@ -8,6 +8,8 @@
 #include <cmath>
 #include <format>
 
+#include <fstream>
+#include "client/custom_champions.hpp"
 #include "client/locale.hpp"
 #include "client/modifiers.hpp"
 #include "game/mobs/monsters.hpp"
@@ -346,15 +348,19 @@ bool GameView::source_at(const NetClient& net, float wx, float wy, const SkillDe
                 return true;
         return false;
     }
-    if (d && d->sub == SubElement::Earth)  // [U-378] earth: a rock (any stone wall)
-        return wx >= 0 && wy >= 0 && Grid::in_bounds(cx, cy) && net.seen.at(cx, cy).wall() == Wall::Stone;
+    if (d && d->sub == SubElement::Earth) {  // [U-378] earth: a rock (any stone wall); [U-513] mud, shallow water
+        if (wx >= 0 && wy >= 0 && Grid::in_bounds(cx, cy) && (net.seen.at(cx, cy).wall() == Wall::Stone || net.seen.at(cx, cy).surface() == Surface::Water)) return true;
+        for (const auto& c : net.cur.clouds)
+            if (c.kind == std::uint8_t(CloudKind::Mud) && (c.x - wx) * (c.x - wx) + (c.y - wy) * (c.y - wy) <= float(c.radius) * float(c.radius)) return true;
+        return false;
+    }
     if (wx >= 0 && wy >= 0 && Grid::in_bounds(cx, cy)) {
         const Cell c = net.seen.at(cx, cy);
         const Surface s = c.surface();
         if (c.wall() == Wall::Ice || s == Surface::Water || s == Surface::DeepWater || s == Surface::Glacier) return true;
     }
     for (const auto& c : net.cur.clouds)
-        if ((c.kind == std::uint8_t(CloudKind::Puddle) || c.kind == std::uint8_t(CloudKind::IcePatch)) &&
+        if ((c.kind == std::uint8_t(CloudKind::Puddle) || c.kind == std::uint8_t(CloudKind::IcePatch) || c.kind == std::uint8_t(CloudKind::Mud)) &&
             (c.x - wx) * (c.x - wx) + (c.y - wy) * (c.y - wy) <= float(c.radius) * float(c.radius))
             return true;
     return false;
@@ -397,7 +403,57 @@ void GameView::hint(std::string h) {
     hint_t_ = last_frame_;
 }
 
+// [U-517] saved for real: an own champion's file gets the changes; a built-in champion gets its own tuned copy (a file in
+// custom_champions/, on from the next match). Q and the specials are shared by many champions: they stay a temporary test.
+std::string GameView::key_of_slot(int slot) const {
+    static constexpr const char* kKeys[] = {"P", "Q", "W", "E", "R", "T", "Y", "F", "G"};
+    return slot >= 0 && slot < int(std::size(kKeys)) ? kKeys[slot] : "?";
+}
+
+void GameView::save_practice_sizes(NetClient& net) {
+    const net::NetMe& me = net.cur.me;
+    const DrawUnit* mu = me_unit();
+    if (!mu || mu->u.champ < 0) return;
+    const ChampionDef& c = champions()[std::size_t(mu->u.champ)];
+    std::string lines;
+    const std::pair<int, const SkillDef*> list[] = {{int(Slot::P), &c.p}, {int(Slot::W), &c.w}, {int(Slot::E), &c.e}, {int(Slot::R), &c.r}, {int(Slot::T), &c.t}, {int(Slot::Y), &c.y}};
+    static constexpr const char* kNames = "p.w.e.r.t.y.";
+    int i = 0;
+    for (const auto& [slot, sk] : list) {
+        const int g = size_pct_[std::size_t(slot) % size_pct_.size()];
+        const char letter = kNames[i++ * 2];
+        if (!g) continue;
+        const std::string mult = std::format("*{:.2f}", 1.0 + g / 100.0);
+        if (sk->radius > 0) lines += std::format("{}.radius = {}\n", letter, mult);
+        if (sk->width > 0) lines += std::format("{}.width = {}\n", letter, mult);
+        if (sk->range > 0 && (sk->kind == SkillKind::Cone || sk->geo == Geo::Line || sk->geo == Geo::Arc || sk->geo == Geo::Cone)) lines += std::format("{}.range = {}\n", letter, mult);
+    }
+    if (model_pct_) lines += std::format("model_size = {:+}\n", model_pct_);
+    if (lines.empty()) return hint(tr("nothing to save: Q and specials stay a test (shared skills)"));
+    namespace fs = std::filesystem;
+    std::error_code ec;
+    fs::create_directories("custom_champions", ec);
+    const bool own = int(mu->u.champ) >= builtin_champion_count();
+    std::string file;
+    if (own) {
+        for (const CustomChampionFile& f : scan_custom_champions())
+            if (f.name == c.name) file = f.file;
+    }
+    std::string text;
+    if (file.empty()) {  // a built-in champion: its own tuned copy (the name must stay short)
+        const std::string name = std::string(c.name).substr(0, 18) + " Tuned";
+        file = name + ".champ";
+        if (!fs::exists(fs::path("custom_champions") / file, ec)) text = std::format("base = {}\nname = {}\n", c.name, name);
+    }
+    std::ofstream out(fs::path("custom_champions") / file, std::ios::app);
+    out << text << "# saved from the practice tool\n" << lines;
+    if (!out) return hint(tr("could not save the sizes"));
+    (void)me;
+    hint(trf("saved in custom_champions/{} (from the next match)", file));
+}
+
 void GameView::cast_key(NetClient& net, int slot, bool from_click) {
+    size_slot_ = slot;  // [U-517]
     const SkillDef* d = skill_of(net, slot);
     if (!d) return;
     if (pending_ == slot && src_x_ >= 0 && (set_.quick(slot) || force_quick_)) {  // [U-450] quick cast: 2nd press = throw at the cursor
@@ -483,9 +539,33 @@ void GameView::handle_event(const SDL_Event& e, NetClient& net) {
                 hint(set_.dev_mode ? "developer view on" : "developer view off");
                 return;
             }
+            if (sc == SDL_SCANCODE_S && net.practice) return save_practice_sizes(net);  // [U-517]
+            if (sc == SDL_SCANCODE_R && net.practice) {  // [U-517] back to normal
+                for (std::size_t i = 0; i < size_pct_.size(); ++i)
+                    if (size_pct_[i]) net.send_cmd({.kind = CmdKind::PracticeSize, .slot = std::uint8_t(i), .y = 1});
+                net.send_cmd({.kind = CmdKind::PracticeSize, .slot = 255, .y = 1});
+                size_pct_ = {}, model_pct_ = 0;
+                hint(tr("practice sizes: back to normal"));
+                return;
+            }
             if (sc == SDL_SCANCODE_N) net.send_cmd({.kind = CmdKind::CheatNoCooldowns});
             if (sc == SDL_SCANCODE_G) net.send_cmd({.kind = CmdKind::CheatGold});
             if (sc == SDL_SCANCODE_L) net.send_cmd({.kind = CmdKind::CheatLevel});
+            return;
+        }
+        // [U-517] practice tool: − / _ smaller, = / + bigger, 5 % at a time: the last skill used; with Ctrl: the model
+        if (net.practice && (sc == SDL_SCANCODE_MINUS || sc == SDL_SCANCODE_EQUALS || sc == SDL_SCANCODE_KP_MINUS || sc == SDL_SCANCODE_KP_PLUS)) {
+            const int step = sc == SDL_SCANCODE_MINUS || sc == SDL_SCANCODE_KP_MINUS ? -5 : 5;
+            if (ctrl) {
+                model_pct_ = std::clamp(model_pct_ + step, -50, 200);
+                net.send_cmd({.kind = CmdKind::PracticeSize, .slot = 255, .x = step});
+                hint(trf("model size {:+} % (Ctrl+Shift+S saves, Ctrl+Shift+R resets)", model_pct_));
+            } else {
+                std::int16_t& g = size_pct_[std::size_t(size_slot_) % size_pct_.size()];
+                g = std::int16_t(std::clamp(g + step, -80, 400));
+                net.send_cmd({.kind = CmdKind::PracticeSize, .slot = std::uint8_t(size_slot_), .x = step});
+                hint(trf("skill {} size {:+} % (Ctrl+Shift+S saves, Ctrl+Shift+R resets)", key_of_slot(size_slot_), int(g)));
+            }
             return;
         }
         // [U-246] Ctrl+1…6 = emotes (laugh, taunt, dance, joke, wave, cheer)
@@ -1131,7 +1211,11 @@ void GameView::draw_indicator(NetClient& net) {
     const std::int32_t ax = caster || range <= 0 ? ux : px, ay = caster || range <= 0 ? uy : py;
     if (d->geo != Geo::Auto)
         s = fx_shape(fk, ax, ay, std::int32_t(radius), std::int32_t(width), std::int32_t(range), dir, flow, 1, local_tick_, std::uint8_t(d->geo), d->inner);
-    if (!s.empty()) {
+    if (geo_is_poly(d->geo)) {  // [U-510] the exact polygon
+        const Poly pl = fx_poly(fk, ax, ay, std::int32_t(std::max(radius, width / 2)), std::int32_t(width), std::int32_t(range), dir, d->geo, d->poly.data(), d->npoly);
+        fill_poly(r_, view_, pl, {255, 255, 255, 40});
+        outline_poly(r_, view_, pl, edge, 2);
+    } else if (!s.empty()) {
         fill_shape(r_, view_, s, {255, 255, 255, 40});
         outline_shape(r_, view_, s, edge, 2);  // exact edges of the skill [U-131]
         if (d->inner > 0) ground_ring(r_, view_, float(ax), float(ay), float(d->inner), {255, 255, 255, 160}, 40);
@@ -1147,7 +1231,7 @@ void GameView::draw_indicator(NetClient& net) {
                             std::max(1, std::int32_t(range * float(sz) / 100.f)), std::max(16, std::int32_t(width)), Flow::Plain, 0, 0);
             lx = float(ux) + float(dir.x) / kOne * (range - range * float(sz) / 200.f), ly = float(uy) + float(dir.y) / kOne * (range - range * float(sz) / 200.f);
         } else {
-            sw = sweet_shape(fk, d->geo, z, sz, ax, ay, std::int32_t(std::max(radius, 48.f)), std::int32_t(width), std::int32_t(range), dir);
+            sw = sweet_shape(fk, d->geo, z, sz, ax, ay, std::int32_t(std::max(radius, 48.f)), std::int32_t(width), std::int32_t(range), dir, d->sweet_from);
             if (!sw.empty()) lx = float(sw.c[sw.n / 2].x), ly = float(sw.c[sw.n / 2].y);
         }
         if (!sw.empty()) {
@@ -1468,7 +1552,15 @@ void GameView::play_sounds(NetClient& net) {
         const std::string el = SubElement(f.sub) == SubElement::Lightning ? std::string("Lightning")
                                                                            : std::string(element_name(base_element(SubElement(f.sub))));
         const std::string name = std::string("fx/") + kShape[std::min<int>(f.kind, int(std::size(kShape)) - 1)] + "_" + el;
-        if (res_.sound(name)) at(name, float(f.x), float(f.y), float(kHearLoud));
+        // [U-510] a champion's own sound for this skill: sounds/champions/<id>/cast_<p|w|e|r|t|y>.wav
+        const Sound* own = nullptr;
+        std::string own_name;
+        if (f.vchamp >= 0) {
+            own_name = "champions/" + Resources::champion_id(f.vchamp) + "/cast_" + std::string(1, "pwerty"[std::min<int>(f.vslot, 5)]);
+            own = res_.sound(own_name);
+        }
+        if (own) at(own_name, float(f.x), float(f.y), float(kHearLoud));
+        else if (res_.sound(name)) at(name, float(f.x), float(f.y), float(kHearLoud));
         else if (k != FxKind::Steam) at(k == FxKind::Auto || k == FxKind::TowerShot ? "auto_ranged" : "cast_" + el, float(f.x), float(f.y), float(kHearLoud));
     }
     // [U-259] my own events: level up, buying / selling, gold, refused orders

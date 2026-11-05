@@ -159,14 +159,15 @@ void status_modifiers(std::uint32_t bits, std::vector<ModView>& out) {
 }
 
 NextEvent next_sky_event(std::int64_t ms) {
-    // event starts in real time: eclipses = sunrise of game days 12 and 17, full moon = day 15 (and every 30 days),
-    // comet 30:00, alignment 60:00
+    // event starts in real time [U-515]: new moon + eclipse 25:00 (every 60:00), full moon 55:00, comet 29:00, alignment 60:00
     NextEvent best{"", 0};
     auto consider = [&](const char* name, std::int64_t at) {
         if (at > ms && (best.name.empty() || at - ms < best.in_ms)) best = {tr(name), at - ms};
     };
-    for (int d : WorldClock::kEclipseDays) consider("Solar eclipse", std::int64_t(d) * 120'000 + 30'000);
-    for (int c = 0; c < 4; ++c) consider("Full moon", (std::int64_t(WorldClock::kFullMoonAge) + c * WorldClock::kMoonCycleDays) * 120'000);
+    for (int c = 0; c < 4; ++c) {
+        consider("Solar eclipse", WorldClock::kNewMoonMs + c * WorldClock::kMoonCycleMs);
+        consider("Full moon", WorldClock::kNewMoonMs + WorldClock::kMoonCycleMs / 2 + c * WorldClock::kMoonCycleMs);
+    }
     consider("Comet", WorldClock::kCometMs);
     consider("Planetary alignment", WorldClock::kAlignStartMs);
     return best;
