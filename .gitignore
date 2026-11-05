@@ -11,6 +11,8 @@ art/raw/
 # local test copies of other games' champions — never publish
 custom_champions/aatrox.champ
 custom_champions/taliyah.champ
+custom_champions/_server/aatrox.champ
+custom_champions/_server/taliyah.champ
 resourcepacks/default/champions/aatrox/
 resourcepacks/default/champions/taliyah/
 resourcepacks/default/models/aatrox/
