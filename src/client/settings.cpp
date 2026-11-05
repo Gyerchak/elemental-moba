@@ -275,6 +275,7 @@ bool Settings::load(const std::string& path) {
 }
 
 void Settings::save(const std::string& path) const {
+    if (hold_saves) return;
     // [U-383] written to a temporary file, then renamed: a crash while saving never leaves a half file
     struct Commit {
         std::string path;

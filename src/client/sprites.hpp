@@ -7,6 +7,8 @@
 #include <SDL3/SDL.h>
 
 #include <map>
+#include <mutex>
+#include <vector>
 #include <memory>
 #include <string>
 
@@ -42,6 +44,8 @@ public:
         if (const SpriteSheet* s = get_dir("models_hd/" + id)) return s;
         return get_dir("models/" + id);
     }
+    void preload(const std::vector<std::string>& dirs);  // [U-505] decode these on background threads
+    int pump(int max_uploads);                           // uploads finished ones; returns how many are still on the way
     void set_scale(float s);  // [U-502] texture size of every sheet (1 = the original); a change reloads them
     // a sheet in any pack folder, e.g. "champions/ember_monk/skins/comet/model" (a skin's own model)
     const SpriteSheet* get_dir(const std::string& dir);
@@ -49,12 +53,24 @@ public:
     // dir 0…7 (0 = facing screen right, clockwise); t = seconds into the animation; hold = stop on the last frame.
     static void draw(SDL_Renderer* r, const SpriteSheet& s, const std::string& anim, double t, int dir, float sx, float sy,
                      float scale, gfx::Rgba tint = {}, bool hold = false);
+    static inline float tilt = 0;       // [U-508] degrees, for the next draw (tumbling in the air)
     static inline bool smooth = false;  // [U-501] blend each frame into the next (much smoother motion, any frame count)
 
 private:
     Resources* res_ = nullptr;
     std::map<std::string, std::unique_ptr<SpriteSheet>> cache_;
     float scale_ = 1;
+    struct Job {
+        std::string key, dir, txt, png;
+    };
+    struct Decoded {
+        std::string key, dir;
+        std::unique_ptr<SpriteSheet> sheet;
+        SDL_Surface* pic = nullptr;
+    };
+    std::vector<std::string> pending_;  // decoded on a thread or waiting for the upload
+    std::vector<Decoded> done_;
+    std::mutex done_mutex_;
 };
 
 // screen direction 0…7 from a world facing vector (flip = the view is turned 180° for the Earth team)

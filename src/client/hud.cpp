@@ -98,7 +98,8 @@ bool GameView::icon_button(Ui& ui, float x, float y, float size, std::string_vie
     const bool hv = hover(ui, x, y, size, size);
     fill_rect(r_, x, y, size, size, active ? Rgba{110, 80, 30, 255} : hv ? Rgba{70, 70, 95, 255} : Rgba{38, 38, 52, 255});
     rect(r_, x, y, size, size, hv ? Rgba{255, 220, 140} : Rgba{110, 110, 140});
-    text(r_, x + size / 2 - text_w(label) / 2, y + size / 2 - 4, label, {235, 235, 235});
+    const std::string& shown = tr(label);  // [U-508]
+    text(r_, x + size / 2 - text_w(shown) / 2, y + size / 2 - 4, shown, {235, 235, 235});
     text(r_, x + 2, y + 2, key, {255, 220, 120});  // the key only on the icon [U-169]
     if (hv && ui.clicked) {
         ui.clicked = false;
@@ -179,17 +180,17 @@ void GameView::draw_buffs(NetClient& net, float x, float y, double since) {
         bx += s + 3;
     }
     if (hovered) {  // tooltip: name, what it does, time left; [U-498] Alt = every sky number for each element of my kit
-        std::vector<std::string> L{hovered->name + (hovered->left_ms >= 0 ? std::format("  {} s", sec1(hovered->left_ms)) : ""), hovered->detail};
+        std::vector<std::string> L{tr(hovered->name) + (hovered->left_ms >= 0 ? std::format("  {} s", sec1(hovered->left_ms)) : ""), tr(hovered->detail)};
         if (hovered->environment) {
             if (SDL_GetModState() & SDL_KMOD_ALT) {
                 for (Element ke : kit_el) {
                     const SkyBoost b = sky_boost(ke, sky);
-                    L.push_back(std::format("{}: power {:.1f}%  size {}%  width {}%  radius {}%  speed {}%  duration {}%  burns {}%  cooldown x{}%  XP {}%{}",
+                    L.push_back(trf("{}: power {:.1f}%  size {}%  width {}%  radius {}%  speed {}%  duration {}%  burns {}%  cooldown x{}%  XP {}%{}",
                                             ke == Element::None ? "no element" : element_name(ke), b.power_pm() / 10.0, b.size_pct, b.width_pct,
                                             b.radius_pct, b.speed_pct, b.dur_pct, b.dot_pct, b.cd_pct, b.xp_pct, b.muted ? "  MUTED" : ""));
                 }
             } else {
-                L.push_back("hold Alt: every sky number for my elements");
+                L.push_back(tr("hold Alt: every sky number for my elements"));
             }
         }
         float tw = 0;
@@ -209,17 +210,17 @@ void GameView::draw_skill_tooltip(NetClient& net, int i, float x, float y, bool 
     const auto& me = net.cur.me;
     const int rank = std::max<int>(1, me.rank[i]);
     std::vector<std::string> L;
-    L.push_back(std::format("{}  [{}]  {} {}{}", d->name, kKeys[i], tr("rank"), me.rank[i], d->ultimate ? "   " + tr("ULTIMATE") : ""));
-    L.push_back(std::string(d->desc));
+    L.push_back(trf("{}  [{}]  {} {}{}", tr(d->name), kKeys[i], tr("rank"), me.rank[i], d->ultimate ? "   " + tr("ULTIMATE") : ""));
+    L.push_back(tr(d->desc));
     // [U-291] its own passive, cast stages, rank rule
-    if (!d->passive_desc.empty()) L.push_back(std::format("{}: {}", tr("Passive"), d->passive_desc));
-    if (d->casts > 1) L.push_back(std::format("{} {} {:.1f} s", d->casts, tr("casts, the next within"), d->recast_ms / 1000.0));
+    if (!d->passive_desc.empty()) L.push_back(trf("{}: {}", tr("Passive"), tr(d->passive_desc)));
+    if (d->casts > 1) L.push_back(trf("{} {} {:.1f} s", d->casts, tr("casts, the next within"), d->recast_ms / 1000.0));
     if (d->kind != SkillKind::Passive && i != int(Slot::P) && i < int(Slot::F)) {
         const int step = d->rank_step ? d->rank_step : 6;
         if (d->ultimate)
-            L.push_back(std::format("{} {}, {} {}", tr("Unlocks at level"), d->unlock_level ? d->unlock_level : 6, tr("a new rank every"), step));
+            L.push_back(trf("{} {}, {} {}", tr("Unlocks at level"), d->unlock_level ? d->unlock_level : 6, tr("a new rank every"), step));
         else
-            L.push_back(std::format("{} {} {} {}, +1 {} {} {}", tr("Max rank"), d->rank_cap ? d->rank_cap : 2, tr("before level"), step, tr("every"), step,
+            L.push_back(trf("{} {} {} {}, +1 {} {} {}", tr("Max rank"), d->rank_cap ? d->rank_cap : 2, tr("before level"), step, tr("every"), step,
                                     tr("levels")));
     }
     const auto it = net.roster.find(net.my_unit);
@@ -231,108 +232,108 @@ void GameView::draw_skill_tooltip(NetClient& net, int i, float x, float y, bool 
     auto zone_text = [&](SweetZone z, int size, FxKind k, Geo g) {  // [U-461]
         z = sweet_zone_for(k, g, z);
         const int sz = sweet_size_for(z, size);
-        return z == SweetZone::Centre ? std::format("the middle {}%", sz) : z == SweetZone::Edge ? std::format("the outer {}%", sz)
-                                                                          : std::format("the last {}% of its flight", sz);
+        return z == SweetZone::Centre ? trf("the middle {}%", sz) : z == SweetZone::Edge ? trf("the outer {}%", sz)
+                                                                          : trf("the last {}% of its flight", sz);
     };
     auto fx_of = [](SkillKind k) {
         return k == SkillKind::Cone ? FxKind::Cone : k == SkillKind::Bolt || k == SkillKind::Dash ? FxKind::Bolt : k == SkillKind::Wave ? FxKind::Wave : FxKind::Burst;
     };
     constexpr const char* kGeoNames[] = {"", "circle", "ring", "line", "rectangle", "cone", "arc"};
     if (plus) {  // what the next rank gives
-        L.push_back(std::format("Next rank ({} → {}):", me.rank[i], me.rank[i] + 1));
-        if (d->dmg_rank) L.push_back(std::format("  damage +{}", d->dmg_rank));
-        if (d->cd_rank) L.push_back(std::format("  cooldown {:+.1f} s", d->cd_rank / 1000.0));
+        L.push_back(trf("Next rank ({} → {}):", me.rank[i], me.rank[i] + 1));
+        if (d->dmg_rank) L.push_back(trf("  damage +{}", d->dmg_rank));
+        if (d->cd_rank) L.push_back(trf("  cooldown {:+.1f} s", d->cd_rank / 1000.0));
         bool any = d->dmg_rank || d->cd_rank;
         for (auto [name, per, ms] : {std::tuple{"crowd control", d->cc_ms_rank, true}, {"crowd control strength", d->cc_val_rank, false},
                                      {"duration", d->dur_ms_rank, true}, {"range", d->range_rank, false}, {"width", d->width_rank, false},
                                      {"radius", d->radius_rank, false}, {"knock back", d->knock_rank, false}, {"cost", d->cost_rank, false}})
             if (per) {  // [U-470]
-                L.push_back(ms ? std::format("  {} {:+.2f} s", name, per / 1000.0) : std::format("  {} {:+}", name, per));
+                L.push_back(ms ? trf("  {} {:+.2f} s", name, per / 1000.0) : trf("  {} {:+}", name, per));
                 any = true;
             }
         for (const SkillDef::Learned& l : d->learned)
             if (l.key != StatKey::Count && l.per_rank) {
-                L.push_back(std::format("  {} {:+.1f}%", kStatKeyNames[int(l.key)], l.per_rank / 100.0));
+                L.push_back(trf("  {} {:+.1f}%", kStatKeyNames[int(l.key)], l.per_rank / 100.0));
                 any = true;
             }
-        if (!any) L.push_back("  rank counts for scaling only");
-        if (d->ultimate) L.push_back(std::format("  {} {}", tr("ultimate: a new rank every"), d->rank_step ? d->rank_step : 6));
+        if (!any) L.push_back(tr("  rank counts for scaling only"));
+        if (d->ultimate) L.push_back(trf("  {} {}", tr("ultimate: a new rank every"), d->rank_step ? d->rank_step : 6));
     } else if (d->kind == SkillKind::Passive) {
-        L.push_back("Passive: always on.");
+        L.push_back(tr("Passive: always on."));
     } else if (!alt) {  // the important numbers, only the ones this skill has
         const char* what = d->kind == SkillKind::Heal ? "Heal" : d->kind == SkillKind::Shield ? "Shield" : "Damage";
-        if (me.s_dmg[i] > 0) L.push_back(std::format("{} {}", what, me.s_dmg[i]));
-        L.push_back(std::format("Cooldown {} s   Cast time {}", sec1(me.cd_total_ms[i]), me.s_cast_ms[i] > 0 ? std::format("{} ms", me.s_cast_ms[i]) : "instant"));
-        if (me.s_cost[i] > 0 && cd) L.push_back(std::format("Cost {} {}", me.s_cost[i], res_name(cd->resource)));
+        if (me.s_dmg[i] > 0) L.push_back(trf("{} {}", what, me.s_dmg[i]));
+        L.push_back(trf("Cooldown {} s   Cast time {}", sec1(me.cd_total_ms[i]), me.s_cast_ms[i] > 0 ? trf("{} ms", me.s_cast_ms[i]) : "instant"));
+        if (me.s_cost[i] > 0 && cd) L.push_back(trf("Cost {} {}", me.s_cost[i], res_name(cd->resource)));
         std::string geo;
-        if (me.s_range[i]) geo += std::format("range {}  ", me.s_range[i]);
-        if (me.s_width[i]) geo += std::format("width {}  ", me.s_width[i]);
-        if (me.s_radius[i]) geo += std::format("radius {}  ", me.s_radius[i]);
+        if (me.s_range[i]) geo += trf("range {}  ", me.s_range[i]);
+        if (me.s_width[i]) geo += trf("width {}  ", me.s_width[i]);
+        if (me.s_radius[i]) geo += trf("radius {}  ", me.s_radius[i]);
         if (me.s_speed[i] && (d->kind == SkillKind::Bolt || d->kind == SkillKind::Wave || d->kind == SkillKind::Tornado || d->kind == SkillKind::Dash))
-            geo += std::format("speed {}", me.s_speed[i]);
+            geo += trf("speed {}", me.s_speed[i]);
         if (!geo.empty()) L.push_back(geo);
-        if (d->delay_ms) L.push_back(std::format("Delay {} ms", d->delay_ms));
-        if (dur_ms) L.push_back(std::format("Lasts {} s{}", sec1(dur_ms), d->kind == SkillKind::Field ? std::format(", hits every {} ms", d->tick_ms) : ""));
-        if (d->cc != StatusKind::Count) L.push_back(std::format("{} {} s{}", cc_name(d->cc), sec1(cc_ms), cc_val ? std::format(" ({})", cc_val) : ""));
-        if (knock) L.push_back(std::format("Knock back {}", knock));
-        if (d->geo != Geo::Auto) L.push_back(std::format("Shape: {}{}", kGeoNames[int(d->geo)], d->inner ? std::format(" (hole {})", d->inner) : ""));
+        if (d->delay_ms) L.push_back(trf("Delay {} ms", d->delay_ms));
+        if (dur_ms) L.push_back(trf("Lasts {} s{}", sec1(dur_ms), d->kind == SkillKind::Field ? trf(", hits every {} ms", d->tick_ms) : ""));
+        if (d->cc != StatusKind::Count) L.push_back(trf("{} {} s{}", cc_name(d->cc), sec1(cc_ms), cc_val ? trf(" ({})", cc_val) : ""));
+        if (knock) L.push_back(trf("Knock back {}", knock));
+        if (d->geo != Geo::Auto) L.push_back(trf("Shape: {}{}", kGeoNames[int(d->geo)], d->inner ? trf(" (hole {})", d->inner) : ""));
         if (d->sweet_pct > 0 && !(d->casts > 1 && d->stages[0].kind != SkillKind::None))
-            L.push_back(std::format("Sweet spot +{}% in {}", d->sweet_pct, zone_text(d->sweet_zone, d->sweet_size, fx_of(d->kind), d->geo)));
-        if (d->casts > 1) L.push_back(std::format("{} casts within {} s", d->casts, sec1(d->recast_ms)));
+            L.push_back(trf("Sweet spot +{}% in {}", d->sweet_pct, zone_text(d->sweet_zone, d->sweet_size, fx_of(d->kind), d->geo)));
+        if (d->casts > 1) L.push_back(trf("{} casts within {} s", d->casts, sec1(d->recast_ms)));
         for (std::size_t sI = 0; d->casts > 1 && sI < d->stages.size() && sI < std::size_t(d->casts); ++sI) {  // [U-456][U-461] each cast
             const SkillDef::CastStage& st = d->stages[sI];
             if (st.kind == SkillKind::None) continue;
             const Geo g = st.geo != Geo::Auto ? st.geo : d->geo;
-            std::string ln = std::format("  cast {}: {}{}{}  {}% dmg", sI + 1, g != Geo::Auto ? kGeoNames[int(g)] : st.kind == SkillKind::Cone ? "cone" : "circle",
-                                         st.range ? std::format(" {}", st.range) : "", st.width ? std::format("×{}", st.width) : st.radius ? std::format(" r{}", st.radius) : "", st.dmg_pct);
+            std::string ln = trf("  cast {}: {}{}{}  {}% dmg", sI + 1, g != Geo::Auto ? kGeoNames[int(g)] : st.kind == SkillKind::Cone ? "cone" : "circle",
+                                         st.range ? trf(" {}", st.range) : "", st.width ? trf("×{}", st.width) : st.radius ? trf(" r{}", st.radius) : "", st.dmg_pct);
             const int sp = st.sweet_pct >= 0 ? st.sweet_pct : d->sweet_pct;
-            if (sp > 0) ln += std::format(", sweet +{}% in {}", sp, zone_text(st.sweet_zone != SweetZone::Auto ? st.sweet_zone : d->sweet_zone,
+            if (sp > 0) ln += trf(", sweet +{}% in {}", sp, zone_text(st.sweet_zone != SweetZone::Auto ? st.sweet_zone : d->sweet_zone,
                                                                              st.sweet_size ? st.sweet_size : d->sweet_size, fx_of(st.kind), g));
             L.push_back(ln);
         }
-        if (d->tether_ms) L.push_back(std::format("Chain {} s: still within {} then = pulled {} + hit again", sec1(d->tether_ms), d->tether_radius, d->pull));
+        if (d->tether_ms) L.push_back(trf("Chain {} s: still within {} then = pulled {} + hit again", sec1(d->tether_ms), d->tether_radius, d->pull));
         if (d->kind == SkillKind::Transform)
-            L.push_back(std::format("Form: +{}% attack, +{}% ALL healing received, +{}% speed", d->buff_attack_pct, d->buff_heal_pct, cc_val));
+            L.push_back(trf("Form: +{}% attack, +{}% ALL healing received, +{}% speed", d->buff_attack_pct, d->buff_heal_pct, cc_val));
         for (const SkillDef::Learned& l : d->learned)  // [U-468]
             if (l.key != StatKey::Count)
-                L.push_back(std::format("While learned: {} {:.1f}%", kStatKeyNames[int(l.key)], (l.base + l.per_rank * rk) / 100.0));
-        if (d->free_cast) L.push_back("Can be used during another cast");
+                L.push_back(trf("While learned: {} {:.1f}%", kStatKeyNames[int(l.key)], (l.base + l.per_rank * rk) / 100.0));
+        if (d->free_cast) L.push_back(tr("Can be used during another cast"));
         if (d->pass_units || d->through_walls) L.push_back(d->pass_units && d->through_walls ? "Goes through units and over walls" : d->pass_units ? "Goes through units" : "Goes over walls");
-        if (d->aa_reset) L.push_back("Resets your autoattack");
+        if (d->aa_reset) L.push_back(tr("Resets your autoattack"));
         if (d->cast_ms > 0) L.push_back(move_name(d->move));
-        L.push_back("hold Alt: formulas");
+        L.push_back(tr("hold Alt: formulas"));
     } else {  // Alt: how every number is built
         const double ep = me.ep_raw / 100.0, atk = me.attack_raw / 100.0, bon = me.bonus_attack_raw / 100.0;
         if (d->dmg || d->dmg_rank || d->ep || d->ad || d->bonus_ad) {
-            std::string f = std::format("Damage = {}", d->dmg);
-            if (d->dmg_rank) f += std::format(" + {}×(rank−1) [{}]", d->dmg_rank, d->dmg_rank * (rank - 1));
-            if (d->ep) f += std::format(" + {}% EP [{:.0f}]", d->ep, ep * d->ep / 100);
-            if (d->ad) f += std::format(" + {}% ATK [{:.0f}]", d->ad, atk * d->ad / 100);
-            if (d->bonus_ad) f += std::format(" + {}% bonus ATK [{:.0f}]", d->bonus_ad, bon * d->bonus_ad / 100);
+            std::string f = trf("Damage = {}", d->dmg);
+            if (d->dmg_rank) f += trf(" + {}×(rank−1) [{}]", d->dmg_rank, d->dmg_rank * (rank - 1));
+            if (d->ep) f += trf(" + {}% EP [{:.0f}]", d->ep, ep * d->ep / 100);
+            if (d->ad) f += trf(" + {}% ATK [{:.0f}]", d->ad, atk * d->ad / 100);
+            if (d->bonus_ad) f += trf(" + {}% bonus ATK [{:.0f}]", d->bonus_ad, bon * d->bonus_ad / 100);
             L.push_back(f);
-            L.push_back(std::format("   × sky power {:.1f}%{} = {}", me.power_pct / 10.0, d->sub == SubElement::Ice || d->sub == SubElement::Steam ? " × 80% (state change)" : "", me.s_dmg[i]));
+            L.push_back(trf("   × sky power {:.1f}%{} = {}", me.power_pct / 10.0, d->sub == SubElement::Ice || d->sub == SubElement::Steam ? " × 80% (state change)" : "", me.s_dmg[i]));
         }
-        L.push_back(std::format("Cooldown = {} ms{} ÷ (1 + haste) = {} ms", d->cd_ms, d->cd_rank ? std::format(" + {}×(rank−1)", d->cd_rank) : "", me.cd_total_ms[i]));
-        if (d->cast_ms) L.push_back(std::format("Cast time = {} ms ÷ (1 + cast speed {}) = {} ms", d->cast_ms, me.cast_speed / 100, me.s_cast_ms[i]));
-        if (d->range) L.push_back(std::format("Range = {} + items × sky size {}% = {}", d->range, me.size_pct, me.s_range[i]));
-        if (d->width) L.push_back(std::format("Width = {} + items × sky size {}% = {}", d->width, me.size_pct, me.s_width[i]));
-        if (d->radius) L.push_back(std::format("Radius = {} + items × sky size {}% = {}", d->radius, me.size_pct, me.s_radius[i]));
-        if (d->cost) L.push_back(std::format("Cost = {}", d->cost));
+        L.push_back(trf("Cooldown = {} ms{} ÷ (1 + haste) = {} ms", d->cd_ms, d->cd_rank ? trf(" + {}×(rank−1)", d->cd_rank) : "", me.cd_total_ms[i]));
+        if (d->cast_ms) L.push_back(trf("Cast time = {} ms ÷ (1 + cast speed {}) = {} ms", d->cast_ms, me.cast_speed / 100, me.s_cast_ms[i]));
+        if (d->range) L.push_back(trf("Range = {} + items × sky size {}% = {}", d->range, me.size_pct, me.s_range[i]));
+        if (d->width) L.push_back(trf("Width = {} + items × sky size {}% = {}", d->width, me.size_pct, me.s_width[i]));
+        if (d->radius) L.push_back(trf("Radius = {} + items × sky size {}% = {}", d->radius, me.size_pct, me.s_radius[i]));
+        if (d->cost) L.push_back(trf("Cost = {}", d->cost));
         // [U-470] every rank-scaled number: base + growth × (rank − 1) = now
         for (auto [name, base, per, ms] : {std::tuple{cc_name(d->cc), d->cc_ms, d->cc_ms_rank, true}, {"CC strength", d->cc_val, d->cc_val_rank, false},
                                            {"Duration", d->dur_ms, d->dur_ms_rank, true}, {"Knock back", d->knock, d->knock_rank, false}})
             if ((base || per) && !(std::string_view(name).empty()))
-                L.push_back(ms ? std::format("{} = {} s{} = {} s", name, sec1(base), per ? std::format(" + {}×(rank−1)", sec1(per)) : "", sec1(base + per * rk))
-                               : std::format("{} = {}{} = {}", name, base, per ? std::format(" + {}×(rank−1)", per) : "", base + per * rk));
+                L.push_back(ms ? trf("{} = {} s{} = {} s", name, sec1(base), per ? trf(" + {}×(rank−1)", sec1(per)) : "", sec1(base + per * rk))
+                               : trf("{} = {}{} = {}", name, base, per ? trf(" + {}×(rank−1)", per) : "", base + per * rk));
         // [U-464] what multiplies the skill's damage by its kind
         const bool martial = !d->arcane && d->sub == SubElement::Physical;
         if (d->dmg && (me.skill_amp || (d->arcane && me.arcane_power) || (martial && me.martial_power)))
-            L.push_back(std::format("   × (1 + skill amp {}%{})", me.skill_amp / 100,
-                                    d->arcane ? std::format(" + arcane {}%", me.arcane_power / 100) : martial ? std::format(" + martial {}%", me.martial_power / 100) : ""));
+            L.push_back(trf("   × (1 + skill amp {}%{})", me.skill_amp / 100,
+                                    d->arcane ? trf(" + arcane {}%", me.arcane_power / 100) : martial ? trf(" + martial {}%", me.martial_power / 100) : ""));
         for (const SkillDef::Learned& l : d->learned)
             if (l.key != StatKey::Count)
-                L.push_back(std::format("{} = {:.1f}%{} = {:.1f}%", kStatKeyNames[int(l.key)], l.base / 100.0,
-                                        l.per_rank ? std::format(" + {:.1f}%×(rank−1)", l.per_rank / 100.0) : "", (l.base + l.per_rank * rk) / 100.0));
+                L.push_back(trf("{} = {:.1f}%{} = {:.1f}%", kStatKeyNames[int(l.key)], l.base / 100.0,
+                                        l.per_rank ? trf(" + {:.1f}%×(rank−1)", l.per_rank / 100.0) : "", (l.base + l.per_rank * rk) / 100.0));
     }
     float w = 0;
     for (const auto& l : L) w = std::max(w, text_w(l));
@@ -607,7 +608,12 @@ void GameView::draw_bottom_panel(NetClient& net, double now_s, Ui& ui) {
     auto key_name = [&](Action a) { return std::string(SDL_GetScancodeName(set_.keys[std::size_t(a)])); };
     const float bx = ix + kItemsW + 6;  // two columns of buttons, never on the item slots
     if (icon_button(ui, bx, y0 + 6, 38, "SHOP", key_name(Action::Shop), show_shop_)) show_shop_ = !show_shop_;
-    if (icon_button(ui, bx, y0 + 46, 38, "HOME", key_name(Action::Recall), me.channel_left_ms > 0)) net.send_cmd({.kind = CmdKind::Recall});
+    if (icon_button(ui, bx, y0 + 46, 38, me.companion_coming ? "STOP" : "HOME", key_name(Action::Recall), me.channel_left_ms > 0 || me.companion_coming)) net.send_cmd({.kind = CmdKind::Recall});
+    if (me.companion_left_ms > 0 && !me.companion_coming) {  // [U-508] its 3 min cooldown, like a skill
+        cooldown_sweep(r_, bx, y0 + 46, 38, float(me.companion_left_ms) / 180'000.f, {0, 0, 0, 170});
+        const std::string cs = std::format("{}", (me.companion_left_ms + 999) / 1000);
+        text(r_, bx + 19 - text_w(cs) / 2, y0 + 60, cs, {255, 255, 255});
+    }
     if (icon_button(ui, bx, y0 + 86, 38, "PORT", key_name(Action::Portal), false)) net.send_cmd({.kind = CmdKind::Portal});
     if (icon_button(ui, bx + 42, y0 + 6, 38, "SCORE", key_name(Action::Score), show_score_)) show_score_ = !show_score_;
     if (icon_button(ui, bx + 42, y0 + 46, 38, set_.auto_attack ? "AA on" : "AA off", key_name(Action::ToggleAutoAttack), set_.auto_attack))
@@ -616,6 +622,10 @@ void GameView::draw_bottom_panel(NetClient& net, double now_s, Ui& ui) {
         on_action(Action::QuickCastAll, false, net);
     if (icon_button(ui, bx + 84, y0 + 86, 38, cam_lock_ ? "CAM on" : "CAM off", key_name(Action::CamLock), cam_lock_))  // [U-494] camera lock
         on_action(Action::CamLock, false, net);
+    if (net.practice && icon_button(ui, bx + 84, y0 + 46, 38, set_.dev_mode ? "DEV on" : "DEV off", "C+S+D", set_.dev_mode)) {  // [U-507] practice tool only
+        set_.dev_mode = !set_.dev_mode;
+        set_.save();
+    }
 
     // [U-478] switchable features (only when this match has them)
     if (net.features & kFeatGlyph) {
@@ -676,7 +686,7 @@ void GameView::draw_portraits(NetClient& net, Ui& ui) {
                             ally ? Rgba{70, 160, 255} : Rgba{230, 60, 50}, false);
             if (du->u.res_max > 0) fill_rect(r_, x + sz + 4, y + 13, 62 * float(du->u.res) / float(du->u.res_max), 3, {120, 160, 255});
         } else if (s.alive) {
-            text(r_, x + sz + 4, y + 4, "unseen", {130, 130, 140});
+            text(r_, x + sz + 4, y + 4, tr("unseen"), {130, 130, 140});
         }
         // ultimate ready? (allies only — enemy cooldowns are hidden) [U-171]
         if (ally) {
@@ -759,7 +769,7 @@ void GameView::draw_tooltip(NetClient& net, Ui& ui) {
                 fill_rect(r_, x + 3, y + 3, 26, 11, mixc(m.colour, {0, 0, 0, 255}, 55));
                 rect(r_, x + 3, y + 3, 26, 11, m.environment ? Rgba{255, 210, 90} : m.debuff ? Rgba{230, 70, 70} : Rgba{80, 220, 110});
                 text(r_, x + 4, y + 5, m.tag, {255, 255, 255});
-                text(r_, x + 34, y + 5, fit_text(m.name + ": " + m.detail, w - 40), m.environment ? Rgba{255, 225, 150} : Rgba{225, 225, 235});
+                text(r_, x + 34, y + 5, fit_text(tr(m.name) + ": " + tr(m.detail), w - 40), m.environment ? Rgba{255, 225, 150} : Rgba{225, 225, 235});
                 y += 14;
             }
             y += 6;

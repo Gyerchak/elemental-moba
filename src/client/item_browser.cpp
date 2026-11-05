@@ -199,7 +199,7 @@ int ItemBrowser::draw(SDL_Renderer* r, Ui& ui, float x, float y, float w, float 
     if (selected >= 0) {
         const ItemDef& d = kItems[std::size_t(selected)];
         draw_item_icon(r, selected, tx + 8, y + 48, 56);
-        text(r, tx + 72, y + 52, d.name, {255, 230, 150}, 1.5f);
+        text(r, tx + 72, y + 52, tr(d.name), {255, 230, 150}, 1.5f);
         float ly = y + 112;
         for (const std::string& l : item_lines(d)) {
             text(r, tx + 8, ly, fit_text(l, tip_w - 16), {225, 225, 235});

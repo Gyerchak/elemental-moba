@@ -384,6 +384,7 @@ bool text_field(SDL_Renderer* r, Ui& ui, int id, float x, float y, float w, std:
     bool enter = false;
     if (f) {
         value += ui.typed;
+        if (ui.copy && !value.empty()) SDL_SetClipboardText(value.c_str());  // [U-506] Ctrl+C (Ctrl+V arrives in ui.typed)
         if (ui.backspace && !value.empty()) value.pop_back();
         if (value.size() > 40) value.resize(40);
         enter = ui.enter;

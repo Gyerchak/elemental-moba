@@ -272,3 +272,11 @@ clang 22 and GCC 16 (`README.md` → Build / Play).
 - [ ] True 3D: fetch image-to-3D weights (TRELLIS.2) → real side views. Needs Hubert's download; then a pipeline: art → mesh → auto-weights → our poses.
 - [ ] Same art treatment for monsters / minions / structures (they have no full-body art yet: ComfyUI first).
 - [ ] Softer map: coasts and walls are still blocky (cell by cell); blend neighbouring cells when painting the ground.
+
+## M27 — Hitch, bug hunt, Polish (2026-11-05)
+- [x] Background model loading with a loading bar [U-505]
+- [x] Copy addresses in the menu [U-506]; practice developer mode + DEV square [U-507]
+- [x] Bug hunt: statuses, interactions, death / respawn, items [U-508]; knock-up animation; looks for statuses without one
+- [ ] Polish: machine draft in lang/pl.txt, needs a human read
+- [ ] Vulkan validation rerun on this build
+- Still open: TRELLIS weights (user download), monster / minion art, softer map coasts

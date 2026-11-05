@@ -145,6 +145,7 @@ struct Settings {
     void default_keys();
     bool load(const std::string& path = "settings.cfg");
     void save(const std::string& path = "settings.cfg") const;
+    bool hold_saves = false;  // [U-508] a test run (--autotest / --quality / --effects) never writes the player's settings
     [[nodiscard]] bool quick(int slot) const { return quick_cast_all || (slot >= 0 && slot < kSkillSlots && quick_cast[std::size_t(slot)]); }
     ChampPrefs& prefs(std::string_view champ);  // creates the entry if missing
     [[nodiscard]] bool tilted() const { return !dev_mode; }

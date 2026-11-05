@@ -540,4 +540,6 @@ void App::champ_select() {
     }
 }
 
+std::string lan_address() { return invite_address(""); }  // [U-506]
+
 }  // namespace em

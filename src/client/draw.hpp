@@ -103,6 +103,7 @@ struct Ui {
     bool clicked = false, rclicked = false;  // this frame
     bool down = false;
     std::string typed;   // text typed this frame
+    bool copy = false;  // [U-506] Ctrl+C this frame
     bool backspace = false, enter = false;
     int focus = -1;      // focused text field id
     int drag = -1;       // slider being dragged

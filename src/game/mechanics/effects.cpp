@@ -17,7 +17,7 @@ void World::effect_hits(Effect& e) {
         if (!o.alive || !targetable(o) || already_hit(e, o.id)) continue;
         // [U-241][U-286] fire or waterbending touching an ally dries them (no damage to allies, as always)
         if (!e.ally && o.team == e.team && o.st.has(StatusKind::Wet) &&
-            (fire_family(e.sub) || base_element(e.sub) == Element::Water) && touches(sh, hitbox(o)))
+            ((fire_family(e.sub) && e.sub != SubElement::Lightning) || base_element(e.sub) == Element::Water) && touches(sh, hitbox(o)))
             dry(o);
         // [U-381] an ally may throw lightning INTO an ally who is redirecting: the ally sends it on (ally → ally → enemy)
         const bool ally_redirect = !e.ally && o.team == e.team && o.id != e.owner && e.sub == SubElement::Lightning &&
@@ -123,8 +123,9 @@ void World::effect_hits(Effect& e) {
         if (!o.alive) continue;
         apply_cc(e.src, e.owner, o, e.cc, e.cc_ms, e.cc_val, e.sub);
         // [U-241] water soaks, fire dries
-        if (fire_family(e.sub)) dry(o);
-        else if (e.sub == SubElement::Water || e.sub == SubElement::Mud || e.sub == SubElement::Blood)
+        if (fire_family(e.sub)) {
+            if (e.sub != SubElement::Lightning) dry(o);  // ([U-286][U-508] water conducts lightning: it stays wet)
+        } else if (e.sub == SubElement::Water || e.sub == SubElement::Mud || e.sub == SubElement::Blood)
             o.st.add(StatusKind::Wet, now_ms + (o.kind == UnitKind::Champion && champions()[std::size_t(o.champ)].element == Element::Water
                                                   ? elements::kWetWaterbenderMs : elements::kWetMs), 0, e.owner);
         if (e.sub == SubElement::Ice && o.st.has(StatusKind::Swimming))  // [U-190] ice on a swimmer = icing stun
@@ -169,7 +170,8 @@ void World::step_effects() {
         Effect& e = fx[i];
         if (e.dead) continue;
         if (now_ms >= e.end_ms) {
-            if (e.kind == FxKind::Burst && e.nhit == 0 && now_ms >= e.arm_ms) effect_hits(e);
+            // ([U-508] only one that never went off: a burst that hit nobody could hit a second time when it ended)
+            if (e.kind == FxKind::Burst && e.nhit == 0 && e.next_tick_ms == 0 && now_ms >= e.arm_ms) effect_hits(e);
             e.dead = true;
             if (e.light > 0 && e.kind != FxKind::Lantern) {  // [U-116] light stays a moment after fire skills
                 Effect glow;

@@ -29,12 +29,15 @@ void flood_water(const Grid& g, int sx, int sy, std::vector<std::uint8_t>& mark,
 // Skill vs skill: blocking [U-17][U-20][U-38], combos [U-134][X-72], group bending [U-135][X-73],
 // a 2nd earthbender pushing a raised boulder [U-27]. Called for every moving effect, every tick.
 void World::effect_interactions(Effect& e, std::size_t i) {
+    // [U-508] a dash is the body moving, not a thrown skill: it neither clashes with nor is stopped by skills
+    if (e.def && e.def->kind == SkillKind::Dash) return;
     const Shape me = shape_of(e);
     const Element my = base_element(e.sub);
     for (std::size_t j = 0; j < fx.size() && !e.dead; ++j) {
         if (j == i) continue;
         Effect& o = fx[j];
         if (o.dead || o.kind == FxKind::Steam || o.kind == FxKind::Auto || o.kind == FxKind::TowerShot) continue;
+        if (o.def && o.def->kind == SkillKind::Dash) continue;
         const Element other = base_element(o.sub);
         const bool o_moving = o.kind == FxKind::Bolt || o.kind == FxKind::Wave;
         const bool o_zone = o.kind == FxKind::Field || o.kind == FxKind::Tornado || o.kind == FxKind::Burst;
@@ -80,7 +83,6 @@ void World::effect_interactions(Effect& e, std::size_t i) {
             continue;
         }
         if (!o_zone || !(e.kind == FxKind::Bolt || e.kind == FxKind::Wave || e.kind == FxKind::Tornado)) continue;
-        if (e.def && e.def->kind == SkillKind::Dash) continue;
         if (my == other && o.group && e.owner != o.owner && o.feeds < kMaxGroupFeeds) {
             // [U-135] group bending: the zone grows, the feeding skill is absorbed
             ++o.feeds;

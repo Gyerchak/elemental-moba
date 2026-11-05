@@ -22,7 +22,7 @@ inline constexpr ChampionDef kStormDaughter{.name = "Storm Daughter", .element =
        .range = 1'200, .radius = 420, .cast_ms = 500, .cd_ms = 100'000, .cost = 60, .dur_ms = 4'000,
        .tick_ms = 500, .cc = C::Slow, .cc_ms = 600, .cc_val = 20, .desc = "Big storm, strikes every 0.5 s", .ultimate = true},
  .p = {.name = "Static", .kind = K::Passive, .passive = PassiveId::Static,
-       .desc = "Autoattacks chain to units in the same water [X-58]"},
+       .desc = "Autoattacks chain to units in the same water"},
  .colour = 0xffd040, .role = Role::Marksman,
  .q_pool = {"Lightning Bolt", "Spark Volley", "Fire Bolt"}};  // [U-270] 3 Q options
 

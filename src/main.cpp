@@ -71,6 +71,7 @@ int main(int argc, char** argv) {
         else if (a == "--practice") scfg.practice = true;
         else if (a == "--autotest") opt.autotest_s = std::atoi(next().c_str());
         else if (a == "--shot") opt.shot = next();
+        else if (a == "--lang") opt.lang = next();  // [U-508] this run only
         else if (a == "--quality") opt.quality = std::atoi(next().c_str());  // [U-502] this run only: 0 … 3
         else if (a == "--effects") opt.effects = std::atoi(next().c_str());  // this run only: 0 none … 3 high
         else if (a == "--shots") opt.shots = std::max(1, std::atoi(next().c_str()));  // [U-446]

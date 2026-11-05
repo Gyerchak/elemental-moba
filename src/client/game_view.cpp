@@ -3,6 +3,7 @@
 #include "client/auto_play.hpp"
 
 #include <algorithm>
+#include <filesystem>
 #include <cstdlib>
 #include <cmath>
 #include <format>
@@ -158,6 +159,8 @@ void GameView::reset() {
     sky_banners_.clear();
     anim_mem_.clear();
     particles_.clear();
+    preload_started_ = false;
+    first_paint_ = false;
     // [U-497] the ground textures come from THIS match's map pack: forget the last match's (they stuck to every later map)
     for (std::size_t i = 0; i < ground_src_.size(); ++i) {
         if (ground_src_[i]) SDL_DestroySurface(ground_src_[i]);
@@ -390,7 +393,7 @@ void GameView::update_controls(NetClient& net, double now_s) {
 }
 
 void GameView::hint(std::string h) {
-    hint_ = std::move(h);
+    hint_ = tr_numbers(h);  // [U-508] (the server's messages too)
     hint_t_ = last_frame_;
 }
 
@@ -416,7 +419,7 @@ void GameView::cast_key(NetClient& net, int slot, bool from_click) {
         return hint(std::format("not enough resource for {}", d->name));
     if (d->full_moon_only && !bloodbending_allowed(WorldClock::at_ms(net.start_ms + net.cur.now_ms)))
         return hint("bloodbending only works at full moon");
-    const bool self = d->kind == SkillKind::Shield || d->kind == SkillKind::Haste || d->kind == SkillKind::Flight || d->kind == SkillKind::Transform ||
+    const bool self = (d->kind == SkillKind::Shield && !d->ally) || d->kind == SkillKind::Haste || d->kind == SkillKind::Flight || d->kind == SkillKind::Transform ||
                       d->kind == SkillKind::SelfFreeze || d->kind == SkillKind::WindSense ||
                       (d->kind == SkillKind::Burst && d->range == 0) || (d->kind == SkillKind::Heal && d->range == 0);
     const bool quick = (set_.quick(slot) || force_quick_) && !from_click;
@@ -474,6 +477,12 @@ void GameView::handle_event(const SDL_Event& e, NetClient& net) {
         const SDL_Scancode sc = e.key.scancode;
         // practice cheats [U-100]: Ctrl+Shift+N no cooldowns, +G gold, +L level
         if (ctrl && shift) {
+            if (sc == SDL_SCANCODE_D && net.practice) {  // [U-507] developer view, in the practice tool only
+                set_.dev_mode = !set_.dev_mode;
+                set_.save();
+                hint(set_.dev_mode ? "developer view on" : "developer view off");
+                return;
+            }
             if (sc == SDL_SCANCODE_N) net.send_cmd({.kind = CmdKind::CheatNoCooldowns});
             if (sc == SDL_SCANCODE_G) net.send_cmd({.kind = CmdKind::CheatGold});
             if (sc == SDL_SCANCODE_L) net.send_cmd({.kind = CmdKind::CheatLevel});
@@ -615,7 +624,7 @@ void GameView::on_action(Action a, bool ctrl, NetClient& net) {
         case Action::Stop: net.send_cmd({.kind = CmdKind::Stop}); pending_ = -1; break;  // [U-265] the cast goes on
         case Action::CancelCast: net.send_cmd({.kind = CmdKind::CancelCast}); pending_ = -1; break;  // [U-265] Z
         case Action::Stance: net.send_cmd({.kind = CmdKind::Stance}); break;            // [U-72]
-        case Action::Recall: net.send_cmd({.kind = CmdKind::Recall}); hint("recalling (8 s, moving cancels)"); break;
+        case Action::Recall: net.send_cmd({.kind = CmdKind::Recall}); break;  // [U-491] calls the companion; again = cancels
         case Action::Portal: net.send_cmd({.kind = CmdKind::Portal}); break;            // [X-54]
         case Action::Shop: show_shop_ = !show_shop_; break;
         case Action::Score: show_score_ = true; break;
@@ -683,6 +692,42 @@ void GameView::frame(NetClient& net, double now_s, Ui& ui) {
     SDL_GetRenderOutputSize(r_, &w, &h);
     view_.sw = float(w);
     view_.sh = float(h);
+    // [U-505] everything the match can show is decoded BEFORE it is shown (on threads, a short loading bar), never during play
+    static constexpr float kScaleLoad[] = {1.f / 3.f, 0.5f, 0.75f, 1.f};
+    sprites_.set_scale(set_.dev_mode ? 1.f : kScaleLoad[std::clamp(set_.render_quality, 0, 3)]);
+    if (!preload_started_ && !net.roster.empty()) {
+        preload_started_ = true;
+        std::vector<std::string> dirs;
+        std::vector<std::string> champion_dirs;
+        for (int c = 0; c < int(champions().size()); ++c) champion_dirs.push_back(Resources::champion_id(c));
+        for (const auto& [id, r] : net.roster) {
+            const std::string cid = Resources::champion_id(r.champ);
+            dirs.push_back("models_hd/" + cid), dirs.push_back("models/" + cid);
+            if (id == net.my_unit) {
+                const std::string& skin = set_.prefs(champions()[std::size_t(r.champ)].name).skin;
+                if (!skin.empty()) dirs.push_back("champions/" + cid + "/skins/" + skin + "/model");
+            }
+        }
+        std::error_code ec;
+        for (const auto& e : std::filesystem::directory_iterator("resourcepacks/default/models", ec))  // mobs, structures, companions, trees …
+            if (const std::string n = e.path().filename().string(); std::ranges::find(champion_dirs, n) == champion_dirs.end()) dirs.push_back("models/" + n);
+        sprites_.preload(dirs);
+        preload_total_ = sprites_.pump(0);
+    }
+    if (const int left = sprites_.pump(2); left > 0 || (preload_started_ && !first_paint_ && net.have_snapshot)) {
+        if (left == 0) {  // [U-505] the first full paint of the map (70 ms) also happens behind the bar
+            first_paint_ = true;
+            rebuild_textures(net, net.cur.now_ms, true);
+            last_fog_ = now_s;
+        }
+        fill_rect(r_, 0, 0, float(w), float(h), {6, 8, 14, 255});
+        const float bw = 420, bx = (float(w) - bw) / 2, by = float(h) / 2;
+        const std::string msg = tr("Loading models");
+        text(r_, (float(w) - text_w(msg, 2)) / 2, by - 34, msg, {230, 225, 200}, 2);
+        fill_rect(r_, bx, by, bw, 12, {40, 40, 56, 255});
+        fill_rect(r_, bx, by, bw * float(preload_total_ - left) / float(std::max(1, preload_total_)), 12, {255, 200, 110, 255});
+        return;
+    }
     if (!net.have_snapshot) {
         fill_rect(r_, 0, 0, float(w), float(h), {10, 10, 16, 255});
         text(r_, float(w) / 2 - 160, float(h) / 2, "Waiting for the server...", {230, 230, 230}, 2);
@@ -795,9 +840,7 @@ void GameView::frame(NetClient& net, double now_s, Ui& ui) {
     }
     // [U-501][U-502] the world image: scaled by the QUALITY (resolution only); shaders by the EFFECTS. HUD + aiming preview stay crisp on top.
     if (!post_tried_) post_tried_ = true, post_.init(r_);
-    static constexpr float kScale[] = {1.f / 3.f, 0.5f, 0.75f, 1.f};
-    const float rscale = set_.dev_mode ? 1.f : kScale[std::clamp(set_.render_quality, 0, 3)];
-    sprites_.set_scale(rscale);
+    const float rscale = set_.dev_mode ? 1.f : kScaleLoad[std::clamp(set_.render_quality, 0, 3)];
     Sprites::smooth = set_.fx_blend;
     particles_.set_density(set_.fx_particles);
     const bool post_on = post_.ready() && !set_.dev_mode && (rscale < 1.f || set_.fx_bloom || set_.fx_grade || set_.fx_vignette || set_.fx_sharpen);
@@ -1074,6 +1117,9 @@ void GameView::draw_indicator(NetClient& net) {
             }
             break;
         }
+        case SkillKind::Shield:  // [U-508] an ally shield: where it lands
+            if (d->ally) ground_ring(r_, view_, float(px), float(py), radius > 0 ? radius : 40.f, {120, 220, 255, 230}, 48);
+            break;
         case SkillKind::Blink: ground_ring(r_, view_, float(px), float(py), 30, edge); break;
         case SkillKind::Bloodbend: text(r_, ui_->mx + 12, ui_->my, "click an enemy", edge); break;
         default: break;
@@ -1165,9 +1211,10 @@ void GameView::draw_hud(NetClient& net, double now_s, Ui& ui) {
     // kill feed under it
     float fy = 72;
     for (auto itf = net.feed.rbegin(); itf != net.feed.rend() && fy < 220; ++itf, fy += 14) {
-        const float tw = text_w(itf->text);
+        const std::string& ftext = tr_feed(itf->text);
+        const float tw = text_w(ftext);
         fill_rect(r_, W - tw - 16, fy - 2, tw + 8, 12, {0, 0, 0, 140});
-        text(r_, W - tw - 12, fy, itf->text, {255, 230, 200});
+        text(r_, W - tw - 12, fy, ftext, {255, 230, 200});
     }
     // chat (bottom-left)
     float cy = H - 230;

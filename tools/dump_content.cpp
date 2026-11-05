@@ -43,6 +43,18 @@ int main(int argc, char** argv) {
         for (const std::string& l : interaction_lines()) std::println("{}", l.starts_with("## ") ? "\n" + l + "\n" : "- " + l);
         return 0;
     }
+    if (argc > 1 && std::string_view(argv[1]) == "--audit") {  // [U-508] every skill's numbers + text, for tools/skill_audit.py
+        auto row = [](std::string_view owner, std::string_view slot, const SkillDef& d) {
+            if (d.name.empty()) return;
+            std::println("{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}", owner, slot, d.name, int(d.kind), int(d.cc), d.cc_ms, d.cc_val, d.knock, int(d.pierce), int(d.ally),
+                         d.dur_ms, d.casts, d.recast_ms, d.range, d.width, d.radius, d.speed, d.dmg, d.sweet_pct, d.desc);
+        };
+        for (const ChampionDef& c : champions())
+            for (auto [sl, d] : {std::pair{"p", &c.p}, {"w", &c.w}, {"e", &c.e}, {"r", &c.r}, {"t", &c.t}, {"y", &c.y}}) row(c.name, sl, *d);
+        for (const SkillDef& d : q_options()) row("(Q)", "q", d);
+        for (const SkillDef& d : specials()) row("(special)", "f", d);
+        return 0;
+    }
     if (argc > 2 && std::string_view(argv[1]) == "--check-version") {  // [U-478] apply a version, print its mods / items
         int n = 0;
         const std::string err = apply_version(argv[2], &n);

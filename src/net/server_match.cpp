@@ -215,7 +215,11 @@ void Server::send_snapshot(Player& p) {
             }
         n.cc_left_cs = std::uint16_t(std::min<std::int64_t>(65'000, cc_left / 10));
         n.emote = u.emote;
-        n.cast_stage = u.cast_stage;  // [U-486] which animation fits: stage, form, dash
+        // [U-486] which animation fits: stage, form, dash. [U-508] while casting: the cast being cast = the casts used so far
+        // (u.cast_stage is only set when a cast finishes), unless the window of the last one ran out
+        n.cast_stage = 0;
+        if (u.casting && u.cast.slot < u.ab.size())
+            if (const auto& mc = u.ab[u.cast.slot].mc; mc.casts_used > 0 && W.now_ms <= mc.window_end_ms) n.cast_stage = mc.casts_used;
         n.anim_flags = std::uint8_t((u.transform_until > W.now_ms ? 1 : 0) | (std::ranges::find(dashers, u.id) != dashers.end() ? 2 : 0) |
                                     (u.st.has(StatusKind::Haste) ? 4 : 0));
         us.push_back(n);
@@ -564,6 +568,9 @@ void Server::send_snapshot(Player& p) {
         m.level = std::uint8_t(std::min(me->level, 255));
         m.neutral = me->neutral;
         m.heal_amp = me->stats.heal_amp;  // [U-481]
+        m.companion_left_ms = std::int32_t(std::max<std::int64_t>(0, me->companion_ready_ms - W.now_ms));  // [U-508]
+        for (const Companion& c : W.companions)
+            if (c.owner == me->id && !c.revive && !c.carrying) m.companion_coming = 1;
         m.self_heal = me->stats.self_heal, m.heal_shield_power = me->stats.heal_shield_power, m.buff_power = me->stats.buff_power;  // [U-484]
     }
     m.uses = champions()[std::size_t(me->champ)].crits ? 1 : 0;

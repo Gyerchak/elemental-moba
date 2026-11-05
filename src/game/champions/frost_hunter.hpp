@@ -11,9 +11,9 @@ inline constexpr ChampionDef kFrostHunter{.name = "Frost Hunter", .element = Ele
        .cd_ms = 11'000, .cost = 30, .desc = "Slide on ice"},
  .e = {.name = "Frost Ring", .kind = K::Burst, .sub = S::Ice, .dmg = 70, .dmg_rank = 35, .ep = 45, .radius = 260,
        .cast_ms = 200, .cd_ms = 13'000, .cost = 50, .cc = C::Frozen, .cc_ms = 1'000,
-       .desc = "Freezes around you (frozen = no heat [U-143])"},
+       .desc = "Freezes around you (frozen = no heat)"},
  .r = {.name = "Ice Wall", .kind = K::Wall, .sub = S::Ice, .range = 650, .width = 280, .cast_ms = 250,
-       .cd_ms = 15'000, .cost = 320, .dur_ms = 2'500, .desc = "Ice wall; costs 320 water (more than you carry): needs a source [U-294][U-339]"},
+       .cd_ms = 15'000, .cost = 320, .dur_ms = 2'500, .desc = "Ice wall; costs 320 water (more than you carry): needs a source"},
  .t = {.name = "Frost Trap", .kind = K::Field, .sub = S::Ice, .dmg = 12, .dmg_rank = 6, .ep = 8, .ad = 10, .range = 650,
        .radius = 160, .cast_ms = 200, .cd_ms = 13'000, .dur_ms = 3'000, .cc = C::Slow, .cc_ms = 600, .cc_val = 45,
        .desc = "Icy ground: slows 45 %"},  // [U-289][U-291] the extra skill (Claude idea); the ultimate is Y

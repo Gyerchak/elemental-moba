@@ -28,7 +28,7 @@ inline constexpr std::int64_t kRecallMs = 6'000;  // recall and the spirit porta
 // the interrupt event of a crowd-control status (0 = none)
 [[nodiscard]] constexpr std::uint32_t interrupt_of(StatusKind k) {
     switch (k) {
-        case StatusKind::Stun: return kIntStun;
+        case StatusKind::Stun: case StatusKind::Fear: case StatusKind::Hex: case StatusKind::Polymorph: return kIntStun;  // [U-508] they stop a channel too
         case StatusKind::Airborne: return kIntAirborne;
         case StatusKind::Frozen: return kIntFrozen;
         case StatusKind::Bloodbound: return kIntBloodbound;

@@ -651,7 +651,10 @@ void World::command(std::uint32_t id, const Cmd& c) {
         default: break;
     }
     if (!u.alive) return refuse(u, "you are dead");
-    if (u.channel_interrupt & kIntMove) u.channel_end_ms = 0;  // [U-337] a move order breaks recall / portal (by their rules)
+    if (u.channel_end_ms && (u.channel_interrupt & kIntMove)) {  // [U-337] a move order breaks recall / portal (by their rules)
+        u.channel_end_ms = 0;
+        std::erase_if(clouds, [&](const Cloud& k) { return k.kind == CloudKind::Arrival && k.owner == u.id; });  // [U-508] nobody comes
+    }
     u.auto_acquired = false;
     u.st.remove(StatusKind::Channel);
     switch (c.kind) {

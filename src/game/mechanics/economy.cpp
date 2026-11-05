@@ -73,6 +73,12 @@ void World::buy(Unit& u, int item) {
         if (d.limit == BuyLimit::OnePerGroup && kItems[std::size_t(it)].group == d.group)
             return refuse(u, "you can carry only one item of this kind (e.g. one pair of boots)");
     }
+    // [U-508] what the courier is bringing counts too: two "only one" items could be ordered on the way
+    for (const Unit::Delivery& dv : u.courier) {
+        if ((d.unique || d.limit == BuyLimit::One) && dv.item == item) return refuse(u, "you can carry only one of this item");
+        if (d.limit == BuyLimit::OnePerGroup && kItems[std::size_t(dv.item)].group == d.group)
+            return refuse(u, "you can carry only one item of this kind (e.g. one pair of boots)");
+    }
     if (by_courier) {  // [U-478] paid now; the parts go with the courier; the item arrives after its trip
         for (std::size_t s = 0; s < u.items.size(); ++s)
             if (plan.used[s]) u.items[s] = -1, u.item_impact[s] = 0;
@@ -106,6 +112,8 @@ void World::buy(Unit& u, int item) {
 
 void World::use_item(Unit& u, int slot, std::int32_t target_x, std::int32_t target_y) {
     if (slot < 0 || slot >= kItemSlots || slot == kBootsSlot) return;  // [U-322] boots never have an active
+    // [U-508] the rider cannot act, a stunned / hexed champion cannot drink or throw anything (only the cast path checked this)
+    if (u.riding || !u.st.can_cast()) return refuse(u, "you can't use items now");
     if (u.items[std::size_t(slot)] < 0 || u.item_cd_ms[std::size_t(slot)] > now_ms) return;
     const ItemDef& d = kItems[std::size_t(u.items[std::size_t(slot)])];
     switch (d.active) {

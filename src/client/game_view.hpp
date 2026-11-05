@@ -177,11 +177,16 @@ private:
         std::uint16_t walk = 0;
         double moved = -10, attacked = -10, died = -10, cast_from = -10;
         bool was_alive = true, was_casting = false;
+        double air_from = -10, air_dur = 0.5;  // [U-508] thrown up: since when, for how long
+        bool in_air = false;
         bool crit = false;          // [U-486] the last autoattack was a crit
         std::uint32_t attack_n = 0; // [U-486] swings so far (alternating attack / attack2)
     };
     std::unordered_map<std::uint32_t, AnimMem> anim_mem_;
     std::unordered_map<std::uint32_t, double> fx_born_;
+    bool preload_started_ = false;  // [U-505] the models of this match are loaded before it is shown
+    int preload_total_ = 0;
+    bool first_paint_ = false;
     PostFx post_;              // [U-501] post-processing of the world
     bool post_tried_ = false;
     SDL_Texture* mask_tex_ = nullptr;      // [U-502] per map cell: r water, g lava (the animated ground shader)

@@ -12,7 +12,7 @@ inline constexpr ChampionDef kEmberMonk{.name = "Ember Monk", .element = Element
        .cc_val = 1'000, .group = true, .desc = "Fire field; other firebenders can feed it (wildfire)"},
  .e = {.name = "Jet Propulsion", .kind = K::Dash, .sub = S::Fire, .dmg = 40, .dmg_rank = 20, .ep = 30, .range = 420,
        .width = 90, .speed = 1'600, .cast_ms = 0, .cd_ms = 14'000, .cd_rank = -1'000, .cost = 30,
-       .desc = "Fly a short way on fire jets [U-51]"},
+       .desc = "Fly a short way on fire jets"},
  .r = {.name = "Combustion", .kind = K::Burst, .sub = S::Combustion, .dmg = 120, .dmg_rank = 60, .ep = 75,
        .range = 1'100, .radius = 190, .cast_ms = 350, .cd_ms = 10'000, .cost = 40, .delay_ms = 700,
        .desc = "Delayed explosion at a point; the centre hits +30 % (sweet spot)", .sweet_pct = 30},

@@ -339,9 +339,23 @@ void World::cast_skill(Unit& u, Slot slot, std::int32_t tx, std::int32_t ty, std
         }
         case SkillKind::Shield: {
             const std::int32_t sh = lol_given_shield(&u, std::int32_t(r.damage * 100));  // [U-484]
-            u.st.add(StatusKind::Shield, now_ms + dur_ms, sh, u.id);
-            u.stat_shielding += sh / 100;
-            u.shield_sub = std::uint8_t(d.sub);  // shown on the HP bar [U-155]
+            auto give = [&](Unit& o) {
+                o.st.add(StatusKind::Shield, now_ms + dur_ms, sh, u.id);
+                o.shield_sub = std::uint8_t(d.sub);  // shown on the HP bar [U-155]
+                u.stat_shielding += sh / 100;
+            };
+            if (!d.ally) give(u);
+            else if (r.radius > 0) {  // [U-508] allies inside the aimed circle (the 7 ally shields used to reach only the caster)
+                for (Unit& o : units)
+                    if (o.alive && o.team == u.team && o.kind == UnitKind::Champion && dist2(o.ux(), o.uy(), px, py) <= r.radius * r.radius) give(o);
+            } else {  // the ally nearest the aimed point, within range; nobody there = myself
+                Unit* best = &u;
+                std::int64_t bd = dist2(u.ux(), u.uy(), px, py);
+                for (Unit& o : units)
+                    if (o.alive && o.team == u.team && o.kind == UnitKind::Champion && dist2(o.ux(), o.uy(), u.ux(), u.uy()) <= r.range * r.range)
+                        if (const std::int64_t dd = dist2(o.ux(), o.uy(), px, py); dd < bd) bd = dd, best = &o;
+                give(*best);
+            }
             if (d.size_bonus) {  // [U-129] armour makes the model (and hitbox) bigger
                 u.tmp_size = d.size_bonus;
                 u.tmp_size_until = now_ms + dur_ms;

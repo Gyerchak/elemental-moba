@@ -432,6 +432,8 @@ void World::respawn(Unit& u) {
     // [U-383] nothing of the last life carries over
     u.riding = false, u.steer_until = 0, u.draw_pts.clear(), u.channel_end_ms = 0, u.windup_end_ms = 0;
     u.untargetable_until = 0, u.flask_revive = 0, u.emote = 255;
+    // [U-508] … also the forms and windows that kept running while dead
+    u.burn_acc = 0, u.transform_until = 0, u.tmp_size_until = 0, u.lotus_until = 0, u.flask_until = 0, u.magic_until = 0, u.chirush_until = 0;
     recompute_stats(u);
     u.hp = u.stats.health.total();
     u.res = u.stats.resource == ResourceKind::Rage ? 0 : u.res_max;  // [U-268] rage starts empty

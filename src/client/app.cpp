@@ -21,7 +21,10 @@ using namespace gfx;
 App::App(AppOptions o) : opt_(std::move(o)) {
     set_.load();  // settings.cfg next to where the game starts [U-99]
     if (!opt_.name.empty()) set_.name = opt_.name;
-    if (opt_.quality >= 0) set_.render_quality = std::min(opt_.quality, 3);  // [U-502] (not saved unless Options change something)
+    // [U-508] those options really are for this run only: the exit used to save them over the player's own choice
+    set_.hold_saves = opt_.autotest_s > 0 || opt_.quality >= 0 || opt_.effects >= 0 || !opt_.lang.empty();
+    if (!opt_.lang.empty()) set_.language = opt_.lang;
+    if (opt_.quality >= 0) set_.render_quality = std::min(opt_.quality, 3);  // [U-502]
     if (opt_.effects >= 0) set_.apply_fx_preset(std::min(opt_.effects, 3));
     loc::load(set_.language);  // [U-239]
     if (!apply_version(set_.version).empty()) set_.version = kOfficialVersion;  // [U-95] own version (bad file → official)
@@ -163,6 +166,7 @@ int App::run() {
         ui_.clicked = ui_.rclicked = ui_.backspace = ui_.enter = false;
         ui_.wheel = 0;
         ui_.typed.clear();
+        ui_.copy = false;
         SDL_Event e;
         while (SDL_PollEvent(&e)) {
             if (ren_) SDL_ConvertEventToRenderCoordinates(ren_, &e);  // [U-389] mouse in render pixels (HiDPI / scaled screens)
@@ -195,6 +199,15 @@ int App::run() {
                 continue;
             }
             if (e.type == SDL_EVENT_TEXT_INPUT) ui_.typed += e.text.text;
+            if (e.type == SDL_EVENT_KEY_DOWN && (e.key.mod & SDL_KMOD_CTRL) && SDL_TextInputActive(win_)) {  // [U-506] copy / paste in text fields
+                if (e.key.key == SDLK_C) ui_.copy = true;
+                if (e.key.key == SDLK_V)
+                    if (char* clip = SDL_GetClipboardText()) {
+                        for (const char* c = clip; *c; ++c)
+                            if (*c != '\n' && *c != '\r') ui_.typed += *c;
+                        SDL_free(clip);
+                    }
+            }
             if (e.type == SDL_EVENT_KEY_DOWN) {
                 if (e.key.key == SDLK_BACKSPACE) ui_.backspace = true;
                 if (e.key.key == SDLK_RETURN || e.key.key == SDLK_KP_ENTER) ui_.enter = true;

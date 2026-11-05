@@ -2,20 +2,21 @@
 #include "client/sprites.hpp"
 #include "client/anim.hpp"
 
+#include <algorithm>
+#include <atomic>
 #include <cmath>
+#include <memory>
+#include <thread>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
 
 namespace em {
 
-const SpriteSheet* Sprites::get_dir(const std::string& dir) {
-    const std::string key = (res_ ? res_->pack() : std::string()) + "|" + dir;  // (a pack switch finds other files)
-    if (auto it = cache_.find(key); it != cache_.end()) return it->second.get();
+namespace {
+std::unique_ptr<SpriteSheet> parse_sheet(const std::string& txt) {
     std::unique_ptr<SpriteSheet> s;
-    const std::string txt = res_ ? res_->file(dir + "/sheet.txt") : std::string();
-    if (!txt.empty()) {
-        s = std::make_unique<SpriteSheet>();
+    s = std::make_unique<SpriteSheet>();
         std::ifstream in(txt);
         std::string line;
         while (std::getline(in, line)) {
@@ -40,6 +41,85 @@ const SpriteSheet* Sprites::get_dir(const std::string& dir) {
                 s->anims[name] = a;
             }
         }
+    return s;
+}
+}  // namespace
+
+// [U-505] Decoding a sheet takes 75–400 ms: done on background threads BEFORE the match, never during play. The main
+// thread only uploads the finished pictures, a few per frame (a texture can only be made there).
+void Sprites::preload(const std::vector<std::string>& dirs) {
+    if (!res_) return;
+    std::vector<Job> jobs;
+    for (const std::string& dir : dirs) {
+        const std::string key = res_->pack() + "|" + dir;
+        if (cache_.contains(key) || std::ranges::any_of(pending_, [&](const std::string& p) { return p == key; })) continue;
+        const std::string txt = res_->file(dir + "/sheet.txt"), png = res_->file(dir + "/sheet.png");
+        if (txt.empty() || png.empty()) continue;
+        pending_.push_back(key);
+        jobs.push_back({key, dir, txt, png});
+    }
+    if (jobs.empty()) return;
+    auto queue = std::make_shared<std::vector<Job>>(std::move(jobs));
+    auto next = std::make_shared<std::atomic<std::size_t>>(0);
+    const float scale = scale_;
+    const int workers = std::clamp(int(std::thread::hardware_concurrency()) - 2, 1, 6);
+    for (int w = 0; w < workers; ++w)
+        std::thread([this, queue, next, scale] {
+            for (std::size_t i = (*next)++; i < queue->size(); i = (*next)++) {
+                const Job& j = (*queue)[i];
+                Decoded d{j.key, j.dir, parse_sheet(j.txt), SDL_LoadPNG(j.png.c_str())};
+                if (d.pic && scale < 0.99f)
+                    if (SDL_Surface* small = SDL_ScaleSurface(d.pic, std::max(1, int(float(d.pic->w) * scale)), std::max(1, int(float(d.pic->h) * scale)), SDL_SCALEMODE_LINEAR)) {
+                        SDL_DestroySurface(d.pic);
+                        d.pic = small;
+                    }
+                const std::scoped_lock lock(done_mutex_);
+                done_.push_back(std::move(d));
+            }
+        }).detach();
+}
+
+int Sprites::pump(int max_uploads) {
+    for (int n = 0; n < max_uploads; ++n) {
+        Decoded d;
+        {
+            const std::scoped_lock lock(done_mutex_);
+            if (done_.empty()) break;
+            d = std::move(done_.back());
+            done_.pop_back();
+        }
+        std::erase(pending_, d.key);
+        std::unique_ptr<SpriteSheet> s = std::move(d.sheet);
+        if (d.pic) {
+            if (s && !s->anims.empty())
+                if (SDL_Texture* t = SDL_CreateTextureFromSurface(res_->renderer(), d.pic)) {
+                    SDL_SetTextureScaleMode(t, scale_ < 0.99f ? SDL_SCALEMODE_NEAREST : SDL_SCALEMODE_LINEAR);
+                    s->tex = t, s->owned = true, s->tex_scale = scale_ < 0.99f ? scale_ : 1.f;
+                }
+            SDL_DestroySurface(d.pic);
+        }
+        if (!s || !s->tex) {  // [U-499] bigger than the GPU allows …: say so instead of failing silently
+            if (std::error_code ec; std::filesystem::create_directories("logs", ec), true)
+                if (std::ofstream lg("logs/models.txt", std::ios::app); lg) lg << d.dir << "/sheet.png could not be loaded: " << SDL_GetError() << '\n';
+            s.reset();
+        }
+        cache_[d.key] = std::move(s);
+    }
+    return int(pending_.size());
+}
+
+const SpriteSheet* Sprites::get_dir(const std::string& dir) {
+    const std::string key = (res_ ? res_->pack() : std::string()) + "|" + dir;  // (a pack switch finds other files)
+    if (auto it = cache_.find(key); it != cache_.end()) return it->second.get();
+    while (std::ranges::any_of(pending_, [&](const std::string& p) { return p == key; })) {  // [U-505] (being decoded: wait for it)
+        pump(8);
+        if (auto it = cache_.find(key); it != cache_.end()) return it->second.get();
+        SDL_Delay(1);
+    }
+    std::unique_ptr<SpriteSheet> s;
+    const std::string txt = res_ ? res_->file(dir + "/sheet.txt") : std::string();
+    if (!txt.empty()) {
+        s = parse_sheet(txt);
         if (scale_ < 0.99f) {  // [U-502] a scaled-down copy of the original (the full size never goes to the GPU)
             const std::string png = res_->file(dir + "/sheet.png");
             if (SDL_Surface* full = png.empty() ? nullptr : SDL_LoadPNG(png.c_str())) {
@@ -111,11 +191,14 @@ void Sprites::draw(SDL_Renderer* r, const SpriteSheet& s, const std::string& ani
     SDL_SetTextureColorMod(s.tex, tint.r, tint.g, tint.b);
     SDL_SetTextureAlphaMod(s.tex, tint.a);
     const SDL_FRect src = frame_rect(f);
-    SDL_RenderTexture(r, s.tex, &src, &dst);
+    const SDL_FPoint pivot{size * s.ax, size * s.ay * 0.7f};
+    if (tilt != 0) SDL_RenderTextureRotated(r, s.tex, &src, &dst, tilt, &pivot, SDL_FLIP_NONE);
+    else SDL_RenderTexture(r, s.tex, &src, &dst);
     if (smooth && next != f && mix > 0.02f) {  // [U-501] the next frame fades in over this one
         const SDL_FRect src2 = frame_rect(next);
         SDL_SetTextureAlphaMod(s.tex, std::uint8_t(float(tint.a) * mix));
-        SDL_RenderTexture(r, s.tex, &src2, &dst);
+        if (tilt != 0) SDL_RenderTextureRotated(r, s.tex, &src2, &dst, tilt, &pivot, SDL_FLIP_NONE);
+        else SDL_RenderTexture(r, s.tex, &src2, &dst);
     }
     SDL_SetTextureColorMod(s.tex, 255, 255, 255);
     SDL_SetTextureAlphaMod(s.tex, 255);

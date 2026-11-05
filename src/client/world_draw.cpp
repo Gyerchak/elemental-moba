@@ -419,7 +419,7 @@ void GameView::draw_units(NetClient& net, double now_s) {
             }
         }
         am.was_casting = u.casting != 0;
-        if (!u.alive && kind == UnitKind::Champion && now_s - am.died > 2.0) continue;
+        // ([U-495] a dead champion's body stays until it respawns: the old rule hid it after 2 s)
         const AnimSlot anim = anim_of(u);
         const Dir face{u.fx, u.fy};
         const Shape body = place_body(body_by_index(u.body), std::int32_t(du.x), std::int32_t(du.y), face, u.walk, u.size_pct);
@@ -427,7 +427,25 @@ void GameView::draw_units(NetClient& net, double now_s) {
         if (anim == AnimSlot::Frozen) tc = mixc(tc, {200, 240, 255, 255}, 65);
         const Rgba fill = kind == UnitKind::Champion && u.champ >= 0 ? mixc(tc, hex(champions()[std::size_t(u.champ)].colour), 45) : tc;
         float H = height_of(u) * float(u.size_pct) / 100.f;
-        float lift = anim == AnimSlot::FlySelf ? 60.f : anim == AnimSlot::FlyEnemy ? 40.f : 0.f;
+        float lift = anim == AnimSlot::FlySelf ? 60.f : 0.f;
+        float air_tilt = 0;
+        {  // [U-508] knocked up: a real arc over its whole time (up, down), a tumble, dust when it leaves and lands the ground
+            AnimMem& air = anim_mem_[u.id];
+            const bool up = anim == AnimSlot::FlyEnemy;
+            if (up && !air.in_air) {
+                air.in_air = true, air.air_from = now_s;
+                air.air_dur = u.cc_kind == std::uint8_t(StatusKind::Airborne) && u.cc_left_cs > 0 ? std::max(0.25, u.cc_left_cs / 100.0) : 0.6;
+                particles_.burst(Element::Earth, SubElement::Earth, du.x, du.y, 26, {150, 130, 100, 255}, 0.7f);
+            } else if (!up && air.in_air) {
+                air.in_air = false;
+                particles_.burst(Element::Earth, SubElement::Earth, du.x, du.y, 30, {150, 130, 100, 255}, 1.f);
+            }
+            if (up) {
+                const float q = std::clamp(float((now_s - air.air_from) / air.air_dur), 0.f, 1.f);
+                lift = 110.f * std::sin(q * 3.14159f);
+                air_tilt = 28.f * std::sin(q * 6.28318f) * (u.id % 2 ? 1.f : -1.f);
+            }
+        }
         if (anim == AnimSlot::Swim) H *= 0.45f;                                                        // half under water
         if (u.riding && std::ranges::any_of(comp_draw_, [&](const net::NetCompanion& c) { return c.owner == u.id && c.carrying; }))
             lift += 45.f;  // [U-407] on the companion's back (not while only waiting for it [U-429])
@@ -449,9 +467,9 @@ void GameView::draw_units(NetClient& net, double now_s) {
             if (u.id == net.my_unit) outline_shape(r_, view_, body, {255, 230, 80, std::uint8_t(std::max<int>(ha, 60))}, 1.f);
             if (anim == AnimSlot::Swim) ground_ring(r_, view_, du.x, du.y, 50 + 10 * float(std::sin(now_s * 4)), {200, 230, 255, 160}, 24);
             if (sheet) {  // [U-258] the Blender model, as a sprite
-                if (set_.fx_shadows && lift < 1) {  // [U-501] a soft shadow grounds the model
+                if (set_.fx_shadows) {  // [U-501] a soft shadow grounds the model; [U-508] it stays on the ground, fainter, when the unit is in the air
                     const float sr = float(body_reach(body_by_index(u.body), u.size_pct)) * 1.7f;
-                    soft_disc(r_, view_.sx(du.x), view_.sy(du.y), view_.rx(sr), view_.ry(sr), {0, 0, 0, 120});
+                    soft_disc(r_, view_.sx(du.x), view_.sy(du.y), view_.rx(sr), view_.ry(sr), {0, 0, 0, std::uint8_t(std::clamp(120.f - lift * 0.7f, 30.f, 120.f))});
                 }
                 // [U-486] the animation KEY for what the unit does (client/anim.hpp); the sheet falls back / remaps it
                 std::string an = "idle";
@@ -492,11 +510,19 @@ void GameView::draw_units(NetClient& net, double now_s) {
                 if (anim == AnimSlot::Burning || has_status(u, StatusKind::Burn))
                     tint = mixc(tint, {255, 110, 40, 255}, int(35 + 20 * std::sin(now_s * 14)));
                 if (anim == AnimSlot::Frozen) tint = mixc(tint, {150, 215, 255, 255}, 70);
+                // [U-508] statuses that had no look at all: fear = dark purple, hex / polymorph = small + coloured, invisible = see-through (only allies get it)
+                const bool critter = has_status(u, StatusKind::Hex) || has_status(u, StatusKind::Polymorph);
+                if (has_status(u, StatusKind::Fear)) tint = mixc(tint, {120, 60, 170, 255}, 55);
+                if (has_status(u, StatusKind::Hex)) tint = mixc(tint, {110, 230, 110, 255}, 60);
+                if (has_status(u, StatusKind::Polymorph)) tint = mixc(tint, {255, 160, 220, 255}, 60);
+                if (has_status(u, StatusKind::Invisible)) tint.a = 110;
                 if (!u.alive) tint = {150, 150, 150, 220};
                 float gy = view_.sy_h(du.y, lift);
                 if (anim == AnimSlot::Swim) gy += 14 * z;  // half in the water
+                Sprites::tilt = air_tilt;
                 Sprites::draw(r_, *sheet, an, t, sprite_dir(float(u.fx), float(u.fy), view_.flip), view_.sx(du.x), gy,
-                              z * float(u.size_pct) / 100.f, tint, hold);
+                              z * float(u.size_pct) / 100.f * (critter ? 0.6f : 1.f), tint, hold);
+                Sprites::tilt = 0;
                 // [U-260] flames on a burning unit
                 if (u.alive && has_status(u, StatusKind::Burn))
                     for (int k = 0; k < 7; ++k) {
@@ -553,6 +579,32 @@ void GameView::draw_units(NetClient& net, double now_s) {
                         const float f = float(std::fmod(now_s * 1.2 + k * 0.33, 1.0));
                         fill_circle(r_, sx0 + float(k * 9 - 9) * z, view_.sy_h(du.y, lift + H * (1 - f)), 2 * z + 1, {120, 180, 255, std::uint8_t(220 * (1 - f))}, 6);
                     }
+                if (has_status(u, StatusKind::Fear))  // [U-508] dark wisps circling above the head
+                    for (int k = 0; k < 4; ++k) {
+                        const float a = float(now_s * 4) + float(k) * 1.57f;
+                        fill_circle(r_, sx0 + std::cos(a) * 16 * z, view_.sy_h(du.y, lift + H + 22) + std::sin(a) * 5 * z, 3 * z + 1, {150, 70, 210, 230}, 8);
+                    }
+                if (has_status(u, StatusKind::Hex) || has_status(u, StatusKind::Polymorph)) {  // [U-508] a puff of magic around the small body
+                    const Rgba c = has_status(u, StatusKind::Hex) ? Rgba{130, 240, 130, 200} : Rgba{255, 170, 225, 200};
+                    for (int k = 0; k < 5; ++k) {
+                        const float f = float(std::fmod(now_s * 0.9 + k * 0.2, 1.0)), a = float(k) * 1.257f + float(now_s);
+                        fill_circle(r_, sx0 + std::cos(a) * 18 * z, view_.sy_h(du.y, lift + 40 * f), (3 - 2 * f) * z + 1, with_alpha(c, std::uint8_t(200 * (1 - f))), 8);
+                    }
+                }
+                if (has_status(u, StatusKind::Disarm) || has_status(u, StatusKind::Subdue)) {  // [U-508] a crossed weapon over the head
+                    const float cy = view_.sy_h(du.y, lift + H + 26);
+                    line(r_, sx0 - 8 * z, cy - 8 * z, sx0 + 8 * z, cy + 8 * z, {235, 90, 70, 240});
+                    line(r_, sx0 + 8 * z, cy - 8 * z, sx0 - 8 * z, cy + 8 * z, {235, 90, 70, 240});
+                }
+                if (has_status(u, StatusKind::Break))  // [U-508] passives off: a broken ring at the feet
+                    for (int k = 0; k < 4; ++k) {
+                        const float a = float(k) * 1.57f + 0.3f;
+                        const float x1 = du.x + std::cos(a) * (rb + 12), y1 = du.y + std::sin(a) * (rb + 12);
+                        const float x2 = du.x + std::cos(a + 0.9f) * (rb + 12), y2 = du.y + std::sin(a + 0.9f) * (rb + 12);
+                        line(r_, view_.sx(x1), view_.sy(y1), view_.sx(x2), view_.sy(y2), {200, 180, 120, 220});
+                    }
+                if (has_status(u, StatusKind::DebuffImmune))  // [U-508] a golden shell
+                    fill_ellipse(r_, sx0, view_.sy_h(du.y, lift + H * 0.5f), (rb + 16) * z, (H * 0.5f + 18) * z * view_.hz + 6 * z, {255, 215, 90, std::uint8_t(60 + 25 * std::sin(now_s * 3))}, 20);
                 if (has_status(u, StatusKind::Airborne))  // dust where it was thrown up
                     ground_fill(r_, view_, du.x, du.y, rb + 10, {150, 130, 100, 70}, 18);
                 // [U-399] an earthbender lifts the rock out of the ground first: it rises in front during the cast

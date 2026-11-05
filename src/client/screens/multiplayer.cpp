@@ -3,6 +3,7 @@
 #include "net/ranking.hpp"
 #include <algorithm>
 #include <format>
+#include <fstream>
 
 #include "client/app.hpp"
 #include "game/match/maps.hpp"
@@ -12,8 +13,13 @@ namespace em {
 
 using namespace gfx;
 
+std::string lan_address();  // (champ_select.cpp)
+
 namespace {
-std::pair<std::string, std::uint16_t> split_address(const std::string& a) {
+std::pair<std::string, std::uint16_t> split_address(std::string a) {
+    if (a.starts_with("em-join://")) a = a.substr(10);  // [U-506] an Invite link pasted as it is
+    while (!a.empty() && a.back() == ' ') a.pop_back();
+    while (!a.empty() && a.front() == ' ') a.erase(a.begin());
     const auto c = a.rfind(':');
     if (c == std::string::npos) return {a, net::kDefaultPort};
     return {a.substr(0, c), std::uint16_t(std::clamp(std::atoi(a.c_str() + c + 1), 1, 65'535))};
@@ -45,6 +51,17 @@ void App::multiplayer() {
         if (pings_[i].valid() && pings_[i].wait_for(std::chrono::seconds(0)) == std::future_status::ready) infos_[i] = pings_[i].get();
 
     float y = 70;
+    {  // [U-506] the public server (SERVER.txt in the game folder) is always in the list
+        static bool added = false;
+        if (std::ifstream pub("SERVER.txt"); pub && !added) {
+            added = true;
+            std::string addr;
+            pub >> addr;
+            if (!addr.empty() && std::ranges::none_of(set_.servers, [&](const ServerEntry& e) { return e.address == addr; }))
+                set_.servers.push_back({"Public test server", addr});
+        }
+        if (infos_.size() < set_.servers.size()) infos_.resize(set_.servers.size());
+    }
     for (std::size_t i = 0; i < set_.servers.size(); ++i, y += 58) {
         const ServerEntry& s = set_.servers[i];
         const ServerInfo& in = infos_[i];
@@ -59,6 +76,10 @@ void App::multiplayer() {
                                      : std::format("{}: {}", tr("offline"), in.error);
         text(ren_, x + 520, y + 8, st, in.ok ? Rgba{140, 230, 140} : Rgba{230, 120, 120});
         if (in.ok) text(ren_, x + 520, y + 26, platforms_text(in.platforms), {150, 150, 170});
+        if (button(ren_, ui_, x + 776, y + 28, 58, 22, tr("Copy"))) {  // [U-506] the address, to send to somebody
+            SDL_SetClipboardText(s.address.c_str());
+            status_ = std::format("{} {}", tr("copied:"), s.address);
+        }
         if (hover(ui_, x, y, 840, 54) && ui_.clicked) {
             if (sel) connect_to(s.address);  // double click = join
             selected_server_ = int(i);
@@ -203,6 +224,14 @@ void App::host(bool dedicated) {
     }
     if (button(ren_, ui_, x + 320, y, 200, 40, tr("Back"))) go(back_);
     if (!status_.empty()) text(ren_, x, y + 56, status_, {255, 160, 120}, 1.5f);
+    {  // [U-506] my address, ready to copy
+        const std::string mine = std::format("{}:{}", lan_address(), port_);
+        text(ren_, x, y + 124, std::format("{}: {}", tr("Your LAN address"), mine), {230, 225, 170}, 1.5f);
+        if (button(ren_, ui_, x + 420, y + 118, 70, 26, tr("Copy"))) {
+            SDL_SetClipboardText(mine.c_str());
+            status_ = std::format("{} {}", tr("copied:"), mine);
+        }
+    }
     text(ren_, x, y + 80, tr("Others join with your IP address and this port (open the UDP port in your router for the internet)."), {150, 150, 170});
     text(ren_, x, y + 98, tr("LAN: players in your local network join with your LAN address (the Invite button in the lobby copies it)."), {150, 150, 170});
 }

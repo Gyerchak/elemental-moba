@@ -184,7 +184,12 @@ void World::step_bot(Unit& u) {
                 }
             } else if (u.order.kind != OrderKind::Recall &&
                        std::ranges::none_of(companions, [&](const Companion& c) { return c.owner == u.id; })) {  // [U-383]
-                send({.kind = CmdKind::Recall});
+                // [U-508] the companion on its 3 min cooldown: walk home instead of standing in the lane
+                if (now_ms >= u.companion_ready_ms) send({.kind = CmdKind::Recall});
+                else if (now_ms >= u.botm.next_path_ms) {
+                    u.botm.next_path_ms = now_ms + 800;
+                    send({.kind = CmdKind::Move, .x = fx_, .y = fy_});
+                }
             }
             return;
         }

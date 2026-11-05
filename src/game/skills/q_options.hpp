@@ -16,14 +16,14 @@ inline constexpr QOptionRow kQOptions[] = {
     // (first made for Frost Hunter)
     {Element::Water, {.name = "Ice Shards", .kind = K::Cone, .sub = S::Ice, .dmg = 80, .dmg_rank = 40, .ep = 50, .ad = 20,
         .range = 480, .width = 300, .cd_ms = 6'000, .cost = 40, .cc = C::Slow, .cc_ms = 1'500, .cc_val = 30,
-        .desc = "Ice cone, slows (state change −20 % [U-28])"}},
+        .desc = "Ice cone, slows (state change −20 %)"}},
     // (first made for Frost Hunter)
     {Element::Water, {.name = "Ice Spear", .kind = K::Bolt, .sub = S::Ice, .dmg = 90, .dmg_rank = 45, .ep = 55, .range = 1'000,
         .width = 60, .speed = 1'800, .cast_ms = 300, .cd_ms = 7'000, .cost = 45, .desc = "Long ice spear"}},
     // (first made for Tide Healer)
     {Element::Water, {.name = "Water Whip", .kind = K::Bolt, .sub = S::Water, .dmg = 60, .dmg_rank = 35, .ep = 50, .range = 900,
         .width = 80, .speed = 1'400, .cd_ms = 5'000, .cost = 40,
-        .desc = "Water lash; counters one fire skill [U-17]"}},
+        .desc = "Water lash; counters one fire skill"}},
     // (first made for Tide Healer)
     {Element::Water, {.name = "Water Wave", .kind = K::Wave, .sub = S::Water, .dmg = 50, .dmg_rank = 30, .ep = 40, .range = 750,
         .width = 260, .speed = 900, .cast_ms = 300, .cd_ms = 8'000, .cost = 50, .knock = 140, .pierce = true,
@@ -46,12 +46,12 @@ inline constexpr QOptionRow kQOptions[] = {
     // (first made for Stone Warden)
     {Element::Earth, {.name = "Rock Throw", .kind = K::Bolt, .sub = S::Earth, .dmg = 70, .dmg_rank = 35, .ep = 40, .ad = 20,
         .range = 900, .width = 90, .speed = 1'200, .cast_ms = 400, .cd_ms = 9'000, .cd_rank = -500,
-        .cc = C::Slow, .cc_ms = 1'500, .cc_val = 30, .desc = "Heavy rock, slows; blocks air/fire [U-20]"}},
+        .cc = C::Slow, .cc_ms = 1'500, .cc_val = 30, .desc = "Heavy rock, slows; blocks air/fire"}},
     // (first made for Stone Warden)
     {Element::Earth, {.name = "Heavy Stone", .kind = K::Boulder, .sub = S::Earth, .dmg = 110, .dmg_rank = 50, .ep = 50,
         .ad = 20, .range = 700, .width = 130, .speed = 1'100, .cast_ms = 450, .cd_ms = 12'000, .cc = C::Stun,
         .cc_ms = 700, .casts = 2, .recast_ms = 6'000,
-        .desc = "Cast 1 raises a boulder, cast 2 pushes it; another earthbender can push it too [U-27]"}},
+        .desc = "Cast 1 raises a boulder, cast 2 pushes it; another earthbender can push it too"}},
     // ---------------------------------------------------------------- fire
     // (first made for Ember Monk)
     {Element::Fire, {.name = "Fire Bolt", .kind = K::Bolt, .sub = S::Fire, .dmg = 80, .dmg_rank = 40, .ep = 60,
@@ -63,16 +63,16 @@ inline constexpr QOptionRow kQOptions[] = {
     // (first made for Storm Daughter)
     {Element::Fire, {.name = "Lightning Bolt", .kind = K::Bolt, .sub = S::Lightning, .dmg = 70, .dmg_rank = 40, .ep = 50,
         .ad = 30, .range = 1'000, .width = 50, .speed = 2'600, .cd_ms = 6'000, .cost = 30, .pierce = true,
-        .desc = "Piercing lightning; chains through connected water [X-58]"}},
+        .desc = "Piercing lightning; chains through connected water"}},
     // (first made for Storm Daughter)
     {Element::Fire, {.name = "Spark Volley", .kind = K::Bolt, .sub = S::Lightning, .dmg = 40, .dmg_rank = 20, .ep = 30,
         .range = 800, .width = 50, .speed = 2'000, .cd_ms = 9'000, .cost = 30, .casts = 3, .recast_ms = 3'000,
-        .desc = "3 recasts in 3 s (multicast) [U-106]"}},
+        .desc = "3 recasts in 3 s (multicast)"}},
     // ---------------------------------------------------------------- air
     // (first made for Mist Dancer)
     {Element::Air, {.name = "Steam Burst", .kind = K::Burst, .sub = S::Steam, .dmg = 85, .dmg_rank = 40, .ep = 60,
         .range = 900, .radius = 180, .cast_ms = 300, .cd_ms = 6'000, .delay_ms = 500,
-        .desc = "Steam explosion; leaves fog 3 s [X-57]"}},
+        .desc = "Steam explosion; leaves fog 3 s"}},
     // (first made for Mist Dancer)
     {Element::Air, {.name = "Mist Bolt", .kind = K::Bolt, .sub = S::Air, .dmg = 70, .dmg_rank = 35, .ep = 55, .range = 950,
         .width = 70, .speed = 1'500, .cd_ms = 4'500, .desc = "Bolt of mist"}},
@@ -88,10 +88,10 @@ inline constexpr QOptionRow kQOptions[] = {
     // (first made for Chi Blocker)
     {Element::None, {.name = "Chi Strike", .kind = K::Dash, .dmg = 60, .dmg_rank = 30, .ad = 80, .range = 350, .width = 80,
         .speed = 1'500, .cast_ms = 0, .cd_ms = 8'000, .cost = 50, .cc = C::Mute, .cc_ms = 1'500,
-        .desc = "Dash strike: blocks chi = no bending 1.5 s [U-77]"}},
+        .desc = "Dash strike: blocks chi = no bending 1.5 s"}},
     // (first made for Chi Blocker)
     {Element::None, {.name = "Knife Throw", .kind = K::Bolt, .dmg = 60, .dmg_rank = 35, .ad = 90, .range = 850, .width = 50,
-        .speed = 2'000, .cast_ms = 150, .cd_ms = 5'000, .cost = 40, .desc = "Thrown knife — 3 charges, one back every 6 s [U-433]",
+        .speed = 2'000, .cast_ms = 150, .cd_ms = 5'000, .cost = 40, .desc = "Thrown knife — 3 charges, one back every 6 s",
         .charges = 3, .charge_ms = 6'000}},
     // [U-270] third non-bender option (Claude idea)
     {Element::None, {.name = "Bolas Throw", .kind = K::Bolt, .dmg = 45, .dmg_rank = 25, .ad = 70, .range = 750, .width = 70,

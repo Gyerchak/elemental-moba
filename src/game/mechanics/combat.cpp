@@ -50,7 +50,8 @@ void World::interrupt(Unit& u, std::uint32_t event) {
     if (u.casting) {
         const SkillDef* d = u.cast.slot < u.skill.size() ? u.skill[u.cast.slot] : nullptr;
         std::uint32_t mask = d && d->interrupt ? d->interrupt : kIntDefaultCast;
-        if (d && d->sub == SubElement::Physical) mask &= ~std::uint32_t(kIntMute);  // mute stops bending only
+        // [U-508] chi block stops only the bending it blocks: a water block leaves a fire cast and weapon skills alone
+        if (d && !chi_blocked(u, base_element(skill_sub(u, *d)))) mask &= ~std::uint32_t(kIntMute);
         if (mask & event) {
             u.casting = false;
             u.windup_end_ms = 0;
@@ -82,8 +83,11 @@ void World::step_tethers() {
 }
 
 void World::knock(Unit& dst, std::int32_t from_x, std::int32_t from_y, std::int32_t dist, std::uint32_t src_id) {
-    if (dist <= 0 || dst.is_structure() || dst.kind == UnitKind::Boss) return;
+    if (dist <= 0 || !dst.alive || dst.is_structure() || dst.kind == UnitKind::Boss) return;
+    if (dst.st.has(StatusKind::DebuffImmune) && src_id != dst.id) return;  // [U-508] a displacement is crowd control too
     interrupt(dst, kIntKnock);  // [U-337] displacement
+    for (Effect& f : fx)  // [U-508] thrown out of a dash: it ends (else the dash pulled the unit back onto its line)
+        if (f.owner == dst.id && f.def && f.def->kind == SkillKind::Dash) f.dead = true;
     const Dir d = dir_of(std::int64_t(dst.ux()) - from_x, std::int64_t(dst.uy()) - from_y);
     std::int32_t moved = 0;
     for (; moved < dist; moved += 8) {
@@ -174,12 +178,13 @@ void World::apply_hit(Unit* src, Unit& dst, std::int32_t hund, SubElement sub, b
     }
     if (dst.kind == UnitKind::Champion) {
         std::erase_if(dst.taken, [&](const TakenHit& h) { return now_ms - h.ms > 30'000; });
-        if (dst.taken.size() < 400)
+        if (dst.taken.size() < 400) {
             dst.taken.push_back({now_ms, src ? src->id : 0, tag, hund / 100, (before_shield - hund) / 100, std::uint8_t(sub), physical,
                                  std::uint8_t(src ? int(src->kind) : 255),
                                  std::uint8_t(!src ? 0 : src->kind == UnitKind::Minion ? int(src->mtype)
                                                      : src->kind == UnitKind::Champion ? src->champ : mob_name_id(*src))});
             dst.taken.back().pre = last_pre_, dst.taken.back().pre_pen = last_pre_pen_, dst.taken.back().dtype = dmg_type_;  // [U-492]
+        }
     }
     if (src) {
         dst.last_hitter = src->id;
@@ -220,8 +225,9 @@ void World::apply_hit(Unit* src, Unit& dst, std::int32_t hund, SubElement sub, b
         dst.stat_dmg_from_champs += hund / 100;  // [U-296]
     }
     // ---- keystone: Elemental Surge — 3 skill hits on the same champion within 3 s [U-177]
-    if (src && !is_auto && src->kind == UnitKind::Champion && dst.kind == UnitKind::Champion && dst.alive &&
-        has_keystone(src->loadout, KeystoneId::ElementalSurge)) {
+    // ([U-508] burn ticks and passives are not skill hits: a burn alone used to fire it every 1.5 s)
+    if (src && !is_auto && tag.from != DmgFrom::Burn && tag.from != DmgFrom::Passive && src->kind == UnitKind::Champion &&
+        dst.kind == UnitKind::Champion && dst.alive && has_keystone(src->loadout, KeystoneId::ElementalSurge)) {
         if (src->surge_target == dst.id && now_ms - src->surge_ms <= 3'000) ++src->surge_count;
         else src->surge_count = 1;
         src->surge_target = dst.id;
@@ -296,7 +302,10 @@ void World::update_attack(Unit& u) {
     }
     const Dir want = dir_of(std::int64_t(t->x) - u.x, std::int64_t(t->y) - u.y);
     turn_towards(u, want);
-    if (!auto_allowed(u)) return;  // [U-474] hard CC, chi block (bending autos), disarm (weapon autos)
+    if (!auto_allowed(u)) {  // [U-474] hard CC, chi block (bending autos), disarm (weapon autos)
+        u.windup_end_ms = 0;  // [U-508] the swing starts over (it used to land the moment the block ended)
+        return;
+    }
     // [U-191] melee autoattacks can't reach flying / water-raised units
     const bool melee_auto = u.attack_range < 200 && !(u.kind == UnitKind::Champion && champions()[std::size_t(u.champ)].range == Range::Ranged);
     if (melee_auto && unit_height(*t) > ground_height(u.ux(), u.uy()) + 40) {  // [U-216] melee reach 40
@@ -528,6 +537,14 @@ void World::on_kill(Unit* killer, Unit& dead) {
     dead.alive = false;
     dead.hp = 0;
     dead.casting = false;
+    // [U-508] the body keeps no shields, burns, hastes … (they were drawn on it), a channel dies with its channeller
+    dead.st.clear();
+    dead.burn_acc = 0;
+    dead.windup_end_ms = 0;
+    if (dead.channel_end_ms) {
+        dead.channel_end_ms = 0;
+        std::erase_if(clouds, [&](const Cloud& c) { return c.kind == CloudKind::Arrival && c.owner == dead.id; });
+    }
     // credit goes to the champion owning the killer (minion/turret kills give no gold)
     Unit* k = killer;
     Team kt = k ? k->team : (dead.team == Team::FireNation ? Team::EarthNation : dead.team == Team::EarthNation ? Team::FireNation : Team::Neutral);

@@ -18,7 +18,7 @@ inline constexpr ChampionDef kAvatarKyren{.name = "Avatar Kyren", .element = Ele
        .desc = "Water wave: pushes and slows; the Avatar's water"},
  .e = {.name = "Stone Bastion", .kind = K::Pillar, .sub = S::Earth, .dmg = 60, .dmg_rank = 35, .ep = 45, .range = 700,
        .radius = 140, .cast_ms = 400, .cd_ms = 14'000, .dur_ms = 2'500, .cc = C::Airborne, .cc_ms = 650,
-       .desc = "Earth pillar under the enemy: knock-up; needs earth under the Avatar's feet [U-269]", .ground = true},
+       .desc = "Earth pillar under the enemy: knock-up; needs earth under the Avatar's feet", .ground = true},
  .r = {.name = "Dragon Spiral", .kind = K::Cone, .sub = S::Fire, .dmg = 110, .dmg_rank = 55, .ep = 70, .range = 520,
        .width = 300, .cast_ms = 300, .cd_ms = 13'000, .cc = C::Burn, .cc_ms = 2'000, .cc_val = 1'800,
        .desc = "Fire cone; burns for 2 s", .sweet_pct = 25},

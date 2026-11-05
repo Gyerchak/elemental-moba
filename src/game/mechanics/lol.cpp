@@ -44,7 +44,7 @@ bool World::lol_fear_step(Unit& u) {
     u.windup_end_ms = std::min<std::int64_t>(u.windup_end_ms, 0);
     u.casting = false;
     const Unit* src = find(u.st.source_of(StatusKind::Fear));
-    const bool held = u.st.has(StatusKind::Stun) || u.st.has(StatusKind::Airborne) || u.st.has(StatusKind::Root) || u.st.has(StatusKind::Frozen);
+    const bool held = u.st.has(StatusKind::Stun) || u.st.has(StatusKind::Airborne) || u.st.has(StatusKind::Root) || u.st.has(StatusKind::Frozen) || u.st.has(StatusKind::Bloodbound);
     if (src && !held) {
         const Dir away = dir_of(std::int64_t(u.ux()) - src->ux(), std::int64_t(u.uy()) - src->uy());
         move_towards(u, u.x + away.x * 200 / kOne * kSub, u.y + away.y * 200 / kOne * kSub, move_speed_sub(u));

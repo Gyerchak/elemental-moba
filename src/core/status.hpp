@@ -75,13 +75,26 @@ public:
         add(k, now_ms + ms, value, source);
     }
     constexpr void add(StatusKind k, std::int64_t until_ms, std::int32_t value, std::uint32_t source) {
+        // [U-508] graded statuses: a strong short one and a weak long one live side by side (the strongest counts, each
+        // ends at its own time). Before, they merged, so 99 % for 0.2 s + 10 % for 5 s made 99 % for 5 s.
+        const bool graded = k == StatusKind::Slow || k == StatusKind::Haste || k == StatusKind::Blind || k == StatusKind::Fear;
         for (int i = 0; i < n_; ++i)
             if (s_[i].kind == k && (k != StatusKind::Burn || s_[i].source == source)) {
+                if (graded && s_[i].value != value && (s_[i].value > value) != (s_[i].until_ms > until_ms) && s_[i].until_ms != until_ms)
+                    continue;
                 s_[i].until_ms = std::max(s_[i].until_ms, until_ms);
-                s_[i].value = k == StatusKind::Shield ? s_[i].value + value : std::max(s_[i].value, value);
+                // [U-508] chi block: value = a mask of elements (0 = all): two blocks add their elements, "all" stays all
+                if (k == StatusKind::Mute) s_[i].value = s_[i].value == 0 || value == 0 ? 0 : s_[i].value | value;
+                else s_[i].value = k == StatusKind::Shield ? s_[i].value + value : std::max(s_[i].value, value);
                 return;
             }
         if (n_ < kMax) s_[n_++] = {k, until_ms, value, source};
+        else if (is_cc(k)) {  // [U-508] full: crowd control must not get lost, the status ending first gives way
+            int first = 0;
+            for (int i = 1; i < n_; ++i)
+                if (s_[i].until_ms < s_[first].until_ms) first = i;
+            s_[first] = {k, until_ms, value, source};
+        }
     }
     constexpr void expire(std::int64_t now_ms) {
         int w = 0;
@@ -120,7 +133,7 @@ public:
     [[nodiscard]] constexpr bool can_attack() const { return !hard_cc() && !has(StatusKind::Hex) && !has(StatusKind::Polymorph); }
     // Move speed % after slows / hastes. Slows don't stack: strongest wins.
     [[nodiscard]] constexpr std::int32_t move_speed_pct() const {
-        const std::int32_t pct = std::max(10, 100 - value(StatusKind::Slow) + value(StatusKind::Haste));
+        const std::int32_t pct = std::max(10, 100 - std::max(value(StatusKind::Slow), value(StatusKind::Fear)) + value(StatusKind::Haste));  // [U-508] fear's own slow
         return has(StatusKind::Swimming) ? pct / 2 : pct;  // [U-188] swimming is slow
     }
     // Shield soaks damage first. Returns damage left after the shield.
@@ -159,6 +172,14 @@ static_assert([] {
     if (!s.has(StatusKind::Airborne) || !s.has(StatusKind::Stun)) return false;
     s.expire(1'000);  // stun 2 000 × 50 % = 1 000 ms, airborne full 1 000 ms
     return s.can_move() && s.has(StatusKind::Slow) && !s.has(StatusKind::Airborne);
+}());
+static_assert([] {  // [U-508] each slow ends at its own time: the strong short one does not last as long as the weak one
+    StatusSet s;
+    s.add(StatusKind::Slow, 3'000, 30, 1);
+    s.add(StatusKind::Slow, 1'000, 50, 2);
+    if (s.move_speed_pct() != 50) return false;
+    s.expire(1'000);
+    return s.move_speed_pct() == 70;
 }());
 static_assert([] {
     StatusSet s;

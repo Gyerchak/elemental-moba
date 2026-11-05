@@ -51,18 +51,18 @@ std::int64_t World::dota_block(const Unit& dst, std::int64_t dmg) {
 void World::dota_on_hit(Unit& u, Unit& target) {
     if (!target.alive) return;
     if (u.stats.bash_chance > 0 && std::int32_t(random() % 10'000) < u.stats.bash_chance) {
-        if (u.stats.bash_dmg > 0) deal_damage(&u, target, u.stats.bash_dmg / 100, SubElement::Physical, true, false);
+        if (u.stats.bash_dmg > 0) deal_damage(&u, target, u.stats.bash_dmg / 100, SubElement::Physical, true, true);  // ([U-508] part of the autoattack)
         if (target.alive && u.stats.bash_ms > 0) apply_cc(u.stats, u.id, target, StatusKind::Stun, u.stats.bash_ms, 0);
     }
     if (u.stats.mana_break > 0 && target.alive && target.stats.resource == ResourceKind::Mana && target.res > 0) {
         const std::int32_t burned = std::min(target.res, u.stats.mana_break);
         target.res -= burned;
-        deal_damage(&u, target, burned / 200, SubElement::Physical, true, false);  // 50 % of the burned mana
+        deal_damage(&u, target, burned / 200, SubElement::Physical, true, true);  // 50 % of the burned mana
     }
 }
 
 // Dispel: basic = slows, silences, chi block, disarm, roots, blinds, burns, grievous wounds; strong = also stuns,
-// knock-ups, freezes, fear, subdue, hex. `debuffs` = clean a friend; else strip an enemy's buffs (haste, shields).
+// knock-ups, freezes, fear, subdue, hex, polymorph, bloodbending. `debuffs` = clean a friend; else strip an enemy's buffs (haste, shields).
 void World::dota_dispel(Unit& u, bool strong, bool debuffs) {
     if (!debuffs) {
         for (StatusKind k : {StatusKind::Haste, StatusKind::Shield, StatusKind::DebuffImmune}) u.st.remove(k);
@@ -72,7 +72,7 @@ void World::dota_dispel(Unit& u, bool strong, bool debuffs) {
                          StatusKind::Burn, StatusKind::Grievous, StatusKind::Break})
         u.st.remove(k);
     if (strong)
-        for (StatusKind k : {StatusKind::Stun, StatusKind::Airborne, StatusKind::Frozen, StatusKind::Fear, StatusKind::Subdue, StatusKind::Hex})
+        for (StatusKind k : {StatusKind::Stun, StatusKind::Airborne, StatusKind::Frozen, StatusKind::Fear, StatusKind::Subdue, StatusKind::Hex, StatusKind::Polymorph, StatusKind::Bloodbound})
             u.st.remove(k);
 }
 

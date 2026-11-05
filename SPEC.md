@@ -711,6 +711,11 @@ Additions outside the plan live in `ENGINE-EXTRAS.md`, never here.
 - [U-502] Graphics quality = resolution only: the original is the highest level, the lower ones are scaled-down (more pixelated) versions of it; everything matches. A whole Effects panel: None / Low / Medium / High, or each effect by hand. Animated water and lava.
 - [U-503] Skill particles (sparks, smoke, embers …).
 - [U-504] Real 3D art for champions, as good as LoL or better; skills too. (Real shadows + more directions: removed from the plan.) Check for graphic bugs.
+- [U-505] The hitch at the match start: found (model sheets decoded on the main thread, also mid-match) and removed; deep check of the Vulkan display.
+- [U-506] IP addresses can be copied in the game menu.
+- [U-507] Practice tool only: developer view on Ctrl+Shift+D + a small DEV square next to the AA / QC / CAM squares.
+- [U-508] Bug hunt: graphics, effects, interactions, systems, skills, statuses; a knock-up animation; everything in the engine; Polish for everything not translated; push.
+- [U-509] Halny router (http://192.168.33.1): look for the public IP option and switch it on.
 
 ---
 *Hubert continues editing the plan later — new ideas get the next free `[U-xx]` number.*

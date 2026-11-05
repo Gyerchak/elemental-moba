@@ -8,7 +8,7 @@ inline constexpr ChampionDef kMagmaHerald{.name = "Magma Herald", .element = Ele
  .hp = 55'000, .attack = 5'000, .attack_range = 450,
  .w = {.name = "Lava Pool", .kind = K::Field, .sub = S::Lava, .dmg = 22, .dmg_rank = 10, .ep = 12, .range = 800,
        .radius = 200, .cast_ms = 450, .cd_ms = 15'000, .dur_ms = 8'000, .cc = C::Burn, .cc_ms = 1'000,
-       .cc_val = 1'200, .desc = "Lava pool → cools into a stone wall after 8 s [X-56]"},
+       .cc_val = 1'200, .desc = "Lava pool → cools into a stone wall after 8 s"},
  .e = {.name = "Ash Cloud", .kind = K::Field, .sub = S::Earth, .range = 800, .radius = 260, .cast_ms = 300,
        .cd_ms = 18'000, .dur_ms = 4'000, .cc = C::Blind, .cc_ms = 600, .cc_val = 70,
        .desc = "Blinding ash, blocks vision"},
