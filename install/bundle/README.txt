@@ -23,6 +23,11 @@ HOST YOUR OWN SERVER
   Without a window, Linux and macOS:  build/em_server --nogui --port 7777
   Without a window, Windows:          em_server.exe --nogui --port 7777
 
+THE MAKERS
+  In the menu, column Create: champions, maps, items, loadouts, units. They open inside the game window.
+  Each is also a program of its own: em_champion_maker, em_map_maker, em_item_maker, em_loadout_maker, em_unit_maker.
+  F9 in the practice tool or a replay: the camera and what is shown. F10: record a video (needs ffmpeg).
+
 WHAT IS HERE
   elemental-moba-source.tar.gz   the game: code, pictures, sounds, languages
   elemental-moba-local.tar.gz    Aatrox and Taliyah (private test copies, not on GitHub; do not share)
