@@ -116,6 +116,8 @@ private:
     int ground_px_ = 8;  // [U-521] pixels per cell of the painted ground: follows the graphics quality (Low 2 … Highest 8)
     void set_ground_quality();
     [[nodiscard]] bool stats_open() const { return expand_stats_ || (SDL_GetModState() & SDL_KMOD_ALT); }  // [U-520] Alt expands it too
+    int tether_lines_ = 0;                            // [U-525]
+    std::unordered_set<std::uint64_t> mud_seen_;
     int replay_before_pause_ = 100;                   // [X-19]
     std::vector<std::pair<int, int>> changed_cells_;  // [U-520]
     const Grid* net_seen_for_paint_ = nullptr;
@@ -185,6 +187,7 @@ private:
     // [U-258] model sprites: animation state per unit (walking = its walk phase changed lately; attack = it just hit)
     Sprites sprites_;
     struct AnimMem {
+        std::uint32_t seen_status = 0;  // [U-525]
         std::uint16_t walk = 0;
         double moved = -10, attacked = -10, died = -10, cast_from = -10;
         bool was_alive = true, was_casting = false;

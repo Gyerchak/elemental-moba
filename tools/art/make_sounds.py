@@ -23,7 +23,7 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parents[2]
 SND = ROOT / "resourcepacks" / "default" / "sounds"
-RATE = 22050
+RATE = 44100  # [U-525] (was 22050: the top of every sound was missing)
 PIPER_MODEL = Path.home() / ".local/share/piper-voices/en/en_US/ryan/high/en_US-ryan-high.onnx"
 
 ANNOUNCE = {  # id: (English, Polish)
@@ -66,6 +66,12 @@ ANNOUNCE = {  # id: (English, Polish)
 
 def save(path, s):
     path.parent.mkdir(parents=True, exist_ok=True)
+    s = np.asarray(s, dtype=np.float64)
+    s = s - s.mean()  # [U-525] no offset, and a few ms of fade at both ends: no clicks
+    k = min(len(s) // 2, int(0.004 * RATE))
+    if k:
+        s[:k] *= np.linspace(0, 1, k)
+        s[-k:] *= np.linspace(1, 0, k)
     s = np.clip(s, -1, 1)
     with wave.open(str(path), "wb") as w:
         w.setnchannels(1)
@@ -265,6 +271,29 @@ def fx(shape, element):
     return finish(room(x * env(n, att, dec)), 0.75)
 
 
+def status_sounds(n):
+    """[U-525] every crowd control and new mechanic has its own sound (sounds/status/<name>.wav, sounds/world/…): a pack can replace each one."""
+    d = SND / "status"
+    bell = lambda f, s: sum(tone(n(s), f * k, f * k) * env(n(s), 0.004, 5 + k * 2) / k for k in (1, 2, 3.01))
+    save(d / "sleep.wav", finish(room(sum(tone(n(0.9), f, f * 0.94) * env(n(0.9), 0.15, 3) for f in (392, 494)) * 0.5, 0.35), 0.45))
+    save(d / "drowsy.wav", finish(room(tone(n(0.7), 520, 300) * env(n(0.7), 0.1, 4) * 0.5, 0.3), 0.35))
+    save(d / "charm.wav", finish(room(np.concatenate([bell(880, 0.22), bell(1108, 0.22), bell(1318, 0.4)]), 0.3), 0.5))
+    save(d / "taunt.wav", finish(room(tone(n(0.45), 150, 110, "square") * env(n(0.45), 0.01, 6) * 0.5 + bp(noise(n(0.45), 2), 300, 1400) * env(n(0.45), 0.01, 7), 0.15), 0.65))
+    save(d / "terrify.wav", finish(room(tone(n(0.8), 620, 180) * env(n(0.8), 0.02, 3) * (1 + 0.5 * np.sin(np.arange(n(0.8)) / RATE * 2 * np.pi * 17)), 0.4), 0.5))
+    save(d / "fear.wav", finish(room(sum(tone(n(0.9), f, f * 0.7) * env(n(0.9), 0.05, 3) for f in (233, 247)) * 0.6, 0.4), 0.55))
+    save(d / "hex.wav", finish(room(np.concatenate([tone(n(0.12), 700, 1100), tone(n(0.12), 1100, 500), tone(n(0.22), 500, 1300)]) * 0.4, 0.3), 0.5))
+    save(d / "polymorph.wav", finish(room(tone(n(0.5), 300, 1500) * env(n(0.5), 0.01, 4) * (1 + np.sin(np.arange(n(0.5)) / RATE * 2 * np.pi * 30)) * 0.3, 0.25), 0.5))
+    save(d / "silence.wav", finish(lp(noise(n(0.35), 2), 900) * env(n(0.35), 0.005, 9), 0.4))
+    save(d / "chi_block.wav", finish(np.concatenate([lp(noise(n(0.05), 1), 1600) * env(n(0.05), 0.001, 60), lp(noise(n(0.05), 1), 1600) * env(n(0.05), 0.001, 60)]), 0.55))
+    save(d / "disarm.wav", finish(bell(1500, 0.3) * 0.5 + bp(noise(n(0.3), 1), 2000, 6000) * env(n(0.3), 0.001, 25) * 0.4, 0.5))
+    save(d / "break.wav", finish(bp(noise(n(0.25), 1), 800, 3500) * env(n(0.25), 0.001, 16), 0.5))
+    w = SND / "world"
+    save(w / "grapple.wav", finish(tone(n(0.3), 500, 1800) * env(n(0.3), 0.005, 8) * 0.4 + sweep_bp(noise(n(0.3), 1), 1200, 4000, q=4) * env(n(0.3), 0.005, 9), 0.55))
+    save(w / "pin.wav", finish(room(tone(n(0.35), 90, 45) * env(n(0.35), 0.001, 10) + lp(noise(n(0.35), 3), 900) * env(n(0.35), 0.001, 12), 0.2), 0.8))
+    save(w / "mud.wav", finish(room(bp(noise(n(0.4), 4), 150, 700) * env(n(0.4), 0.01, 6) + tone(n(0.4), 180, 90) * env(n(0.4), 0.01, 10) * 0.4, 0.12), 0.5))
+    save(w / "embers.wav", finish(crackle(n(0.6), 18, 5) * env(n(0.6), 0.02, 4), 0.25))
+
+
 def effects():
     for shape in SHAPE:
         for el in ELEMENT:
@@ -317,6 +346,7 @@ def effects():
     save(SND / "companion_4.wav", finish(room(lp(noise(n(1.2), 8), 300) * env(n(1.2), 0.05, 2)), 0.8))  # badgermole digging
     save(SND / "companion_5.wav", finish(room(tone(n(1.5), 180, 90, "square") * env(n(1.5), 0.05, 2) * 0.4
                                               + bp(noise(n(1.5), 2), 800, 4000) * env(n(1.5), 0.2, 2) * 0.5), 0.7))  # dragon roar
+    status_sounds(n)
     print("effects done", flush=True)
 
 

@@ -285,6 +285,11 @@ void GameView::draw_clouds(NetClient& net) {
             ground_ring(r_, view_, float(c.x), float(c.y), 90.f + 20.f * pulse, {230, 245, 255, 220}, 40);
             continue;
         }
+        if (c.kind == 7 && !mud_seen_.contains(std::uint64_t(std::uint32_t(c.x)) << 32 | std::uint32_t(c.y))) {  // [U-525] a puddle sank in: a soft sound
+            if (mud_seen_.size() > 256) mud_seen_.clear();
+            mud_seen_.insert(std::uint64_t(std::uint32_t(c.x)) << 32 | std::uint32_t(c.y));
+            if (const DrawUnit* me = me_unit()) audio_.play_at(res_.sound("world/mud"), (float(c.x) - me->x) * (view_.flip ? -1.f : 1.f), float(c.y) - me->y, 1'500.f);
+        }
         if (c.kind == 7) {  // [U-513] mud: dark wet earth, lumps and a dull shine (its own look, not a puddle)
             const float cr = float(c.radius);
             ground_fill(r_, view_, float(c.x), float(c.y), cr, {74, 54, 34, 215}, 28);
@@ -359,6 +364,9 @@ AnimSlot GameView::anim_of(const net::NetUnit& u) const {
     if (!u.alive) return AnimSlot::Death;
     if (u.emote != 255) return AnimSlot::Emote;
     if (has(StatusKind::Frozen)) return AnimSlot::Frozen;
+    if (has(StatusKind::Sleep)) return AnimSlot::Asleep;      // [U-524]
+    if (has(StatusKind::Fear) || has(StatusKind::Terrify)) return AnimSlot::Feared;
+    if (has(StatusKind::Charm)) return AnimSlot::Charmed;
     if (has(StatusKind::Bloodbound)) return AnimSlot::Bloodbent;
     if (has(StatusKind::Stun)) return AnimSlot::Stunned;
     if (has(StatusKind::Airborne)) return AnimSlot::FlyEnemy;
@@ -432,6 +440,19 @@ void GameView::draw_units(NetClient& net, double now_s) {
             }
         }
         am.was_casting = u.casting != 0;
+        if (am.seen_status != u.status) {  // [U-525] a crowd control starts: its own sound, where it happens (a pack can replace each one)
+            static constexpr std::pair<StatusKind, const char*> kCcSounds[] = {
+                {StatusKind::Sleep, "status/sleep"}, {StatusKind::Drowsy, "status/drowsy"}, {StatusKind::Charm, "status/charm"}, {StatusKind::Taunt, "status/taunt"},
+                {StatusKind::Terrify, "status/terrify"}, {StatusKind::Fear, "status/fear"}, {StatusKind::Hex, "status/hex"}, {StatusKind::Polymorph, "status/polymorph"},
+                {StatusKind::Silence, "status/silence"}, {StatusKind::Mute, "status/chi_block"}, {StatusKind::Disarm, "status/disarm"}, {StatusKind::Subdue, "status/chi_block"}, {StatusKind::Break, "status/break"}};
+            const std::uint32_t fresh = u.status & ~am.seen_status;
+            for (const auto& [k, name] : kCcSounds)
+                if ((fresh >> int(k)) & 1) {
+                    if (const DrawUnit* me = me_unit()) audio_.play_at(res_.sound(name), (du.x - me->x) * (view_.flip ? -1.f : 1.f), du.y - me->y, 2'000.f);
+                    else audio_.play(res_.sound(name), SoundCat::Effects, 0.7f);
+                }
+            am.seen_status = u.status;
+        }
         // ([U-495] a dead champion's body stays until it respawns: the old rule hid it after 2 s)
         const AnimSlot anim = anim_of(u);
         const Dir face{u.fx, u.fy};
@@ -512,7 +533,9 @@ void GameView::draw_units(NetClient& net, double now_s) {
                     an = hasted ? "run" : "walk";
                     if (const SpriteSheet::Anim* w = sheet->find(form ? "form_" + an : an))  // frames follow the real steps
                         t = double(u.walk % 1024) / 1024.0 * w->n / std::max(1, w->fps);
-                } else if (anim == AnimSlot::Silenced) an = "silenced";
+                } else if (anim == AnimSlot::Asleep) an = "asleep";  // [U-524]
+                else if (anim == AnimSlot::Charmed) an = "charmed";
+                else if (anim == AnimSlot::Silenced) an = "silenced";
                 else if (anim == AnimSlot::Burning) an = "burning";
                 else if (anim == AnimSlot::Swim) an = "swim";
                 if (form && u.alive) an = "form_" + an;  // transformed: form_walk, form_attack … (falls back to the normal one)
@@ -1085,6 +1108,12 @@ void GameView::draw_fx_marks(double now_s) {
 
 // [U-456] a chain: a line from the caster to the target, the circle it must leave, and how long it has left
 void GameView::draw_tethers(NetClient& net, double /*now_s*/) {
+    {  // [U-525] a new grapple: its sound
+        int lines = 0;
+        for (const net::NetTether& t : net.cur.tethers) lines += t.radius == 0;
+        if (lines > tether_lines_) audio_.play(res_.sound("world/grapple"), SoundCat::Effects, 0.7f);
+        tether_lines_ = lines;
+    }
     for (const net::NetTether& t : net.cur.tethers) {
         Rgba c = t.team == net.my_team ? Rgba{120, 190, 255, 255} : Rgba{255, 90, 70, 255};
         const float q = t.total_ms > 0 ? std::clamp(float(t.left_ms) / float(t.total_ms), 0.f, 1.f) : 0.f;

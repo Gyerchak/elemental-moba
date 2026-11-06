@@ -17,6 +17,7 @@ enum class AnimSlot : std::uint8_t {
     FlySelf, FlyAlly, FlyEnemy,       // [U-224][U-249] lifted by myself / an ally / an enemy
     Cast, Autoattack, Recall, Death,
     Stunned, Frozen, Electrocuted, Bloodbent, Blinded, Pushed, Slowed, Silenced, Burning,
+    Asleep, Feared, Charmed,          // [U-524]
     Emote,                            // laugh / taunt / dance / joke / wave / cheer [U-246]
     Count
 };
@@ -24,7 +25,7 @@ enum class AnimSlot : std::uint8_t {
 [[nodiscard]] constexpr std::string_view anim_name(AnimSlot s) {
     constexpr std::string_view n[] = {"idle", "walk_slow", "walk", "run", "swim", "fly_self", "fly_ally", "fly_enemy",
                                       "cast", "autoattack", "recall", "death", "stunned", "frozen", "electrocuted",
-                                      "bloodbent", "blinded", "pushed", "slowed", "silenced", "burning", "emote"};
+                                      "bloodbent", "blinded", "pushed", "slowed", "silenced", "burning", "asleep", "feared", "charmed", "emote"};
     static_assert(std::size(n) == std::size_t(AnimSlot::Count));
     return n[std::size_t(s)];
 }
@@ -36,7 +37,7 @@ enum class AnimSlot : std::uint8_t {
 //   blinded bloodbent burning slowed | form_<any key> = the same while transformed (e.g. form_walk, form_cast_w2)
 inline constexpr std::string_view kAnimKeys[] = {
     "idle", "idle2", "walk", "run", "dash", "attack", "attack2", "attack3", "crit", "cast", "death", "recall", "channel",
-    "stunned", "frozen", "airborne", "flying", "swim", "silenced", "blinded", "bloodbent", "burning", "slowed"};
+    "stunned", "frozen", "airborne", "flying", "swim", "silenced", "blinded", "bloodbent", "burning", "slowed", "asleep", "feared", "charmed"};
 [[nodiscard]] inline std::string anim_fallback(std::string_view k) {
     if (k.starts_with("form_")) return std::string(k.substr(5));                     // form_walk → walk
     if (!k.empty() && k.back() >= '0' && k.back() <= '9') {                          // cast_w2 → cast_w, attack3 → attack
