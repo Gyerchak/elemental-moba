@@ -18,6 +18,8 @@
 // The server tells joining players its version; a player who has the same folder switches to it.
 // Any mistake (unknown champion / skill / key, bad number) = the version is refused with the reason.
 #include <string>
+#include <utility>
+#include <vector>
 #include <string_view>
 #include <vector>
 
@@ -30,6 +32,9 @@ inline constexpr const char* kOfficialVersion = "official-0.1";
 std::string apply_version(const std::string& name, int* changes = nullptr);
 [[nodiscard]] const std::string& current_version();
 [[nodiscard]] std::string version_description(const std::string& name);
+[[nodiscard]] std::string version_id(const std::string& name);  // [U-375] computed from its files
+[[nodiscard]] std::vector<std::pair<std::string, std::string>> version_files(const std::string& name);  // [U-374] relative path, text
+bool store_version_files(const std::string& name, const std::vector<std::pair<std::string, std::string>>& files);
 // [U-478] the active version's mods and assets
 [[nodiscard]] bool mod_enabled(std::string_view mod);
 [[nodiscard]] std::string version_pack_dir();     // "versions/<name>/pack" when it exists, else ""

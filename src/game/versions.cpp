@@ -5,6 +5,7 @@
 #include <charconv>
 #include <filesystem>
 #include <format>
+#include <iterator>
 #include <fstream>
 
 #include "core/numbers.hpp"
@@ -268,6 +269,58 @@ std::vector<std::string> list_versions() {
     std::ranges::sort(own);
     out.insert(out.end(), own.begin(), own.end());
     return out;
+}
+
+// [U-375] the same files = the same id, whatever the version is called
+std::string version_id(const std::string& name) {
+    std::uint64_t h = 1469598103934665603ull;
+    auto mix = [&](std::string_view b) {
+        for (const char c : b) h = (h ^ static_cast<unsigned char>(c)) * 1099511628211ull;
+    };
+    if (name == kOfficialVersion) {
+        mix(kOfficialVersion);
+    } else {
+        std::vector<fs::path> files;
+        std::error_code ec;
+        for (const auto& e : fs::recursive_directory_iterator(fs::path("versions") / name, ec))
+            if (e.is_regular_file() && e.path().extension() == ".txt") files.push_back(e.path());
+        std::ranges::sort(files);
+        for (const fs::path& f : files) {
+            std::ifstream in(f, std::ios::binary);
+            const std::string text((std::istreambuf_iterator<char>(in)), {});
+            mix(f.filename().string()), mix(text);
+        }
+    }
+    return std::format("{:08x}", std::uint32_t(h ^ (h >> 32)));
+}
+
+// [U-374] a version's text files, to give to a player who does not have them
+std::vector<std::pair<std::string, std::string>> version_files(const std::string& name) {
+    std::vector<std::pair<std::string, std::string>> out;
+    std::error_code ec;
+    const fs::path root = fs::path("versions") / name;
+    for (const auto& e : fs::recursive_directory_iterator(root, ec))
+        if (e.is_regular_file() && e.path().extension() == ".txt" && e.file_size(ec) < 1'000'000) {
+            std::ifstream in(e.path(), std::ios::binary);
+            out.push_back({fs::relative(e.path(), root, ec).generic_string(), std::string((std::istreambuf_iterator<char>(in)), {})});
+        }
+    return out;
+}
+
+bool store_version_files(const std::string& name, const std::vector<std::pair<std::string, std::string>>& files) {
+    const auto safe = [](std::string_view p) {  // only plain relative paths inside the version's own folder
+        if (p.empty() || p.front() == '/' || p.find("..") != std::string_view::npos || p.find('\\') != std::string_view::npos || p.find(':') != std::string_view::npos) return false;
+        return p.ends_with(".txt");
+    };
+    if (name.empty() || name == kOfficialVersion || name.find('/') != std::string::npos || name.find('\\') != std::string::npos || name.find("..") != std::string::npos) return false;
+    std::error_code ec;
+    for (const auto& [rel, text] : files) {
+        if (!safe(rel)) return false;
+        const fs::path to = fs::path("versions") / name / rel;
+        fs::create_directories(to.parent_path(), ec);
+        std::ofstream(to, std::ios::binary) << text;
+    }
+    return !files.empty();
 }
 
 std::string version_description(const std::string& name) {

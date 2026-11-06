@@ -17,7 +17,8 @@
 namespace em::net {
 
 inline constexpr std::size_t kLongStrMax = 16'000'000;  // [U-518] own champion files up to 64 KB, own maps up to 16 MB
-inline constexpr std::uint16_t kProtocol = 26;  // 26: spectators, replays [X-19][X-20]
+inline constexpr std::uint16_t kProtocol = 27;  // 27: version id, version download [U-374][U-375]
+//inline constexpr std::uint16_t kProtocol = 26;  // 26: spectators, replays [X-19][X-20]
 //inline constexpr std::uint16_t kProtocol = 25;  // 25: server password, match timeline [U-371][U-374]
 //inline constexpr std::uint16_t kProtocol = 24;  // 24: own maps are sent to players [U-518]
 //inline constexpr std::uint16_t kProtocol = 23;  // 23: mud, polygon skills, skill pictures [U-510][U-513]
@@ -34,6 +35,7 @@ enum class Msg : std::uint8_t {
     Ban,           // [U-181] ban one champion in the ban phase
     SkinUpload,    // [U-200] my skin image for this match (Minecraft-like)
     Spectate,      // [X-20] whose vision I watch (team), replay speed % (0 = pause)
+    GetVersion,    // [U-374] send me this server's game version files
     EmoteUpload,   // [U-414] one of my own emotes (picture + optional sound), separate from skins
     LobbyConfig,   // [U-422] the owner sets the map + rule set (u8 map, u8 ruleset)
     TransferOwner, // [U-422] the owner hands the lobby to another player (u8 slot id)
@@ -49,6 +51,7 @@ enum class Msg : std::uint8_t {
     CustomMaps,       // [U-518] the server's own maps (sent on joining)
     EmoteData,     // [U-414] another player's own emote (only when the server allows own emotes)
     Timeline,      // [U-371] numbers of every champion over the match, for the graphs
+    VersionFiles,  // [U-374] the server's game version: name, then its text files
 };
 
 // [U-414] own emotes: up to 4 per player, a PNG ≤ 96 KB (≤ 256 × 256) + an optional WAV ≤ 256 KB; emote slots 6…9

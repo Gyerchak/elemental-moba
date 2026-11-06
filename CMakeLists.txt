@@ -11,6 +11,7 @@ endif()
 add_compile_options(-Wall -Wextra -Wpedantic)
 if(WIN32)  # [U-213] Windows headers must keep their hands off our names
   add_compile_definitions(NOMINMAX WIN32_LEAN_AND_MEAN)
+  link_libraries(stdc++exp)  # std::print on the Windows console lives here
 endif()
 
 add_library(em_core STATIC src/map/default_map.cpp src/map/twisted_grove.cpp)

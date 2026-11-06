@@ -291,3 +291,5 @@ clang 22 and GCC 16 (`README.md` → Build / Play).
 - [ ] Settings: allow / disallow animations and effects; own effects of any kind
 - [ ] Champion icons and splash arts: higher quality, more original, less sloppy
 - [ ] Everything made locally; then another bug hunt
+- [ ] Fire heat levels [U-523]: red 600, red 800, orange 1000 (basic), yellow 1400, white, blue 2000, 2500, 3000, 3333: own graphic and physics each; heat in fire sweet spots
+- [ ] All skill graphics better, with settings under the champion graphics [U-523]

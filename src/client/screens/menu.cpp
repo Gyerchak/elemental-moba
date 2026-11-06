@@ -15,9 +15,24 @@ using namespace gfx;
 void App::menu() {
     int w = 0, h = 0;
     SDL_GetRenderOutputSize(ren_, &w, &h);
+    if (!version_offer_.empty()) {  // [U-374] agree or stay out
+        const float dw = 640, dx = (float(w) - dw) / 2, dy = float(h) / 2 - 90;
+        fill_rect(ren_, dx, dy, dw, 180, {30, 32, 44, 255});
+        rect(ren_, dx, dy, dw, 180, {255, 190, 110, 255});
+        text(ren_, dx + 16, dy + 14, fit_text(trf("This server plays the game version {}", version_offer_), dw - 32, 2), {255, 220, 150}, 2);
+        text(ren_, dx + 16, dy + 52, fit_text(tr("Download its settings (text files) and join? Pictures of that version are not downloaded."), dw - 32), {220, 220, 230});
+        if (button(ren_, ui_, dx + 16, dy + 110, 300, 44, tr("Download and join"))) {
+            version_offer_.clear();
+            net_.fetch_version = true;
+            connect_to(last_address_);
+            return;
+        }
+        if (button(ren_, ui_, dx + 330, dy + 110, 200, 44, tr("Stay out"))) version_offer_.clear();
+        return;
+    }
     const float cx = float(w) / 2;
     text(ren_, cx - text_w("ELEMENTAL MOBA", 5) / 2, 50, "ELEMENTAL MOBA", {255, 170, 70}, 5);
-    const std::string sub = std::format("{} — {} {}", tr("placeholder build"), tr("version"), set_.version);
+    const std::string sub = std::format("{} — {} {} ({})", tr("placeholder build"), tr("version"), set_.version, version_id(set_.version));  // [U-375]
     text(ren_, cx - text_w(sub, 1.5f) / 2, 100, sub, {170, 170, 190}, 1.5f);
 
     const float bw = 380, bh = 40, gap = 8;

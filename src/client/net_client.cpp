@@ -5,6 +5,7 @@
 #include <fstream>
 #include "client/net_client.hpp"
 #include "game/match/map_file.hpp"
+#include "game/versions.hpp"
 #include "game/match/maps.hpp"
 
 #include <enet/enet.h>
@@ -237,6 +238,13 @@ void NetClient::poll(double now_s) {
     for (Packet& p : got) {
         if (p.event == 1) {  // connected → say hello
             Writer w;
+            if (fetch_version) {  // [U-374] only the files, no joining
+                fetch_version = false;
+                Writer gv;
+                gv.put(Msg::GetVersion);
+                send_raw(gv, true);
+                continue;
+            }
             w.put(Msg::Hello);
             w.put(kProtocol);
             w.str(client_version);
@@ -246,6 +254,7 @@ void NetClient::poll(double now_s) {
             w.put<std::uint8_t>(allow_skins_);     // [U-98]
             w.str(password);                       // [U-374]
             w.put<std::uint8_t>(spectator ? 1 : 0);  // [X-20]
+            w.str(version_id(client_version));       // [U-375]
             send_raw(w, true);
         } else if (p.event == 2) {
             if (state != State::Rejected) state = State::Disconnected;
@@ -520,6 +529,14 @@ void NetClient::handle(const std::uint8_t* data, std::size_t n, double now_s) {
             reset_custom_champions();
             for (const ChampionDef& d : defs) register_champion(d);
             custom_from_server = int(defs.size());
+            break;
+        }
+        case Msg::VersionFiles: {  // [U-374] what I asked for: the server's game version
+            const std::string name = r.str();
+            std::vector<std::pair<std::string, std::string>> files(r.get<std::uint16_t>());
+            for (auto& f : files) f.first = r.str(), f.second = r.long_str();
+            if (!r.bad() && store_version_files(name, files)) downloaded_version = name;
+            else reject_reason = "the version could not be downloaded", state = State::Rejected;
             break;
         }
         case Msg::Timeline: {  // [U-371]

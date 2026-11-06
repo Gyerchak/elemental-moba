@@ -729,6 +729,7 @@ Additions outside the plan live in `ENGINE-EXTRAS.md`, never here.
 - [U-520] Do everything else in the plan that was not done, to the end, without stopping.
 - [U-521] **For later:** the original map's graphics in much better quality, adjustable with the same kind of levels as champions; coming settings: allow / disallow animations and effects, own effects of any kind; then look for bugs again. Champion icons and splash arts in higher quality, more original, less sloppy. Everything made locally.
 - [U-522] Hitboxes must not show as circles lying on top of each other: one clean, unified shape of the combined parts.
+- [U-523] **For later (after the current work):** fire heat levels as a mechanic: each level has its own graphic and its temperature changes its physics; 9 colour levels with shades matching the heat: red 600, red 800, orange 1000, yellow 1400, white, blue 2000, blue 2500, blue 3000, blue 3333 (°C). The basic level for today's fire is orange: adjust its graphics and physics. Fire sweet spots may have different heat levels in some abilities, looking clean. Better graphics for all skills, the same way as other things in the game, with settings under the champion graphics in the graphics settings. Temperatures given: red 600–1000, orange 1000–1200, yellow 1100–1400, white 1400–1600, blue 1500–3000+.
 
 ---
 *Hubert continues editing the plan later — new ideas get the next free `[U-xx]` number.*

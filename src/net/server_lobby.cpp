@@ -10,6 +10,7 @@
 
 #include "net/server.hpp"
 #include "game/match/maps.hpp"
+#include "game/versions.hpp"
 
 namespace em::net {
 
@@ -18,6 +19,16 @@ void Server::receive(int pid, Reader& r) {
     Player& p = players_[std::size_t(pid)];
     const Msg m = r.get<Msg>();
     if (m == Msg::StatusQuery) return on_status_query(p);
+    if (m == Msg::GetVersion) {  // [U-374] (no Hello needed: a player who does not have the version cannot join yet)
+        Writer w;
+        w.put(Msg::VersionFiles);
+        w.str(cfg_.version);
+        const auto files = version_files(cfg_.version);
+        w.put<std::uint16_t>(std::uint16_t(std::min<std::size_t>(files.size(), 500)));
+        for (std::size_t i = 0; i < files.size() && i < 500; ++i) w.str(files[i].first), w.long_str(files[i].second);
+        send(p.peer, w, true);
+        return;
+    }
     if (m == Msg::Hello) return on_hello(pid, r);
     if (!p.joined) return;  // everything else needs a Hello first
     switch (m) {
@@ -140,6 +151,7 @@ void Server::on_hello(int pid, Reader& r) {
     const bool allow_skins = r.get<std::uint8_t>() != 0;
     const std::string password = r.str();  // [U-374]
     const bool watching = r.get<std::uint8_t>() != 0 || !cfg_.replay_file.empty();  // [X-20]
+    const std::string their_id = r.str();  // [U-375]
     auto reject = [&](std::string_view why) {
         Writer w;
         w.put(Msg::Reject);
@@ -152,6 +164,8 @@ void Server::on_hello(int pid, Reader& r) {
     if (!cfg_.password.empty() && password != cfg_.password && !(cfg_.host_secret != 0 && secret == cfg_.host_secret)) return reject("wrong password");  // [U-374]
     // [U-95] the client falls back to the server's version itself; we only refuse unknown ones
     if (version != cfg_.version) return reject(std::format("server runs version {}", cfg_.version));
+    if (their_id != version_id(cfg_.version))  // [U-375] the same name, other files
+        return reject(std::format("server runs version {}", cfg_.version));
     if (!(cfg_.allowed_platforms & platform))  // [U-213]
         return reject(std::format("this server does not allow {} players", platform_name(platform)));
     if (name.empty()) name = std::format("Player{}", pid);

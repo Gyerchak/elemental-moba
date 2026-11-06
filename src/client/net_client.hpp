@@ -138,6 +138,8 @@ public:
     std::vector<net::FinalRow> final_stats;  // [U-179]
     std::vector<net::NetTimeline> timeline;  // [U-371]
     std::string password;                    // [U-374] of the next server I join
+    bool fetch_version = false;              // [U-374] the next connection only downloads the server's game version
+    std::string downloaded_version;          //         … done: its name
     bool spectator = false;                  // [X-20] the next join only watches
     int spec_team = 0, replay_speed = 100;   // whose vision, replay speed % (0 = pause)
     void send_spectate();

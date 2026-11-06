@@ -149,6 +149,7 @@ void App::connect_to(const std::string& address_in) {
     const auto c = address.rfind(':');
     const std::string host = c == std::string::npos ? address : address.substr(0, c);
     const int port = c == std::string::npos ? net::kDefaultPort : std::atoi(address.c_str() + c + 1);
+    last_address_ = address_in;  // [U-374]
     net_.spectator = watch_next_ || opt_.spectate;  // [X-20]
     watch_next_ = false;
     net_.connect(host, std::uint16_t(std::clamp(port, 1, 65'535)), set_.name, 0, set_.version, set_.show_other_skins);
@@ -358,8 +359,23 @@ void App::frame(double now_s) {
             stop_server();
             go(Screen::Menu);
         } else {
-            status_ = std::format("{}: {}", tr("rejected"), net_.reject_reason);
+            status_ = std::format("{}: {}", tr("rejected"), tr_numbers(net_.reject_reason));
+            // [U-374] a server with a version I do not have (or the same name with other files): offer to download it
+            if (net_.reject_reason.starts_with("server runs version") && net_.server_version != kOfficialVersion) version_offer_ = net_.server_version;
             stop_server();
+            go(Screen::Menu);
+        }
+    }
+    if (!net_.downloaded_version.empty()) {  // [U-374] downloaded: use it and join
+        const std::string got = net_.downloaded_version;
+        net_.downloaded_version.clear();
+        net_.disconnect();
+        if (const std::string e = apply_version(got); e.empty()) {
+            set_.version = got;
+            set_.save();
+            connect_to(last_address_);
+        } else {
+            status_ = e;
             go(Screen::Menu);
         }
     }
