@@ -24,7 +24,7 @@ TMP="$(mktemp -d)"
 gh run download "$RUN" -n elemental-moba-windows-programs -D "$TMP"
 mkdir -p "$DEST/windows-programs"
 cp "$TMP"/* "$DEST/windows-programs/"
-gio trash "$TMP"
+gio trash "$TMP" 2>/dev/null || true  # (a temp folder on tmpfs has no wastebasket: it goes when the computer restarts)
 cp install/bundle/README.txt install/bundle/install-linux.sh install/bundle/install-macos.sh install/bundle/install-windows.ps1 install/bundle/install-windows.cmd SERVER.txt "$DEST/"
 ( cd "$DEST" && find . -type f ! -name SHA256SUMS.txt -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS.txt )
 sync
