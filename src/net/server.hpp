@@ -102,6 +102,7 @@ private:
     void drop(int pid);
     // [U-277] own champions: (file name, text) in roster order; loaded at start, sent to every joining player
     std::vector<std::pair<std::string, std::string>> custom_files_;
+    void send_custom_maps(Player& p);  // [U-518]
     void load_custom_champions();
     void send_custom_champions(Player& p);
     // server_lobby.cpp

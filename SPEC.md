@@ -724,6 +724,9 @@ Additions outside the plan live in `ENGINE-EXTRAS.md`, never here.
 - [U-515] **Time:** new moon exactly at 25:00 so the eclipse is realistic; the game starts at the beginning of the night; the comet moves to 29:00.
 - [U-516] Bug hunt in both graphic systems and the engine, skill code, each graphic and animation that could cause game-wide glitches, skills that could cause lag or bugs: fix without changing already set logic. Then push everything.
 - [U-517] **Practice tool sizes:** `_` (minus) makes smaller, `+` makes bigger, for skills and for the model: temporarily (just to check how it turns out) and saved as a setting, an easy way to grow a skill gradually from its existing shape.
+- [U-518] **Map maker / editor** on the same principles as the champion tool: everything about a map can be set; loads existing maps; saves by default as new, or overwrites. Its own program and also in the game's start menu.
+- [U-519] The champion maker too: loads existing champions; saves by default as new, or overwrites.
+- [U-520] Do everything else in the plan that was not done, to the end, without stopping.
 
 ---
 *Hubert continues editing the plan later — new ideas get the next free `[U-xx]` number.*

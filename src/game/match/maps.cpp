@@ -54,13 +54,45 @@ std::vector<MapDef> make_maps() {
     return m;
 }
 int g_map = 0;
-}  // namespace
-
-std::span<const MapDef> maps() {
-    static const std::vector<MapDef> all = make_maps();
+constexpr std::size_t kMaxMaps = 60;
+std::vector<MapDef>& store() {
+    static std::vector<MapDef> all = [] {
+        std::vector<MapDef> v = make_maps();
+        v.reserve(kMaxMaps);  // never moves: cur_map() references stay good
+        return v;
+    }();
     return all;
 }
-const MapDef& cur_map() { return maps()[std::size_t(g_map)]; }
+}  // namespace
+
+std::span<const MapDef> maps() { return store(); }
+Grid map_grid(const MapDef& m) {
+    if (m.make) return m.make();
+    Grid g;
+    if (m.cells && m.cells->size() == std::size_t(kGridSize) * kGridSize)
+        for (int y = 0; y < kGridSize; ++y)
+            for (int x = 0; x < kGridSize; ++x) g.at(x, y) = Cell((*m.cells)[std::size_t(y) * kGridSize + std::size_t(x)]);
+    return g;
+}
+void reset_maps() {
+    auto& v = store();
+    const std::string_view cur = v[std::size_t(std::clamp(g_map, 0, int(v.size()) - 1))].id;
+    v = make_maps();
+    v.reserve(kMaxMaps);
+    g_map = std::clamp(map_index(cur), 0, int(v.size()) - 1);
+}
+bool add_map(MapDef m) {
+    auto& v = store();
+    for (MapDef& o : v)
+        if (o.id == m.id) {
+            o = std::move(m);
+            return true;
+        }
+    if (v.size() >= kMaxMaps) return false;
+    v.push_back(std::move(m));
+    return true;
+}
+const MapDef& cur_map() { return maps()[std::size_t(std::clamp(g_map, 0, int(maps().size()) - 1))]; }
 void set_map(int index) { g_map = std::clamp(index, 0, int(maps().size()) - 1); }
 int map_index(std::string_view id) {
     for (std::size_t i = 0; i < maps().size(); ++i)

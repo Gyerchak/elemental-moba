@@ -120,24 +120,62 @@ void GameView::paint_cell(int x, int y, Cell c) {
         std::uint32_t& mp = mask_px_[std::size_t(y) * std::size_t(kGridSize) + std::size_t(x)];
         if (mp != m) mp = m, mask_dirty_ = true;
     }
-    const Rgba base = cell_colour(c);
-    int which = int(c.surface());  // the surface's texture (index = Surface)
-    if (c.tree() == Tree::Burned || c.tree() == Tree::Destroyed) which = 13;
-    else if (c.bush() == Bush::Burned) which = 14;
-    else if (c.bush() == Bush::Alive) which = 15;
-    else if (c.tree() == Tree::Alive) which = 16;
-    const SDL_Surface* t = c.wall() == Wall::None ? ground_texture(which) : nullptr;
-    // the texture keeps 70 % of its own look; 30 % comes from the cell colour (elevation, special states)
-    const int keep = t ? 70 : 0;
+    // [U-520] soft ground: a cell's look (its colour + texture); where a neighbour looks different the two blend across the
+    // border, with a little noise, so coasts and paths are no longer stairs of cells. Walls stay sharp.
+    struct Look {
+        Rgba base;
+        const SDL_Surface* t = nullptr;
+        int which = 0;
+        bool wall = false;
+    };
+    auto look_of = [&](Cell k) {
+        Look l;
+        l.base = cell_colour(k);
+        l.which = int(k.surface());
+        if (k.tree() == Tree::Burned || k.tree() == Tree::Destroyed) l.which = 13;
+        else if (k.bush() == Bush::Burned) l.which = 14;
+        else if (k.bush() == Bush::Alive) l.which = 15;
+        else if (k.tree() == Tree::Alive) l.which = 16;
+        l.wall = k.wall() != Wall::None;
+        l.t = l.wall ? nullptr : ground_texture(l.which);
+        return l;
+    };
+    auto pixel = [&](const Look& l, int wx, int wy) {  // 256 px of texture span 32 cells; the texture keeps 70 % of its own look
+        if (!l.t) return l.base;
+        const int tx = (wx * 2) % l.t->w, ty = (wy * 2) % l.t->h;
+        const std::uint8_t* p = static_cast<const std::uint8_t*>(l.t->pixels) + std::size_t(ty) * std::size_t(l.t->pitch) + std::size_t(tx) * std::size_t(SDL_BYTESPERPIXEL(l.t->format));
+        return mixc(l.base, Rgba{p[0], p[1], p[2], 255}, 70);
+    };
+    const Look me = look_of(c);
+    Look around[3][3];
+    bool plain = true;  // no different neighbour: the fast way
+    for (int ny = -1; ny <= 1; ++ny)
+        for (int nx = -1; nx <= 1; ++nx) {
+            Look& n = around[ny + 1][nx + 1];
+            n = Grid::in_bounds(x + nx, y + ny) ? look_of(net_seen_for_paint_->at(x + nx, y + ny)) : me;
+            if (me.wall || n.wall) n = me;  // walls stay sharp
+            plain = plain && n.which == me.which && n.base.r == me.base.r && n.base.g == me.base.g && n.base.b == me.base.b;
+        }
+    auto put = [&](int i, int j, Rgba px) { map_px_[std::size_t(y * kGroundPx + j) * std::size_t(kGridSize * kGroundPx) + std::size_t(x * kGroundPx + i)] = pack(px); };
     for (int j = 0; j < kGroundPx; ++j)
         for (int i = 0; i < kGroundPx; ++i) {
-            Rgba px = base;
-            if (t) {  // 256 px of texture span 32 cells
-                const int tx = ((x * kGroundPx + i) * 2) % t->w, ty = ((y * kGroundPx + j) * 2) % t->h;
-                const std::uint8_t* p = static_cast<const std::uint8_t*>(t->pixels) + std::size_t(ty) * std::size_t(t->pitch) + std::size_t(tx) * 4;
-                px = mixc(base, Rgba{p[0], p[1], p[2], 255}, keep);
+            const int wx = x * kGroundPx + i, wy = y * kGroundPx + j;
+            if (plain) {
+                put(i, j, pixel(me, wx, wy));
+                continue;
             }
-            map_px_[std::size_t(y * kGroundPx + j) * std::size_t(kGridSize * kGroundPx) + std::size_t(x * kGroundPx + i)] = pack(px);
+            // how far this pixel lies towards the next cell (0 … 0.5), moved a little by noise
+            const std::uint32_t h = (std::uint32_t(wx) * 73856093u) ^ (std::uint32_t(wy) * 19349663u);
+            const float jitter = float((h ^ (h >> 11)) % 100) / 100.f * 0.28f - 0.14f;
+            const float fx = (float(i) + 0.5f) / float(kGroundPx) - 0.5f, fy = (float(j) + 0.5f) / float(kGroundPx) - 0.5f;
+            const float ax = std::clamp(std::abs(fx) + jitter, 0.f, 0.5f), ay = std::clamp(std::abs(fy) + jitter, 0.f, 0.5f);
+            const int sx = fx > 0 ? 2 : 0, sy = fy > 0 ? 2 : 0;
+            const Rgba c00 = pixel(me, wx, wy), c10 = pixel(around[1][sx], wx, wy), c01 = pixel(around[sy][1], wx, wy), c11 = pixel(around[sy][sx], wx, wy);
+            auto mix = [&](std::uint8_t a, std::uint8_t b, std::uint8_t d, std::uint8_t e) {
+                const float top = float(a) * (1 - ax) + float(b) * ax, bot = float(d) * (1 - ax) + float(e) * ax;
+                return std::uint8_t(top * (1 - ay) + bot * ay);
+            };
+            put(i, j, Rgba{mix(c00.r, c10.r, c01.r, c11.r), mix(c00.g, c10.g, c01.g, c11.g), mix(c00.b, c10.b, c01.b, c11.b), 255});
         }
 }
 
@@ -287,9 +325,25 @@ void GameView::rebuild_textures(NetClient& net, std::int64_t now_ms, bool force)
                 std::uint32_t& old = map_raw_[std::size_t(y) * kGridSize + std::size_t(x)];
                 if (old == c.raw()) continue;
                 old = c.raw();
-                paint_cell(x, y, c);
-                x0 = std::min(x0, x), y0 = std::min(y0, y), x1 = std::max(x1, x), y1 = std::max(y1, y);
+                changed_cells_.push_back({x, y});
             }
+        // [U-520] a changed cell repaints its neighbours too: they blend into it (all reads are done now)
+        net_seen_for_paint_ = &net.seen;
+        const bool whole = changed_cells_.size() > 20'000;
+        if (whole) {
+            for (int y = 0; y < kGridSize; ++y)
+                for (int x = 0; x < kGridSize; ++x) paint_cell(x, y, net.seen.at(x, y));
+            x0 = y0 = 0, x1 = y1 = kGridSize - 1;
+        } else {
+            for (const auto& [cx, cy] : changed_cells_)
+                for (int ny = cy - 1; ny <= cy + 1; ++ny)
+                    for (int nx = cx - 1; nx <= cx + 1; ++nx)
+                        if (Grid::in_bounds(nx, ny)) {
+                            paint_cell(nx, ny, net.seen.at(nx, ny));
+                            x0 = std::min(x0, nx), y0 = std::min(y0, ny), x1 = std::max(x1, nx), y1 = std::max(y1, ny);
+                        }
+        }
+        changed_cells_.clear();
         if (x1 >= 0) {
             const SDL_Rect rr{x0 * kGroundPx, y0 * kGroundPx, (x1 - x0 + 1) * kGroundPx, (y1 - y0 + 1) * kGroundPx};
             const int pitch = kGridSize * kGroundPx * 4;
@@ -1556,7 +1610,7 @@ void GameView::play_sounds(NetClient& net) {
         const Sound* own = nullptr;
         std::string own_name;
         if (f.vchamp >= 0) {
-            own_name = "champions/" + Resources::champion_id(f.vchamp) + "/cast_" + std::string(1, "pwerty"[std::min<int>(f.vslot, 5)]);
+            own_name = "champions/" + Resources::champion_id(f.vchamp) + "/cast_" + std::string(1, "pwertyqfg"[std::min<int>(f.vslot, 8)]);
             own = res_.sound(own_name);
         }
         if (own) at(own_name, float(f.x), float(f.y), float(kHearLoud));

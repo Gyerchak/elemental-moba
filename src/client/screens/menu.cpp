@@ -63,6 +63,11 @@ void App::menu() {
         if (!tool::open_program("em_champion_maker", &err)) status_ = err;
     }
     ry += bh + gap;
+    if (button(ren_, ui_, rx, ry, bw, bh, tr("Map maker"))) {  // [U-518]
+        std::string err;
+        if (!tool::open_program("em_map_maker", &err)) status_ = err;
+    }
+    ry += bh + gap;
     if (button(ren_, ui_, rx, ry, bw, bh, tr("Own champions"))) back_ = Screen::Menu, go(Screen::CustomChampions);  // [U-210]
     ry += bh + gap;
     if (button(ren_, ui_, rx, ry, bw, bh, tr("Interactions (every rule)"))) back_ = Screen::Menu, interactions_scroll_ = 0, go(Screen::Interactions);  // [U-397]

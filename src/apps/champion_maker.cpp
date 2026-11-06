@@ -58,7 +58,7 @@ void set_kv(Pairs& p, const std::string& k, const std::string& v) {
     return nullptr;
 }
 
-constexpr std::string_view kSlots = "pwerty";
+constexpr std::string_view kSlots = "pwertyqfg";
 
 std::string draft_text(const Draft& d) {
     std::string t = std::format("# made with the champion maker\nbase = {}\nname = {}\n", d.base, d.name);
@@ -306,7 +306,7 @@ const std::vector<ChampField>& champ_fields() {
 }
 
 [[nodiscard]] const SkillDef& slot_skill(const ChampionDef& c, char s) {
-    return s == 'p' ? c.p : s == 'w' ? c.w : s == 'e' ? c.e : s == 'r' ? c.r : s == 't' ? c.t : c.y;
+    return s == 'p' ? c.p : s == 'w' ? c.w : s == 'e' ? c.e : s == 'r' ? c.r : s == 't' ? c.t : s == 'y' ? c.y : s == 'q' ? c.q_own : s == 'f' ? c.f_own : c.g_own;
 }
 
 // ================================================================ an imported model sheet (kept in memory until Save)
@@ -384,7 +384,20 @@ private:
     void reparse();
     void new_champion();
     void open_file(const std::string& file);
+    void open_builtin(const std::string& name);
+    [[nodiscard]] std::string unique_name(const std::string& wanted) const;
+    void save_as_new(const std::string& name);
+    void overwrite();
     void save();
+    std::string opened_builtin_;  // [U-519] opened from the built-in champions
+    bool saving_ = false;
+    std::string save_name_;
+    int overwrite_armed_ = 0;
+    // [U-510] a model built from a picture or a 3D file (Blender, a while)
+    SDL_Process* build_proc_ = nullptr;
+    std::string build_dir_;
+    void start_model_build(const std::string& file);
+    void poll_model_build();
     void load_model(const std::string& png);
     void load_pack_model();
     void write_sheet(const fs::path& dir) const;
@@ -435,6 +448,7 @@ void Maker::set_champ(const std::string& k, const std::string& v) {
 
 void Maker::new_champion() {
     d_ = {};
+    opened_builtin_.clear();
     file_.clear();
     undo_.clear();
     dirty_ = false;
@@ -444,7 +458,58 @@ void Maker::new_champion() {
     load_pack_model();
 }
 
+// [U-519] a built-in champion: everything copied; "Save as new" makes an own one beside it, "Overwrite" replaces it
+void Maker::open_builtin(const std::string& name) {
+    d_ = {};
+    d_.base = name;
+    d_.name = unique_name(name);
+    opened_builtin_ = name;
+    file_.clear();
+    undo_.clear();
+    dirty_ = false;
+    picked_.clear();
+    model_ = {};
+    reparse();
+    load_pack_model();
+    status_ = trf("opened {}", name);
+}
+
+[[nodiscard]] std::string Maker::unique_name(const std::string& wanted) const {
+    const auto taken = [&](const std::string& n) {
+        std::error_code ec;
+        if (fs::exists(fs::path("custom_champions") / (n + ".champ"), ec)) return true;
+        return std::ranges::any_of(champions(), [&](const ChampionDef& c) { return c.name == n; }) ||
+               std::ranges::any_of(scan_custom_champions(), [&](const CustomChampionFile& f) { return f.name == n; });
+    };
+    std::string base = wanted.substr(0, 20);
+    while (!base.empty() && (base.back() == ' ' || std::isdigit(static_cast<unsigned char>(base.back())))) base.pop_back();
+    if (!taken(wanted)) return wanted;
+    for (int i = 2; i < 100; ++i)
+        if (const std::string n = std::format("{} {}", base, i); !taken(n)) return n;
+    return wanted;
+}
+
+void Maker::save_as_new(const std::string& name) {
+    d_.name = unique_name(name.empty() ? d_.name : name);  // never over another champion
+    set_kv(d_.champ, "replaces", "");
+    file_.clear();
+    opened_builtin_.clear();
+    reparse();
+    save();
+}
+
+void Maker::overwrite() {
+    if (!opened_builtin_.empty()) {  // own file with the built-in name: it replaces the built-in champion everywhere
+        d_.name = opened_builtin_;
+        set_kv(d_.champ, "replaces", "1");
+        reparse();
+    }
+    save();
+    if (error_.empty()) opened_builtin_.clear();
+}
+
 void Maker::open_file(const std::string& file) {
+    opened_builtin_.clear();
     std::ifstream in(fs::path("custom_champions") / file, std::ios::binary);
     const std::string text((std::istreambuf_iterator<char>(in)), {});
     d_ = draft_from_text(text);
@@ -487,7 +552,8 @@ void Maker::ask_file(const std::string& what, bool picture) {
     }
     static const SDL_DialogFileFilter kPic[] = {{"PNG / BMP", "png;bmp"}};
     static const SDL_DialogFileFilter kWav[] = {{"WAV", "wav"}};
-    SDL_ShowOpenFileDialog(on_files, this, win.win(), picture ? kPic : kWav, 1, nullptr, false);
+    static const SDL_DialogFileFilter kModel[] = {{"Picture / 3D", "png;jpg;jpeg;webp;glb;gltf;fbx;obj"}};
+    SDL_ShowOpenFileDialog(on_files, this, win.win(), what == "build" ? kModel : picture ? kPic : kWav, 1, nullptr, false);
 }
 
 void Maker::got_file(const std::string& what, const std::string& path) {
@@ -497,6 +563,7 @@ void Maker::got_file(const std::string& what, const std::string& path) {
         return;
     }
     if (what == "model") return load_model(path);
+    if (what == "build") return start_model_build(path);
     picked_[what] = path;
     if (what.starts_with("sound")) {
         // a copy under a new name in the tool's own pack, so the preview always plays the new file
@@ -513,6 +580,33 @@ void Maker::got_file(const std::string& what, const std::string& path) {
     }
     dirty_ = true;
     status_ = trf("picked {}", fs::path(path).filename().string());
+}
+
+// [U-510] Blender makes the sheet in the background; the tool stays usable
+void Maker::start_model_build(const std::string& file) {
+    if (build_proc_) {
+        status_ = tr("a model is being built already");
+        return;
+    }
+    build_dir_ = std::format("resourcepacks/_maker/models/m{}_built", ++import_n_);
+    const char* args[] = {"python3", "tools/art/model_from_file.py", file.c_str(), build_dir_.c_str(), nullptr};
+    build_proc_ = SDL_CreateProcess(args, false);
+    status_ = build_proc_ ? tr("Blender is building the model: this takes some minutes, you can keep working") : std::string(SDL_GetError());
+}
+
+void Maker::poll_model_build() {
+    if (!build_proc_) return;
+    int code = 0;
+    if (!SDL_WaitProcess(build_proc_, false, &code)) return;
+    SDL_DestroyProcess(build_proc_);
+    build_proc_ = nullptr;
+    std::error_code ec;
+    const fs::path png = fs::path(build_dir_) / "sheet.png";
+    if (code != 0 || !fs::exists(png, ec)) {
+        status_ = tr("the model could not be built from this file");
+        return;
+    }
+    load_model(png.string());
 }
 
 // Reads sheet.txt next to the picture when there is one; a lone picture becomes a simple sheet (the numbers can be set).
@@ -965,7 +1059,7 @@ void Maker::page_look(float x, float& y, float w) {
 void Maker::tab_skills(float x, float& y, float w) {
     SDL_Renderer* r = win.ren();
     Ui& ui = win.ui;
-    const float cw = (w - 8) / 6;
+    const float cw = (w - 8) / float(kSlots.size());
     for (std::size_t i = 0; i < kSlots.size(); ++i) {
         const char s = kSlots[i];
         const std::string key(1, char(std::toupper(static_cast<unsigned char>(s))));
@@ -976,6 +1070,10 @@ void Maker::tab_skills(float x, float& y, float w) {
         text(r, x + cw * float(i) + 6, y + 28, nm, {225, 225, 235});
     }
     y += 50;
+    if (slot_ == 'q' || slot_ == 'f' || slot_ == 'g') {
+        text(r, x, y, fit_text(tr("Its own skill for this key: only this champion can pick it (empty = it uses the shared ones)."), w), {150, 150, 170});
+        y += 18;
+    }
     if (button(r, ui, x, y, 190, 26, tr("Start from a skill"))) {
         std::vector<Pick> items;
         for (const auto& [nm, ds] : skill_template_list()) items.push_back({std::string(nm), std::string(nm), tr(ds)});
@@ -1006,7 +1104,9 @@ void Maker::tab_skills(float x, float& y, float w) {
             const auto ca = d_.copy.find(sl), cb = d_.copy.find(other);
             const std::string sa = ca != d_.copy.end() ? ca->second : std::string(slot_skill(champions()[std::size_t(std::max<std::ptrdiff_t>(0, std::ranges::find_if(champions(), [&](const ChampionDef& c) { return c.name == d_.base; }) - champions().begin()))], sl).name);
             const std::string sb = cb != d_.copy.end() ? cb->second : std::string(slot_skill(champions()[std::size_t(std::max<std::ptrdiff_t>(0, std::ranges::find_if(champions(), [&](const ChampionDef& c) { return c.name == d_.base; }) - champions().begin()))], other).name);
-            d_.copy[sl] = sb, d_.copy[other] = sa;
+            d_.copy.erase(sl), d_.copy.erase(other);
+            if (!sb.empty()) d_.copy[sl] = sb;
+            if (!sa.empty()) d_.copy[other] = sa;
             d_.skill[sl] = kb, d_.skill[other] = ka;
             changed(before);
             slot_ = other;
@@ -1210,6 +1310,9 @@ void Maker::tab_model(float x, float& y, float w) {
     py += 20;
     if (button(r, ui, x, py, 240, 28, tr("Load a model file"))) ask_file("model", true);
     if (button(r, ui, x + 250, py, 200, 28, tr("Use what it has already"))) load_pack_model();
+    py += 32;
+    if (hover(ui, x, py, w, 28)) tip_ = tr("A full-body picture or a 3D file (.glb .gltf .fbx .obj): Blender renders all 8 directions and the animations");
+    if (button(r, ui, x, py, 450, 28, build_proc_ ? tr("Blender is building the model...") : tr("Build a model from a picture or a 3D file"), build_proc_ != nullptr)) ask_file("build", true);
     py += 44;
     text_field(r, ui, 11, x, py, w - 90, path_text_, tr("or paste a file path (or drop a file on this window)"));
     if (button(r, ui, x + w - 80, py, 80, 28, tr("Load"))) got_file("model", path_text_);
@@ -1556,14 +1659,35 @@ void Maker::toolbar() {
     x += 94;
     if (button(r, ui, x, 8, 90, 28, tr("Open"))) {
         std::vector<Pick> items;
-        for (const CustomChampionFile& f : scan_custom_champions()) items.push_back({f.file, f.file, f.ok ? f.name : f.error});
-        open_picker(tr("Open an own champion"), std::move(items), [this](const std::string& v) { open_file(v); });
+        for (const CustomChampionFile& f : scan_custom_champions()) items.push_back({f.file, "f:" + f.file, f.ok ? f.name : f.error});
+        for (int i = 0; i < builtin_champion_count(); ++i) {
+            const ChampionDef& c = champions()[std::size_t(i)];
+            items.push_back({std::string(c.name), "b:" + std::string(c.name), std::format("{} - {}", tr("built in"), tr(element_name(c.element)))});
+        }
+        open_picker(tr("Open a champion: your own or a built-in one"), std::move(items), [this](const std::string& v) {
+            if (v.starts_with("f:")) open_file(v.substr(2));
+            else open_builtin(v.substr(2));
+        });
     }
     x += 94;
-    if (button(r, ui, x, 8, 100, 28, dirty_ ? tr("Save *") : tr("Save"), dirty_)) save();
-    x += 104;
+    if (hover(ui, x, 8, 170, 28)) tip_ = tr("A new champion beside the old one: nothing is overwritten");
+    if (button(r, ui, x, 8, 170, 28, dirty_ ? tr("Save as new *") : tr("Save as new"), dirty_)) {
+        saving_ = true;
+        save_name_ = file_.empty() && opened_builtin_.empty() ? d_.name : unique_name(d_.name);
+        ui.focus = 98;
+    }
+    x += 174;
+    const bool can_over = !file_.empty() || !opened_builtin_.empty();
+    if (can_over && hover(ui, x, 8, 170, 28)) tip_ = !opened_builtin_.empty() ? trf("Replaces the built-in {} with this one; remove the file to get the original back", opened_builtin_) : trf("Writes over {}", file_);
+    if (button(r, ui, x, 8, 170, 28, overwrite_armed_ > 0 ? tr("Click again to overwrite") : tr("Overwrite"), overwrite_armed_ > 0, can_over)) {
+        if (overwrite_armed_ > 0) overwrite_armed_ = 0, overwrite();
+        else overwrite_armed_ = 240;
+    }
+    if (overwrite_armed_ > 0) --overwrite_armed_;
+    x += 174;
     if (button(r, ui, x, 8, 170, 28, tr("Test in practice"))) {
-        save();
+        if (file_.empty() && opened_builtin_.empty()) save_as_new(d_.name);
+        else if (dirty_ || file_.empty()) overwrite();
         if (error_.empty() && !file_.empty()) {
             const char* base = SDL_GetBasePath();
             const std::string exe = (fs::path(base ? base : "") / "elemental_moba").string();
@@ -1578,7 +1702,7 @@ void Maker::toolbar() {
         undo_.pop_back();
         reparse();
     }
-    if (button(r, ui, win.w - 150, 8, 140, 28, std::format("{}: {}", tr("Language"), loc::current()))) loc::load(tool::next_language(loc::current()));
+    if (button(r, ui, win.w - 120, 8, 110, 28, loc::current() == "en" ? "EN" : "PL")) loc::load(tool::next_language(loc::current()));
     const char* const tabs[] = {"Champion", "Skills", "Model, hitbox, sounds"};
     float tx = 14;
     for (int i = 0; i < 3; ++i) {
@@ -1599,7 +1723,7 @@ void Maker::frame() {
         }
         if (!got.empty()) got_file(what, got);
     }
-    const bool modal = pick_done_ != nullptr;
+    const bool modal = pick_done_ != nullptr || saving_;
     const bool real_clicked = ui.clicked, real_r = ui.rclicked;
     if (modal) ui.clicked = false, ui.rclicked = false;
     toolbar();
@@ -1619,7 +1743,25 @@ void Maker::frame() {
         text(r, 14, win.h - 42, fit_text(tip_, win.w - 28), {230, 230, 200});
         text(r, 14, win.h - 24, fit_text(status_.empty() ? tr("Everything here is checked by the game's own rules after every change.") : status_, win.w - 28), {170, 220, 170});
     }
-    if (modal) {
+    poll_model_build();
+    if (saving_) {
+        ui.clicked = real_clicked;
+        const float dw = 520, dx = (win.w - dw) / 2, dy = win.h / 2 - 90;
+        fill_rect(r, 0, 0, win.w, win.h, {0, 0, 0, 170});
+        fill_rect(r, dx, dy, dw, 170, {30, 32, 44, 255});
+        rect(r, dx, dy, dw, 170, {255, 190, 110, 255});
+        text(r, dx + 16, dy + 12, tr("Save as a new champion"), {255, 220, 150}, 2);
+        text_field(r, ui, 98, dx + 16, dy + 62, dw - 32, save_name_, tr("Name of the new champion"));
+        if (button(r, ui, dx + 16, dy + 110, 200, 36, tr("Save")) || ui.enter) {
+            saving_ = false;
+            ui.focus = -1;
+            save_as_new(save_name_);
+        }
+        if (button(r, ui, dx + 226, dy + 110, 140, 36, tr("Close"))) {
+            saving_ = false;
+            ui.focus = -1;
+        }
+    } else if (modal) {
         ui.clicked = real_clicked, ui.rclicked = real_r;
         draw_picker();
     }

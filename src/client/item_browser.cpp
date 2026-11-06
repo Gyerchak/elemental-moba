@@ -205,6 +205,22 @@ int ItemBrowser::draw(SDL_Renderer* r, Ui& ui, float x, float y, float w, float 
             text(r, tx + 8, ly, fit_text(l, tip_w - 16), {225, 225, 235});
             ly += 14;
         }
+        if (SDL_GetModState() & SDL_KMOD_ALT) {  // [U-520] Alt: the parts in words, with what each one gives
+            ly += 4;
+            for (std::string_view p : d.from) {
+                const int pi = item_index(p);
+                if (pi < 0) continue;
+                text(r, tx + 8, ly, fit_text(std::format("{} ({})", tr(kItems[std::size_t(pi)].name), kItems[std::size_t(pi)].cost), tip_w - 16), {255, 215, 120});
+                ly += 14;
+                for (const std::string& l : item_lines(kItems[std::size_t(pi)])) {
+                    text(r, tx + 16, ly, fit_text(l, tip_w - 24), {190, 190, 200});
+                    ly += 14;
+                }
+            }
+        } else if (has_parts(d)) {
+            text(r, tx + 8, ly, tr("hold Alt: what the parts give"), {150, 150, 170});
+            ly += 14;
+        }
         // [U-261] build path: what it is made of (+ recipe), and what it builds into — click an icon to open it
         ly += 6;
         if (has_parts(d)) {

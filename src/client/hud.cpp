@@ -392,14 +392,14 @@ void GameView::draw_bottom_panel(NetClient& net, double now_s, Ui& ui) {
             std::format("ATK  {}", me.attack), std::format("EP   {}", me.ep), std::format("DEF  {}", me.def),
             std::format("EDEF {}", me.edef), std::format("AS   {:.2f}", me.as100x / 100.0), std::format("MS   {}", me.move_speed),
         };
-        if (expand_stats_)
+        if (stats_open())
             for (std::string extra : {std::format("RNG  {}", me.attack_range), std::format("HST  {}", me.haste), std::format("TEN  {}%", me.tenacity),
                                       std::format("SIZE {}%", me.model_size), std::format("CAST {}", me.cast_speed / 100)})
                 stats.push_back(extra);
         // [U-463][U-464] only what this champion can use: crits (champions that crit), the skill power of its kinds of skills
-        if (expand_stats_) {
+        if (stats_open()) {
             if (me.uses & 1) stats.push_back(std::format("CRIT {}%", me.crit_chance / 100)), stats.push_back(std::format("CDMG {}%", me.crit_damage / 100));
-            if (expand_stats_) {
+            if (stats_open()) {
                 if (me.uses & 2) stats.push_back(std::format("ARC  +{}%", me.arcane_power / 100));
                 if (me.uses & 4) stats.push_back(std::format("MAR  +{}%", me.martial_power / 100));
                 if (me.skill_amp) stats.push_back(std::format("AMP  +{}%", me.skill_amp / 100));
@@ -428,7 +428,7 @@ void GameView::draw_bottom_panel(NetClient& net, double now_s, Ui& ui) {
             fill_rect(r_, px - 4, py - 4, float(cols) * 92 + 6, 6 * 12 + 8, {8, 8, 14, 225});
             for (std::size_t k = 0; k < more; ++k) text(r_, px + float(k / 6) * 92, py + float(k % 6) * 12, stats[12 + k], {205, 205, 215});
         }
-        if (!expand_stats_) text(r_, sx0 + 78, y0 + 10, tr("C = all"), {130, 130, 150});  // (beside the stats, not on them)
+        if (!stats_open()) text(r_, sx0 + 78, y0 + 10, tr("C = all"), {130, 130, 150});  // (beside the stats, not on them)
     } else {
         const Loadout& lo = me.loadout;
         float ly = y0 + 8;
@@ -785,7 +785,7 @@ void GameView::draw_tooltip(NetClient& net, Ui& ui) {
         }
         y += 28;
         L.push_back(std::format("ATK {}  EP {}  DEF {}  EDEF {}  AS {:.2f}  MS {}", sc->attack, sc->ep, sc->def, sc->edef, sc->as100x / 100.0, sc->ms));
-        if (expand_stats_) {
+        if (stats_open()) {
             L.push_back(std::format("{} {}  {} {}%", tr("range"), sc->range, tr("size"), sc->size));
             const auto r = net.roster.find(u.id);
             const ChampionDef& c = champions()[std::size_t(std::max<int>(0, u.champ))];

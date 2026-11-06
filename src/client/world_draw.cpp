@@ -1156,8 +1156,8 @@ void GameView::draw_world(NetClient& net, double now_s) {
         bool pictured = false;
         if (f.vchamp >= 0 && std::size_t(f.vchamp) < champions().size()) {
             const ChampionDef& cd = champions()[std::size_t(f.vchamp)];
-            const SkillDef* const list[] = {&cd.p, &cd.w, &cd.e, &cd.r, &cd.t, &cd.y};
-            const SkillDef::Visual& pv = list[std::min<int>(f.vslot, 5)]->vis;
+            const SkillDef* const list[] = {&cd.p, &cd.w, &cd.e, &cd.r, &cd.t, &cd.y, &cd.q_own, &cd.f_own, &cd.g_own};
+            const SkillDef::Visual& pv = list[std::min<int>(f.vslot, 8)]->vis;
             if (!pv.sheet.empty())
                 if (SDL_Texture* pic = res_.texture("skills/" + std::string(pv.sheet))) {
                     const float life = float(f.life) / 255.f;

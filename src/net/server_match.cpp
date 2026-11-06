@@ -140,7 +140,7 @@ void Server::send_match_start(Player& p) {
 }
 
 void Server::send_all_cells(Player& p) {  // reconnect / late start: every cell that differs from the start map
-    Grid fresh = cur_map().make();  // [U-420]
+    Grid fresh = map_grid(cur_map());  // [U-420]
     prepare_match_grid(fresh);
     Writer w;
     w.put(Msg::Cells);
@@ -268,8 +268,8 @@ void Server::send_snapshot(Player& p) {
             n.vchamp = -1;
             if (const Unit* ow = W.find(e.owner); ow && ow->kind == UnitKind::Champion && ow->champ >= 0) {
                 const ChampionDef& cd = champions()[std::size_t(ow->champ)];
-                const SkillDef* const list[] = {&cd.p, &cd.w, &cd.e, &cd.r, &cd.t, &cd.y};
-                for (std::uint8_t q = 0; q < 6; ++q)
+                const SkillDef* const list[] = {&cd.p, &cd.w, &cd.e, &cd.r, &cd.t, &cd.y, &cd.q_own, &cd.f_own, &cd.g_own};
+                for (std::uint8_t q = 0; q < 9; ++q)
                     if (list[q] == e.def || (list[q]->name == e.def->name && !e.def->name.empty())) n.vchamp = std::int16_t(ow->champ), n.vslot = q;
             }
         }
@@ -690,6 +690,7 @@ void Server::finish_match() {
                 r.gold = std::int32_t(u.stat_gold);
                 r.dmg_champs = std::int32_t(u.stat_dmg_champs);
                 r.dmg_taken = std::int32_t(u.stat_dmg_taken);
+                r.dealt_pre = std::int32_t(u.stat_dealt_pre), r.taken_pre = std::int32_t(u.stat_taken_pre);
                 r.healing = std::int32_t(u.stat_healing);
                 r.shielding = std::int32_t(u.stat_shielding);
                 r.keystone_impact = std::int32_t(u.stat_keystone);

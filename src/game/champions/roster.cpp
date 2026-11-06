@@ -89,27 +89,61 @@ std::vector<ChampionDef>& roster_vec() {
 
 std::span<const ChampionDef> champions() { return roster_vec(); }
 int builtin_champion_count() { return int(kRoster.size()); }
-void reset_custom_champions() { roster_vec().resize(kRoster.size()); }  // [U-277] (pointers to built-ins stay valid)
+namespace {
+std::vector<std::pair<std::size_t, ChampionDef>> g_replaced;  // [U-519] what own files replaced: reset puts them back
+std::vector<std::string_view> g_own_q, g_own_special;         // [U-520] who owns each own Q / special
+}
+// [U-520] own Q / F / G skills join at the end; reserved, so pointers to skills stay valid
+constexpr std::size_t kMaxOwnSkills = 300;
+template <class A>
+std::vector<SkillDef> table_of(const A& a) {
+    std::vector<SkillDef> v;
+    v.reserve(a.size() + kMaxOwnSkills);
+    v.assign(a.begin(), a.end());
+    return v;
+}
+std::vector<SkillDef>& specials_store() {
+    static std::vector<SkillDef> a = table_of(kSpecials);
+    return a;
+}
+std::vector<SkillDef>& q_store() {
+    static std::vector<SkillDef> a = table_of(kQ);
+    return a;
+}
+void reset_custom_champions() {
+    roster_vec().resize(kRoster.size());
+    q_store().resize(kQ.size()), specials_store().resize(kSpecials.size());  // [U-520]
+    g_own_q.clear(), g_own_special.clear();
+    for (auto& [i, def] : g_replaced) roster_vec()[i] = def;
+    g_replaced.clear();
+}  // [U-277] (pointers to built-ins stay valid)
 int register_champion(const ChampionDef& c) {
     auto& v = roster_vec();
     if (v.size() >= kMaxChampions) return -1;  // [U-415] was 64 — with 71 built-ins no own champion could register
     Kit kit{to_ability(c.p, Slot::P), to_ability(c.w, Slot::W), to_ability(c.e, Slot::E), to_ability(c.r, Slot::R), to_ability(c.t, Slot::T),
             to_ability(c.y, Slot::Y)};
     if (!kit_ok(kit, c.mage)) return -1;
+    // [U-520] its own Q / F / G skills join the tables (same order everywhere: the same files in the same order)
+    auto add_own = [&] {
+        if (c.q_own.kind != SkillKind::None && g_own_q.size() < kMaxOwnSkills) q_store().push_back(c.q_own), g_own_q.push_back(c.name);
+        for (const SkillDef* s : {&c.f_own, &c.g_own})
+            if (s->kind != SkillKind::None && g_own_special.size() < kMaxOwnSkills) specials_store().push_back(*s), g_own_special.push_back(c.name);
+    };
+    if (c.replaces)  // [U-519] takes the place of the built-in one (everybody keeps the same numbering)
+        for (std::size_t i = 0; i < kRoster.size(); ++i)
+            if (v[i].name == c.name) {
+                g_replaced.push_back({i, v[i]});
+                v[i] = c;
+                add_own();
+                return int(i);
+            }
     for (const ChampionDef& o : v)
         if (o.name == c.name) return -1;
+    add_own();
     v.push_back(c);
     return int(v.size()) - 1;
 }
 // [U-95] the tables in use are copies, so an own game version can change numbers (game/versions.cpp)
-auto& specials_store() {
-    static auto a = kSpecials;
-    return a;
-}
-auto& q_store() {
-    static auto a = kQ;
-    return a;
-}
 std::span<const SkillDef> specials() { return specials_store(); }
 std::span<const SkillDef> q_options() { return q_store(); }
 std::span<SkillDef> specials_mut() { return specials_store(); }
@@ -118,37 +152,43 @@ std::span<ChampionDef> champions_mut() { return roster_vec(); }
 void restore_official_numbers() {  // built-in champions, Q options and specials back to the code's numbers
     auto& v = roster_vec();
     for (std::size_t i = 0; i < kRoster.size(); ++i) v[i] = kRoster[i];
-    specials_store() = kSpecials;
-    q_store() = kQ;
+    std::ranges::copy(kSpecials, specials_store().begin());
+    std::ranges::copy(kQ, q_store().begin());
     restore_setup();  // [U-483] runes / masteries / keystones / trees back to the defaults
 }
 Element q_option_element(int q) {
+    if (q >= int(kQ.size()) && q < int(q_store().size())) return base_element(q_store()[std::size_t(q)].sub);  // [U-520]
     return q >= 0 && q < int(kQ.size()) ? data::kQOptions[std::size_t(q)].element : Element::None;
 }
 bool q_allowed(int champ, int q) {
-    if (champ < 0 || champ >= int(roster_vec().size()) || q < 0 || q >= int(kQ.size())) return false;
+    if (champ < 0 || champ >= int(roster_vec().size()) || q < 0 || q >= int(q_store().size())) return false;
+    if (q >= int(kQ.size())) return g_own_q[std::size_t(q) - kQ.size()] == roster_vec()[std::size_t(champ)].name;  // [U-520] only its owner
     return q_ok(roster_vec()[std::size_t(champ)], std::size_t(q));
 }
 int default_q(int champ) {
+    for (int q = int(kQ.size()); q < int(q_store().size()); ++q)  // [U-520] its own Q first
+        if (q_allowed(champ, q)) return q;
     for (int q = 0; q < int(kQ.size()); ++q)
         if (q_allowed(champ, q)) return q;
     return -1;
 }
 
 bool special_allowed(int special, Element e) {
-    if (special < 0 || special >= int(std::size(data::kSpecialRows))) return false;
+    if (special < 0 || special >= int(std::size(data::kSpecialRows))) return false;  // ([U-520] own ones: only their owner)
     // [U-448] no magic stance as a pick: non-benders get the stances (the whole set) only at the 60:00 alignment
     if (data::kSpecialRows[std::size_t(special)].def.kind == SkillKind::MagicStance) return false;
     return data::kSpecialRows[std::size_t(special)].element == e;
 }
 bool special_allowed(int special, const ChampionDef& c) {
+    if (special >= int(std::size(data::kSpecialRows)) && special < int(specials_store().size()))
+        return g_own_special[std::size_t(special) - std::size(data::kSpecialRows)] == c.name;  // [U-520]
     if (special < 0 || special >= int(std::size(data::kSpecialRows))) return false;
     if (c.avatar) return data::kSpecialRows[std::size_t(special)].element != Element::None;  // [U-279] any bender special
     return special_allowed(special, c.element);
 }
 int find_special(std::string_view name) {
-    for (int i = 0; i < int(std::size(data::kSpecialRows)); ++i)
-        if (data::kSpecialRows[std::size_t(i)].def.name == name) return i;
+    for (int i = 0; i < int(specials_store().size()); ++i)
+        if (specials_store()[std::size_t(i)].name == name) return i;
     return -1;
 }
 

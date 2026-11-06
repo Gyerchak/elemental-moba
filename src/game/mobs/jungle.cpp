@@ -77,6 +77,10 @@ void World::spawn_jungle() {
         for (CellPt p : {c, mirror(c)}) spawn_unit(make_monster("Dark Spirit", cell_mid(p.first), cell_mid(p.second)));
     // [X-55][U-364][U-404][U-420] the map's epic monsters (some appear later: first_spawn_ms)
     for (const EpicSpot& e : cur_map().epics) spawn_unit(make_monster(e.monster, cell_mid(e.cell.first), cell_mid(e.cell.second)));
+    for (const MonsterSpot& s : cur_map().spots) {  // [U-518] an own map's monsters
+        spawn_unit(make_monster(s.monster, cell_mid(s.cell.first), cell_mid(s.cell.second)));
+        if (s.mirrored) spawn_unit(make_monster(s.monster, cell_mid(mirror(s.cell).first), cell_mid(mirror(s.cell).second)));
+    }
     for (Unit& u : units)
         if (u.mob >= 0 && kMonsters[std::size_t(u.mob)].first_spawn_ms > 0 && u.alive && u.respawn_ms == 0) {
             u.alive = false;

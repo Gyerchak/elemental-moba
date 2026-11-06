@@ -146,6 +146,7 @@ public:
     DeathRecapView recap;                    // [U-262] the last death
     bool reload_own_champions = false;      // [U-415] set on disconnect after a server sent its own champions
     int custom_from_server = -1;
+    bool maps_from_server = false;  // [U-518]
     std::uint8_t ruleset = 0;               // [U-416] the server's rule set (RuleSet)
     std::string_view map;                   // [U-420] the server's map id
     bool queue_mode = false;                // [U-423] the server matches players by queue (map + mode)

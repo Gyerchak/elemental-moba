@@ -1,5 +1,6 @@
 // [X-01][U-102][U-103] Server core: binding the port, sending, the fixed-tick loop, disconnects.
 // Lobby / draft / chat: server_lobby.cpp. Match / snapshots / statistics: server_match.cpp.
+#include "game/match/map_file.hpp"
 #include "game/versions.hpp"
 #include "game/champions/custom.hpp"
 #include <filesystem>
@@ -39,6 +40,7 @@ void Server::load_custom_champions() {
         ChampionDef d;
         return parse_champion_text(text, d).empty() ? std::string(d.name) : std::string();
     };
+    if (cfg_.host_secret == 0) load_custom_maps();  // [U-518] a dedicated server's own maps (a hosting client has loaded them)
     if (cfg_.host_secret == 0)  // dedicated server: every valid file. Hosted / practice: only what the host enabled.
         for (auto& [file, text] : files) {
             ChampionDef d;
@@ -105,6 +107,16 @@ void Server::lobby_timer() {
     }
     send_chat(Chat::System, "server", "Somebody did not pick — the lobby was disbanded. Pick again.", nullptr, nullptr);
     send_lobby();
+}
+
+// [U-518] the server's own maps: every player gets them, so the map list and the terrain are the same everywhere
+void Server::send_custom_maps(Player& p) {
+    Writer w;
+    w.put(Msg::CustomMaps);
+    const auto& blobs = custom_map_blobs();
+    w.put<std::uint8_t>(std::uint8_t(blobs.size()));
+    for (const std::string& b : blobs) w.long_str(b);
+    send(p.peer, w, true);
 }
 
 void Server::send_custom_champions(Player& p) {

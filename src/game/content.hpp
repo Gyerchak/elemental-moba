@@ -361,6 +361,8 @@ struct ChampionDef {
     // [U-478] own talents (feature Talents) at levels 10 / 15 / 20 / 25, left / right; key Count = the default one
     std::array<std::array<SkillDef::Learned, 2>, 4> talents{};
     std::int32_t model_size = 0;                        // [U-510][U-517] +model and hitbox size (100 = 1 %)
+    SkillDef q_own, f_own, g_own;                       // [U-520] its OWN Q / F / G skill (kind None = none): only this champion can pick it
+    bool replaces = false;                              // [U-519] an own file that replaces the built-in champion of the same name
     std::uint32_t colour = 0xffffff;
     Role role = Role::Mage;                             // [U-180]
     bool auto_projectile = true;                        // [U-186] ranged autos fly as projectiles (melee: never)

@@ -250,6 +250,7 @@ struct Unit {
     std::int8_t surge_count = 0;
     std::int64_t surge_ms = 0, stoneheart_ready_ms = 0, chirush_until = 0;
     // ---- statistics for the post-game screen [U-179]
+    std::int64_t stat_dealt_pre = 0, stat_taken_pre = 0;  // [U-520] the same damage before any defence
     std::int64_t stat_dmg_champs = 0, stat_dmg_taken = 0, stat_healing = 0, stat_shielding = 0, stat_gold = 0;
     std::int64_t stat_keystone = 0;  // what the keystone did (see KeystoneDef::impact)
     std::array<std::int64_t, kItemSlots> item_impact{};  // [U-209] what each item's effect did this game

@@ -64,8 +64,11 @@ void App::postgame() {
     text(ren_, W / 2 - text_w(title, 4) / 2, 20, title, won ? Rgba{255, 220, 100} : Rgba{255, 90, 90}, 4);
     const float x = 30;
     float y = 80;
-    const std::string head = std::format("{:<22}{:>5}{:>12}{:>6}{:>8}{:>9}{:>9}{:>9}{:>9}   {}", tr("Player"), tr("Lvl"), "K / D / A",
+    const bool record = (SDL_GetModState() & SDL_KMOD_ALT) != 0;  // [U-520] Alt: the damage record (before defence, stopped by defence)
+    const std::string head = record ? std::format("{:<22}{:>11}{:>11}{:>11}{:>11}{:>11}{:>11}", tr("Player"), tr("Dealt"), tr("Before def."), tr("Stopped"), tr("Taken"), tr("Before def."), tr("Stopped"))
+                                    : std::format("{:<22}{:>5}{:>12}{:>6}{:>8}{:>9}{:>9}{:>9}{:>9}   {}", tr("Player"), tr("Lvl"), "K / D / A",
                                          "CS", tr("Gold"), tr("Dmg"), tr("Taken"), tr("Heal"), tr("Shield"), tr("Keystone (impact)"));
+    text(ren_, x, H - 110, tr("Hold Alt: the damage record (before defence, stopped by defence)"), {170, 170, 190});
     text(ren_, x, y, head, {255, 255, 255});
     y += 18;
     for (int team = 0; team < 2; ++team) {
@@ -80,7 +83,9 @@ void App::postgame() {
                 const KeystoneDef& k = keystones()[std::size_t(r.keystone)];
                 ks = std::format("{} ({} {})", k.name, r.keystone_impact, k.impact);
             }
-            const std::string line = std::format("{:<22}{:>5}{:>12}{:>6}{:>8}{:>9}{:>9}{:>9}{:>9}   {}", who.substr(0, 21), r.level,
+            const std::string line = record ? std::format("{:<22}{:>11}{:>11}{:>11}{:>11}{:>11}{:>11}", who.substr(0, 21), r.dmg_champs, r.dealt_pre, std::max(0, r.dealt_pre - r.dmg_champs),
+                                                          r.dmg_taken, r.taken_pre, std::max(0, r.taken_pre - r.dmg_taken))
+                                            : std::format("{:<22}{:>5}{:>12}{:>6}{:>8}{:>9}{:>9}{:>9}{:>9}   {}", who.substr(0, 21), r.level,
                                                  std::format("{}/{}/{}", r.kills, r.deaths, r.assists), r.cs, r.gold, r.dmg_champs,
                                                  r.dmg_taken, r.healing, r.shielding, ks);
             text(ren_, x, y, line, r.unit == net_.my_unit ? Rgba{255, 230, 120} : Rgba{220, 220, 230});

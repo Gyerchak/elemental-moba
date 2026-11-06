@@ -13,6 +13,7 @@
 namespace em {
 
 void prepare_match_grid(Grid& g) {
+    if (cur_map().exact_terrain) return;  // [U-518] an own map: exactly as painted
     auto clear_disc = [&](CellPt c, int r, Surface s, bool force_surface) {
         for (int y = c.second - r; y <= c.second + r; ++y)
             for (int x = c.first - r; x <= c.first + r; ++x) {

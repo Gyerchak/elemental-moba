@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <fstream>
 #include "client/net_client.hpp"
+#include "game/match/map_file.hpp"
 #include "game/match/maps.hpp"
 
 #include <enet/enet.h>
@@ -19,7 +20,7 @@ using namespace net;
 void NetClient::use_map(int index) {
     set_map(index);
     map = cur_map().id;
-    grid = cur_map().make();
+    grid = map_grid(cur_map());
     prepare_match_grid(grid);
     seen = grid;
     grid_dirty = true;
@@ -55,7 +56,7 @@ bool NetClient::connect(const std::string& host, std::uint16_t port, const std::
     allow_skins_ = allow_skins;
     client_version = std::move(version);
     state = State::Connecting;
-    grid = cur_map().make();
+    grid = map_grid(cur_map());
     prepare_match_grid(grid);
     seen = grid;
     have_snapshot = false;
@@ -92,6 +93,10 @@ void NetClient::disconnect() {
     inbox_.clear();
     outbox_.clear();
     state = State::Idle;
+    if (maps_from_server) {  // [U-518] back to my own maps
+        maps_from_server = false;
+        load_custom_maps();
+    }
     if (custom_from_server >= 0) {  // [U-415] the server's own champions are dropped; the app loads mine again
         custom_from_server = -1;
         reload_own_champions = true;
@@ -330,7 +335,7 @@ void NetClient::handle(const std::uint8_t* data, std::size_t n, double now_s) {
                 e.name = r.str();
                 roster[e.id] = std::move(e);
             }
-            grid = make_default_map();
+            grid = map_grid(cur_map());
             prepare_match_grid(grid);
             seen = grid;
             grid_dirty = true;
@@ -468,6 +473,15 @@ void NetClient::handle(const std::uint8_t* data, std::size_t n, double now_s) {
             for (auto& h : v.hits) h = r.get<NetRecapHit>();
             v.born = now_s;
             if (!r.bad()) recap = std::move(v);
+            break;
+        }
+        case Msg::CustomMaps: {  // [U-518] the server's own maps (a hosting client already has the same ones)
+            const int cnt = r.get<std::uint8_t>();
+            std::vector<std::string> blobs;
+            for (int i = 0; i < cnt && !r.bad(); ++i) blobs.push_back(r.long_str());
+            if (r.bad() || blobs == custom_map_blobs()) break;
+            set_custom_maps(blobs);
+            maps_from_server = true;
             break;
         }
         case Msg::CustomChampions: {  // [U-277] take the server's own champions (save the files, same order)

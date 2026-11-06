@@ -195,6 +195,8 @@ std::string parse_text(const std::string& text, ChampionDef& out) {
             return std::format("line {}: 'base = …' must come first", n);
         } else if (k == "name") {
             name = v;
+        } else if (k == "replaces") {  // [U-519] replaces = 1: this file replaces the built-in champion of the same name
+            out.replaces = v == "1" || v == "yes";
         } else if (k == "hp") ok = number(out.hp, 100);
         else if (k == "attack") ok = number(out.attack, 100);
         else if (k == "ep_per_level") ok = number(out.ep_lvl, 100);
@@ -308,9 +310,10 @@ std::string parse_text(const std::string& text, ChampionDef& out) {
             else if (f == "chain_range") out.autos.chain_range = std::int16_t(std::clamp(x, 0, 2000));
             else if (f == "chain_pct") out.autos.chain_pct = std::int16_t(std::clamp(x, 0, 100));
             else return std::format("line {}: unknown key '{}'", n, k);
-        } else if (k.size() > 2 && k[1] == '.' && std::string("pwerty").find(k[0]) != std::string::npos) {
+        } else if (k.size() > 2 && k[1] == '.' && std::string("pwertyqfg").find(k[0]) != std::string::npos) {
             // [U-415] ANY field of a skill: w.dmg = 80, w.kind = Cone, w.cc = Stun, w.desc = …, w.casts = 3 …
-            SkillDef& sk = k[0] == 'p' ? out.p : k[0] == 'w' ? out.w : k[0] == 'e' ? out.e : k[0] == 'r' ? out.r : k[0] == 't' ? out.t : out.y;
+            SkillDef& sk = k[0] == 'p' ? out.p : k[0] == 'w' ? out.w : k[0] == 'e' ? out.e : k[0] == 'r' ? out.r : k[0] == 't' ? out.t : k[0] == 'y' ? out.y
+                        : k[0] == 'q' ? out.q_own : k[0] == 'f' ? out.f_own : out.g_own;  // [U-520]
             const std::string f = k.substr(2);
             std::int32_t x = 0;
             auto num = [&](auto& field, long long lo, long long hi) {  // [U-482] relative to the field's current value
@@ -589,16 +592,18 @@ std::string parse_text(const std::string& text, ChampionDef& out) {
             else if (what == "rank_step") sk.rank_step = std::uint8_t(std::clamp(x, 0, 255));
             else if (what == "rank_cap") sk.rank_cap = std::uint8_t(std::clamp(x, 0, 255));
             else return std::format("line {}: unknown key '{}'", n, k);
-        } else if (k == "p" || k == "w" || k == "e" || k == "r" || k == "t" || k == "y") {
+        } else if (k == "p" || k == "w" || k == "e" || k == "r" || k == "t" || k == "y" || k == "q" || k == "f" || k == "g") {
             const SkillDef* s = find_skill(v);
             if (!s) return std::format("line {}: unknown skill '{}'", n, v);
-            (k == "p" ? out.p : k == "w" ? out.w : k == "e" ? out.e : k == "r" ? out.r : k == "y" ? out.y : out.t) = *s;
+            (k == "p" ? out.p : k == "w" ? out.w : k == "e" ? out.e : k == "r" ? out.r : k == "y" ? out.y : k == "q" ? out.q_own : k == "f" ? out.f_own : k == "g" ? out.g_own : out.t) = *s;
         } else {
             return std::format("line {}: unknown key '{}'", n, k);
         }
         if (!ok) return std::format("line {}: '{}' is not a valid number", n, v);
     }
     if (!has_base) return "no 'base = …'";
+    for (auto [letter, sk] : {std::pair{"Q", &out.q_own}, {"F", &out.f_own}, {"G", &out.g_own}})
+        if (sk->kind != SkillKind::None && sk->name.empty()) sk->name = keep(std::format("{} {}", name, letter));  // [U-520]
     if (name.empty()) return "no 'name = …'";
     if (!good_name(name)) return "names: letters, digits, space ' _ - only, at most 24 characters";
     // sane numbers (a file can't break the game) [U-415]
@@ -608,7 +613,7 @@ std::string parse_text(const std::string& text, ChampionDef& out) {
     // [U-480] the same kit rules as register_champion(), with the reason (a refused kit used to vanish silently)
     {
         int targeted = 0;
-        for (auto [slot, sk] : {std::pair{"p", &out.p}, {"w", &out.w}, {"e", &out.e}, {"r", &out.r}, {"t", &out.t}, {"y", &out.y}}) {
+        for (auto [slot, sk] : {std::pair{"p", &out.p}, {"w", &out.w}, {"e", &out.e}, {"r", &out.r}, {"t", &out.t}, {"y", &out.y}, {"q", &out.q_own}, {"f", &out.f_own}, {"g", &out.g_own}}) {
             targeted += sk->targeted;
             const bool deals = sk->dmg || sk->dmg_rank || sk->ep || sk->ad || sk->bonus_ad || sk->ap;
             if (!out.mage && deals && !sk->ad && !sk->bonus_ad && !sk->ap)
@@ -620,7 +625,11 @@ std::string parse_text(const std::string& text, ChampionDef& out) {
     // only BUILT-IN names count here: an own champion that is already loaded must still read as valid
     // (two own files with the same name: register_champion() refuses the second) [U-353]
     for (int i = 0; i < builtin_champion_count(); ++i)
-        if (champions()[std::size_t(i)].name == name) return std::format("the name '{}' is already used", name);
+        if (champions()[std::size_t(i)].name == name) {
+            if (!out.replaces) return std::format("the name '{}' is already used", name);
+            out.avatar = champions()[std::size_t(i)].avatar, out.dark = champions()[std::size_t(i)].dark;  // [U-519] still that champion
+            out.unique_group = champions()[std::size_t(i)].unique_group;
+        }
     auto kept = std::ranges::find(g_strings, name);  // one stored copy per name (files are re-read often)
     if (kept == g_strings.end()) g_strings.push_back(name), kept = std::prev(g_strings.end());
     out.name = *kept;

@@ -15,7 +15,7 @@ namespace em {
 
 std::int32_t isqrt32(std::int64_t v) { return std::int32_t(isqrt(v)); }
 
-World::World(MatchConfig c) : cfg(c), grid((set_map(c.map), cur_map().make())), rng(c.seed ? c.seed : 1) {  // [U-420] the chosen map
+World::World(MatchConfig c) : cfg(c), grid((set_map(c.map), map_grid(cur_map()))), rng(c.seed ? c.seed : 1) {  // [U-420] the chosen map
     prepare_match_grid(grid);
     sky = WorldClock::at_ms(cfg.start_ms);
     next_wave_ms = std::min(cfg.first_wave_ms, cur_map().minions.first_ms);  // [U-420] the map's first wave (a test may start earlier)

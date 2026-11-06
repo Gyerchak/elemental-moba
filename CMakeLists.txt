@@ -41,6 +41,9 @@ target_link_libraries(elemental_moba PRIVATE em_ui em_net)
 # [U-510] the champion maker
 add_executable(em_champion_maker src/apps/champion_maker.cpp)
 target_link_libraries(em_champion_maker PRIVATE em_ui)
+# [U-518] the map maker
+add_executable(em_map_maker src/apps/map_maker.cpp)
+target_link_libraries(em_map_maker PRIVATE em_ui)
 # [U-511] the server only: without the game, without joining as a player
 add_executable(em_server src/apps/server_app.cpp)
 target_link_libraries(em_server PRIVATE em_ui em_net)

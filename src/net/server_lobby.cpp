@@ -155,6 +155,7 @@ void Server::on_hello(int pid, Reader& r) {
         w.put<std::uint8_t>(cfg_.allow_own_emotes ? 1 : 0); // [U-414]
         w.put<std::uint8_t>(std::uint8_t(cfg_.map));        // [U-420]
         send(to.peer, w, true);
+        send_custom_maps(to);      // [U-518]
         send_custom_champions(to);  // [U-277] before any lobby state that names champions
     };
     // [X-22] reconnect: same name, match running, slot free
