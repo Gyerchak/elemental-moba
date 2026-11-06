@@ -67,6 +67,7 @@ private:
     void start_replay(const std::string& file);   // [X-19]
     void replays_screen();
     bool watch_next_ = false, replay_starting_ = false;
+    std::string last_replay_;  // [U-549]
     std::string version_offer_, last_address_;  // [U-374]
     float replays_scroll_ = 0;
     void go(Screen s);

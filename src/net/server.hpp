@@ -78,6 +78,7 @@ public:
     bool start(std::string* error = nullptr);  // binds the port
     void run(std::stop_token stop);            // blocking loop
     [[nodiscard]] std::uint16_t port() const { return cfg_.port; }
+    [[nodiscard]] std::int64_t replay_total_ms() const { return replay_total_ms_; }  // [U-549]
 
     // status for the host / dedicated-server screen
     std::atomic<int> players{0};
@@ -134,6 +135,7 @@ private:
     bool replaying_ = false, replay_saved_ = false, replay_off_ = false;
     std::size_t replay_next_ = 0;
     int replay_speed_pct_ = 100;  // 0 = paused
+    std::int64_t replay_total_ms_ = 0;  // [U-549]
     [[nodiscard]] std::uint64_t world_checksum() const;
     void replay_note_champion(const ReplayChampion& c);
     void replay_note(std::uint8_t type, std::uint32_t unit, const Cmd& c = {}, std::uint64_t value = 0);

@@ -109,7 +109,7 @@ void Server::receive(int pid, Reader& r) {
             const std::uint16_t speed = r.get<std::uint16_t>();
             if (r.bad() || !p.spectator) break;
             p.spec_team = std::uint8_t(team & 1);
-            if (replaying_) replay_speed_pct_ = std::clamp<int>(speed, 0, 800);
+            if (replaying_) replay_speed_pct_ = std::clamp<int>(speed, 0, 3200);  // ([U-549] fast to a moment)
             break;
         }
         default: break;

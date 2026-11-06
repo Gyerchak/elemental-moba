@@ -340,6 +340,19 @@ void GameView::draw_ghosts(NetClient& net) {
 
 // ---------------------------------------------------------------- units [U-129][U-130][U-175][U-176][U-226]
 // [U-258] which model sprite a unit uses
+// [U-548] a champion standing on the lobby's stage
+void GameView::draw_lobby_model(int champ, const std::string& skin, float x, float feet_y, float scale, double now_s, std::uint8_t shade) {
+    if (champ < 0) return;
+    const SpriteSheet* sheet = nullptr;
+    if (!skin.empty()) sheet = sprites_.get_dir("champions/" + Resources::champion_id(champ) + "/skins/" + skin + "/model");
+    if (!sheet) sheet = sprites_.get(Resources::champion_id(champ));
+    if (!sheet) {
+        draw_icon(champ, x - 40 * scale / 2, feet_y - 90 * scale, 40 * scale, false);
+        return;
+    }
+    Sprites::draw(r_, *sheet, "idle", now_s, 2, x, feet_y, scale, {shade, shade, shade, 255}, false);
+}
+
 std::string GameView::model_id(const net::NetUnit& u) const {
     switch (UnitKind(u.kind)) {
         case UnitKind::Champion: return Resources::champion_id(u.champ);
@@ -384,7 +397,8 @@ AnimSlot GameView::anim_of(const net::NetUnit& u) const {
 void GameView::draw_units(NetClient& net, double now_s) {
     const float z = view_.zoom;
     std::vector<const DrawUnit*> order;
-    for (const DrawUnit& du : draw_) order.push_back(&du);
+    for (const DrawUnit& du : draw_)
+        if (dir_.shows(UnitKind(du.u.kind))) order.push_back(&du);  // [U-549]
     // back to front; equal heights keep a FIXED order (by id) — an unstable sort swapped them every frame (flicker) [U-338]
     std::ranges::sort(order, [&](const DrawUnit* a, const DrawUnit* b) {
         const float ya = view_.sy(a->y), yb = view_.sy(b->y);
@@ -765,6 +779,7 @@ void GameView::draw_units(NetClient& net, double now_s) {
         }
         if (!u.alive) continue;
         deferred.push_back([=, this, &net] {  // [U-389] bars / names / CC timers after ALL sprites and terrain rows
+        if (!dir_.bars) return;  // [U-549]
         // ---- bars [U-155][U-166]
         const bool is_struct = u.kind >= std::uint8_t(UnitKind::Turret) && u.kind <= std::uint8_t(UnitKind::Nexus);
         const float bw = kind == UnitKind::Champion ? 96 : is_struct ? 110 : kind == UnitKind::Boss ? 120 : 40;
@@ -829,7 +844,7 @@ void GameView::draw_units(NetClient& net, double now_s) {
         }
         if (kind == UnitKind::Champion) {
             const auto it = net.roster.find(u.id);
-            if (set_.show_names && it != net.roster.end()) text(r_, bx, by - 22, std::format("{} {}", u.level, it->second.name), {240, 240, 240});
+            if (set_.show_names && dir_.names && it != net.roster.end()) text(r_, bx, by - 22, std::format("{} {}", u.level, it->second.name), {240, 240, 240});
         }
         });
     }
@@ -1183,8 +1198,8 @@ void GameView::draw_world(NetClient& net, double now_s) {
         if (du.u.alive && du.u.kind == std::uint8_t(UnitKind::Turret) && du.u.team != net.my_team)
             ground_ring(r_, view_, du.x, du.y, 680 + 75, {255, 80, 60, 70}, 64);
     terrain_begin(net);  // [U-389] the terrain rows are drawn between the units (draw_units); cracks with them [U-438]
-    draw_clouds(net);
-    if (set_.fx_lights) {  // [U-501] warm pools of light (stronger at night), under the fog layer
+    if (dir_.clouds) draw_clouds(net);
+    if (set_.fx_lights && dir_.lights) {  // [U-501] warm pools of light (stronger at night), under the fog layer
         const bool dark = !WorldClock::at_ms(net.start_ms + cur.now_ms).is_day;
         int n = 0;
         for (const auto& l : cur.lights) {
@@ -1196,6 +1211,7 @@ void GameView::draw_world(NetClient& net, double now_s) {
     draw_fx_marks(now_s);  // [U-459] scorch marks / impact rings of skills that ended
     // skills [U-131]: fluid body + exact edge
     for (const auto& real : fx_draw_) {
+        if (!dir_.effects) break;  // [U-549]
         auto f = real;
         if (!set_.dev_mode && f.vchamp >= 0 && std::size_t(f.vchamp) < champions().size()) {  // [U-538] how big it looks; the developer view shows the real size
             const ChampionDef& cd = champions()[std::size_t(f.vchamp)];
@@ -1326,14 +1342,14 @@ void GameView::draw_world(NetClient& net, double now_s) {
     draw_wall_damage(net);  // [U-288][U-341] falling pieces fly over everything
     particles_.step(float(std::clamp(now_s - particles_t_, 0.0, 0.1)));  // [U-503]
     particles_t_ = now_s;
-    particles_.draw(r_, view_);
+    if (dir_.particles) particles_.draw(r_, view_);
     draw_paths(net);
     draw_pings(net);
     draw_waves(net, now_s);
-    draw_hits(net, now_s);
+    if (dir_.effects) draw_hits(net, now_s);
     // fog + night on top [U-75][U-108][U-115][U-117]
     update_fog_fade(now_s);  // [U-290]
-    draw_layer(fog_tex_, 1.f);
+    if (dir_.fog) draw_layer(fog_tex_, 1.f);
     draw_rewards(net, now_s);
     for (const auto& f : cur.falcons)  // my team's falcons [U-235]
         fill_circle(r_, view_.sx(float(f.x)), view_.sy_h(float(f.y), 160), 6, {240, 230, 200, 255}, 8),

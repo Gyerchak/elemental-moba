@@ -134,6 +134,7 @@ void App::connect_local(std::uint16_t port) {
 
 // [X-19] a replay runs on its own small server here; I am its viewer
 void App::start_replay(const std::string& file) {
+    last_replay_ = file;
     net::ServerConfig c;
     c.version = set_.version;
     c.port = std::uint16_t(7790 + std::random_device{}() % 200);
@@ -148,6 +149,7 @@ void App::start_replay(const std::string& file) {
     }
     net_.spectator = true;
     replay_starting_ = true;
+    if (view_) view_->replay_total_ms = server_->replay_total_ms();  // [U-549]
     connect_local(c.port);
 }
 
@@ -296,6 +298,7 @@ int App::run() {
                 }
             if (++shots_taken_ >= std::max(1, opt_.shots)) shot_done_ = true, quit_ = true;
         }
+        if (view_ && screen_ == Screen::Game) view_->record_frame(now_s_);  // [U-549]
         SDL_RenderPresent(ren_);
         gfx::end_frame_text();
         if (set_.fps_limit > 0) {  // [U-488] FPS limit: wait out the rest of the frame
@@ -468,6 +471,12 @@ void App::frame(double now_s) {
             }
             if (ingame_menu_) ingame_menu();
             if (set_.dev_mode) text(ren_, 8, 80, std::format("keys: {}  last: {}  renderer: {}", key_count_, last_key_, renderer_name_), {150, 255, 150});
+            if (view_->replay_restart) {  // [U-549] going back: from the beginning, then it runs fast to the moment
+                view_->replay_restart = false;
+                net_.disconnect();
+                start_replay(last_replay_);
+                break;
+            }
             if (view_->leave) {
                 net_.disconnect();
                 stop_server();

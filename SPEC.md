@@ -755,6 +755,7 @@ Additions outside the plan live in `ENGINE-EXTRAS.md`, never here.
 - [U-546] **Structures, minions, monsters, epic monsters:** an option to use skills and to be set like champions: they are just bots using the game's mechanics.
 - [U-547] **Items and builds, any browsing of items:** sort by the amount of stats and by gold efficiency, of the whole item or of selected stats.
 - [U-548] **Champion choosing menu:** in the lobby show my own champion's model in the middle, allies' champions at the sides and behind.
+- [U-549] **Replay tool:** many options, with all the functions of the League Director tool (a modded tool for LoL replays): camera, what is shown, timeline, sequences. **Practice tool:** camera options for a while, a reset to normal, and changing the perspective the same way as in the replay tool.
 
 ---
 *Hubert continues editing the plan later — new ideas get the next free `[U-xx]` number.*

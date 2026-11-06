@@ -568,7 +568,7 @@ void GameView::cast_key(NetClient& net, int slot, bool from_click) {
 
 void GameView::handle_event(const SDL_Event& e, NetClient& net) {
     if (e.type == SDL_EVENT_MOUSE_WHEEL) {
-        view_.zoom = std::clamp(view_.zoom * (e.wheel.y > 0 ? 1.12f : 0.89f), 0.12f, 1.6f);
+        view_.zoom = std::clamp(view_.zoom * (e.wheel.y > 0 ? 1.12f : 0.89f), dir_.open || dir_.on ? 0.05f : 0.12f, dir_.open || dir_.on ? 3.f : 1.6f);  // [U-549]
         return;
     }
     if (chat_open_) {
@@ -600,6 +600,10 @@ void GameView::handle_event(const SDL_Event& e, NetClient& net) {
         const bool shift = (e.key.mod & SDL_KMOD_SHIFT) != 0;
         const bool alt = (e.key.mod & SDL_KMOD_ALT) != 0;
         const SDL_Scancode sc = e.key.scancode;
+        if (net.spectator || net.practice) {  // [U-549] the director
+            if (sc == SDL_SCANCODE_F9) return void(dir_.open = !dir_.open);
+            if (sc == SDL_SCANCODE_F10) return director_record(net);
+        }
         if (net.spectator) {  // [X-20] watching: O whose vision, [ ] speed, P pause
             if (sc == SDL_SCANCODE_O) net.spec_team = 1 - net.spec_team, net.my_team = net.spec_team, net.send_spectate(), net.grid_dirty = true;
             if (sc == SDL_SCANCODE_P) replay_before_pause_ = net.replay_speed ? net.replay_speed : replay_before_pause_, net.replay_speed = net.replay_speed ? 0 : replay_before_pause_, net.send_spectate();
@@ -965,10 +969,11 @@ void GameView::frame(NetClient& net, double now_s, Ui& ui) {
     const bool space_held = held[set_.keys[std::size_t(Action::CenterSelf)]] && !(SDL_GetModState() & SDL_KMOD_CTRL) && !chat_open_;
     const SDL_MouseButtonFlags mb = SDL_GetMouseState(nullptr, nullptr);
     const bool both_held = set_.both_buttons_center && (mb & SDL_BUTTON_LMASK) && (mb & SDL_BUTTON_RMASK);
-    if ((cam_lock_ || space_held || both_held) && mine) {
+    director_camera(net, now_ms);  // [U-549]
+    if ((cam_lock_ || space_held || both_held) && mine && !dir_.follow && !dir_.seq_play) {
         view_.cx = mine->x;
         view_.cy = mine->y;
-    } else {
+    } else if (!dir_.follow && !dir_.seq_play) {
         const float pan = 1400.f * float(std::min(frame_ms_, 50.0)) / 1000.f / std::max(0.2f, view_.zoom * 1.6f);
         const bool* ks = SDL_GetKeyboardState(nullptr);
         const float sg = view_.flip ? -1.f : 1.f;  // pan in SCREEN directions
@@ -999,7 +1004,7 @@ void GameView::frame(NetClient& net, double now_s, Ui& ui) {
     const float rscale = set_.dev_mode ? 1.f : kScaleLoad[std::clamp(set_.render_quality, 0, 3)];
     Sprites::smooth = set_.fx_blend;
     particles_.set_density(set_.fx_particles);
-    const bool post_on = post_.ready() && !set_.dev_mode && (rscale < 1.f || set_.fx_bloom || set_.fx_grade || set_.fx_vignette || set_.fx_sharpen);
+    const bool post_on = dir_.post && post_.ready() && !set_.dev_mode && (rscale < 1.f || set_.fx_bloom || set_.fx_grade || set_.fx_vignette || set_.fx_sharpen);
     if (post_on) post_.begin(w, h, rscale);
     gfx::defer_text(post_on && rscale < 1.f);  // [U-502] world text stays readable at every quality
     draw_world(net, now_s);
@@ -1025,9 +1030,12 @@ void GameView::frame(NetClient& net, double now_s, Ui& ui) {
         fill_rect(r_, 0, view_.sh - 26, view_.sw, 26, {0, 0, 0, 170});
         text(r_, 12, view_.sh - 20, line, {235, 235, 240}, 1.2f);
         mouse_on_hud_ = false;
-    } else {
+    } else if (dir_.hud) {
         draw_hud(net, now_s, ui);
+    } else {
+        mouse_on_hud_ = false;
     }
+    draw_director(net, now_ms, ui);  // [U-549]
 
     // mouse orders (after the HUD had its chance to eat the click)
     if (mouse_on_hud_) ui.clicked = ui.rclicked = false;

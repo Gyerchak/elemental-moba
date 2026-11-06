@@ -1414,8 +1414,10 @@ void Maker::tab_model(float x, float& y, float w) {
     if (hover(ui, x, clip_top_, w, clip_bottom_ - clip_top_)) scroll_ = std::max(0.f, scroll_ - ui.wheel * 44);
     float py = clip_top_ + 6 - scroll_;
     // ---- the base hitbox
-    text(r, x, py, fit_text(tr("Base hitbox: the circles the game hits. Shown on the model in the preview."), w, 2), {255, 220, 150}, 2);
-    py += 26;
+    text(r, x, py, tr("Hitbox"), {255, 220, 150}, 2);
+    py += 24;
+    text(r, x, py, fit_text(tr("The circles the game hits. Shown on the model in the preview."), w), {170, 170, 190});
+    py += 18;
     {   // [U-536] its size alone: the model and its animations stay as they are
         int hs = cur_.hitbox_pct;
         if (hover(ui, x, py, w, 26)) tip_ = tr("Only the hitbox changes: the model and its animations stay as they are");
@@ -1917,7 +1919,7 @@ void Maker::preview(float x, float y, float w, float h) {
     for (std::size_t i = 1; i < stroke_.size() && (stroking_ || draw_mode_); ++i)
         line(r, v.sx(stroke_[i - 1].first), v.sy(stroke_[i - 1].second), v.sx(stroke_[i].first), v.sy(stroke_[i].second), {255, 240, 120, 255});
     if (button(r, ui, x + w - 130, y + 8, 122, 24, tilt_ >= 100 ? tr("From above") : tr("Game camera"), false)) tilt_ = tilt_ >= 100 ? 72 : 100;
-    slider(r, ui, 9101, x + w - 250, y + 36, 240, tilt_, 40, 100, tr("Angle of the camera"));  // [U-531]
+    slider(r, ui, 9101, x + w - 460, y + 36, 450, tilt_, 40, 100, tr("Angle of the camera"));  // [U-531]
     text(r, x + 10, y + 10, show_skill ? tr("Click to aim. Wheel = zoom. Yellow = the body's hitbox, pink = the sweet spot.") : (draw_mode_ == 1 ? tr("Hold and draw the outline of the body: it becomes the hitbox.") : tr("Wheel = zoom. Drag = turn the model. Yellow = the hitbox of the body.")), {200, 200, 210});
 }
 

@@ -101,6 +101,7 @@ bool Server::load_replay(std::string* error) {
     if (r.bad()) return fail("the replay file is damaged");
     cfg_.map = mi;
     replaying_ = true;
+    if (!replay_.events.empty()) replay_total_ms_ = std::int64_t(replay_.events.back().tick) * 1000 / std::max<std::int64_t>(1, cfg_.tick_hz);  // [U-549]
     return true;
 }
 

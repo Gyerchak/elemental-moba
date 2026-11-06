@@ -238,7 +238,9 @@ void App::champ_select() {
         set_.companion = (std::clamp(set_.companion, 0, 5) + 1) % int(CompanionKind::Count), set_.save();
 
     // ---- filters [U-180]
-    const float gx = 290, gw = W - 580;
+    // [U-548] the stage: my champion in the middle, allies at the sides and behind
+    const float stage_w = W >= 1100 ? std::clamp((W - 580) * 0.36f, 280.f, 560.f) : 0.f;
+    const float gx = 290, gw = W - 580 - stage_w;
     float y = 64;
     text_field(ren_, ui_, 50, gx, y + 12, 220, search_, tr("Search"));
     // filter buttons wrap inside the middle column (never under the team lists) [U-250]
@@ -327,6 +329,41 @@ void App::champ_select() {
 
     // ---- my picks: Q option [U-11], specials F/G [U-71], skin [U-197], loadout [U-177][U-178]
     // The panel sits under the grid in the middle column. Rows wrap; if it is still taller than the space,
+    if (stage_w > 0) {
+        const float sx0 = gx + gw + 10, sw = stage_w - 14, sy0 = 86, sh = H - 86 - 56;
+        fill_rect(ren_, sx0, sy0, sw, sh, {12, 14, 22, 170});
+        rect(ren_, sx0, sy0, sw, sh, {90, 90, 110, 200});
+        const SDL_Rect sclip{int(sx0), int(sy0), int(sw), int(sh)};
+        SDL_SetRenderClipRect(ren_, &sclip);
+        const float cx = sx0 + sw / 2, floor_y = sy0 + sh * 0.86f, unit = sw / 560;
+        fill_ellipse(ren_, cx, floor_y, sw * 0.46f, sh * 0.09f, {60, 66, 90, 150}, 48);
+        int my_team = 0;
+        for (const auto& s : net_.lobby)
+            if (s.id == net_.my_id) my_team = s.team;
+        struct Place { float dx, dy, scale; std::uint8_t shade; };
+        static constexpr Place kPlaces[] = {{-0.30f, -0.11f, 1.35f, 170}, {0.30f, -0.11f, 1.35f, 170}, {-0.15f, -0.20f, 1.05f, 120}, {0.15f, -0.20f, 1.05f, 120}, {-0.42f, -0.02f, 1.2f, 150}, {0.42f, -0.02f, 1.2f, 150}};
+        std::vector<std::pair<int, const net::LobbySlot*>> allies;
+        for (const auto& s : net_.lobby)
+            if (s.team == my_team && s.id != net_.my_id && s.champ >= 0 && allies.size() < std::size(kPlaces)) allies.push_back({int(allies.size()), &s});
+        for (auto it = allies.rbegin(); it != allies.rend(); ++it) {  // the far ones first
+            const Place& p = kPlaces[std::size_t(it->first)];
+            const float ax = cx + p.dx * sw, ay = floor_y + p.dy * sh;
+            fill_ellipse(ren_, ax, ay, 46 * unit * p.scale, 14 * unit * p.scale, {0, 0, 0, 90}, 20);
+            view_->draw_lobby_model(it->second->champ, "", ax, ay, 1.6f * unit * p.scale, now_s_, p.shade);
+            const std::string nm = fit_text(it->second->name, 150);
+            text(ren_, ax - text_w(nm) / 2, ay + 8, nm, {200, 200, 215});
+        }
+        if (pick_champ_ >= 0) {  // me, in front, big, with my skin
+            fill_ellipse(ren_, cx, floor_y, 78 * unit * 2.1f, 24 * unit * 2.1f, {0, 0, 0, 120}, 28);
+            view_->draw_lobby_model(pick_champ_, set_.prefs(roster[std::size_t(pick_champ_)].name).skin, cx, floor_y, 2.6f * unit, now_s_, 255);
+            const std::string nm = std::string(roster[std::size_t(pick_champ_)].name);
+            text(ren_, cx - text_w(nm, 2) / 2, floor_y + sh * 0.05f, nm, {255, 225, 150}, 2);
+        } else {
+            const std::string t = tr("Choose a champion");
+            text(ren_, cx - text_w(t, 2) / 2, floor_y - 40, t, {200, 200, 215}, 2);
+        }
+        SDL_SetRenderClipRect(ren_, nullptr);
+    }
     // it scrolls with the mouse wheel and is clipped to its area → nothing ever leaves the screen [U-250].
     const float grid_rows = float((int(list.size()) + cols - 1) / cols);
     const float px0 = gx, pw = gw, ptop = std::min(y + grid_rows * (cell + 14) + 8, H - 260), pbot = H - 52;

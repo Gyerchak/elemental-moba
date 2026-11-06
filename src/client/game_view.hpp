@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdio>
 // [U-03][X-17][X-25] In-match view: map, fog + night darkness + light, units with body hitboxes,
 // fluid skills with exact edges, skill indicators, sense waves, HUD, shop, scoreboard, minimap.
 #include <SDL3/SDL.h>
@@ -34,10 +35,14 @@ public:
     void reset();
     void handle_event(const SDL_Event& e, NetClient& net);
     void frame(NetClient& net, double now_s, gfx::Ui& ui);
+    void record_frame(double now_s);      // [U-549]
+    bool replay_restart = false;          // [U-549] a replay goes backwards: it starts again and runs to the moment
+    std::int64_t replay_total_ms = 0;
     bool leave = false;
     bool wants_menu = false;  // Esc pressed: the app opens the in-game menu [U-207]
     bool screenshot_ready = false;
     [[nodiscard]] bool wants_text() const { return chat_open_; }
+    void draw_lobby_model(int champ, const std::string& skin, float x, float feet_y, float scale, double now_s, std::uint8_t shade);  // [U-548]
     void draw_icon(int champ, float x, float y, float size, bool dim);  // champion icon (lobby, HUD, portraits)
 
 private:
@@ -118,6 +123,29 @@ private:
     [[nodiscard]] bool stats_open() const { return expand_stats_ || (SDL_GetModState() & SDL_KMOD_ALT); }  // [U-520] Alt expands it too
     int tether_lines_ = 0;                            // [U-525]
     std::unordered_set<std::uint64_t> mud_seen_;
+    // [U-549] the director (client/director.cpp)
+    struct Director {
+        struct Key { double t = 0; float cx = 0, cy = 0, zoom = 1, gy = 1, hz = 0; int speed = 100; };
+        bool open = false, on = false;
+        int tab = 0, turn = -1;            // turn: -1 as usual, 0 not turned, 1 turned
+        float gy = 0.78f, hz = 0.62f;
+        std::uint32_t follow = 0;
+        bool hud = true, bars = true, names = true, fog = true, champions = true, minions = true, monsters = true, structures = true,
+             effects = true, clouds = true, lights = true, particles = true, post = true;
+        std::vector<Key> keys;
+        bool seq_play = false, seq_loop = false, seeking = false;
+        double target_ms = -1;
+        int speed_before = 100;
+        std::FILE* rec = nullptr;
+        int rec_w = 0, rec_h = 0;
+        double rec_next = 0;
+        std::string rec_file;
+        [[nodiscard]] bool shows(UnitKind k) const;
+    } dir_;
+    void director_camera(NetClient& net, std::int64_t now_ms);
+    void director_reset();
+    void draw_director(NetClient& net, std::int64_t now_ms, gfx::Ui& ui);
+    void director_record(NetClient& net);
     int replay_before_pause_ = 100;                   // [X-19]
     std::vector<std::pair<int, int>> changed_cells_;  // [U-520]
     const Grid* net_seen_for_paint_ = nullptr;
