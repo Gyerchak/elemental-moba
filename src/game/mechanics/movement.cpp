@@ -479,6 +479,7 @@ bool World::step_pull(Unit& u) {
 
 // [U-524] a pin: into the nearest wall within reach (the direction of the skill first): displaced + airborne on the way, then the CC
 bool World::pin_to_wall(const Effect& e, Unit& o) {
+    if (o.is_structure() || o.kind == UnitKind::Boss || o.st.has(StatusKind::DebuffImmune)) return false;  // (cannot be thrown: no airborne either)
     const std::int32_t reach = e.def->pin_range;
     std::int64_t best = -1;
     std::int32_t bx = 0, by = 0;
@@ -489,7 +490,8 @@ bool World::pin_to_wall(const Effect& e, Unit& o) {
             const std::int32_t x = o.ux() + std::int32_t(std::int64_t(d.x) * r / kOne), y = o.uy() + std::int32_t(std::int64_t(d.y) * r / kOne);
             const int cx = x / kCellUnits, cy = y / kCellUnits;
             if (!Grid::in_bounds(cx, cy)) break;
-            if (grid.at(cx, cy).wall() == Wall::None) continue;
+            const Cell c = grid.at(cx, cy);
+            if (c.wall() == Wall::None || c.temp_walkable()) continue;
             const std::int64_t score = std::int64_t(r) * kOne * 2 - along * reach;  // near first, the way it was hit first
             if (best < 0 || score < best) best = score, bx = x, by = y;
             break;
@@ -511,6 +513,11 @@ void World::grapple_hit(Effect& e, Unit* unit, std::int32_t x, std::int32_t y) {
     const int mode = e.def->grapple;
     const std::int32_t speed = e.def->grapple_speed;
     const std::int64_t ms = isqrt(dist2(owner->ux(), owner->uy(), x, y)) * 1'000 / std::max<std::int32_t>(1, speed) + 80;
+    // a structure, a boss or a debuff immune unit does not move: "pull it to me" does nothing, "meet halfway" pulls only me (like a wall)
+    if (unit && (unit->is_structure() || unit->kind == UnitKind::Boss || unit->st.has(StatusKind::DebuffImmune))) {
+        if (mode == 2) return;
+        if (mode == 3) unit = nullptr;
+    }
     if (mode == 1 || (mode == 3 && !unit)) {
         owner->ghost_until = now_ms + ms;
         start_pull(*owner, x * kSub, y * kSub, speed);

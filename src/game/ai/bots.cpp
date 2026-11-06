@@ -207,7 +207,17 @@ void World::step_bot(Unit& u) {
             for (Slot s : {Slot::Y, Slot::R, Slot::T, Slot::E, Slot::W, Slot::Q, Slot::F, Slot::G}) {  // ultimate (Y) first
                 const SkillDef* d = u.skill[std::size_t(s)];
                 if (!d || !offensive(d->kind)) continue;
-                if (d->kind == SkillKind::Dash && hp_pct < 50) continue;
+                if ((d->kind == SkillKind::Dash || d->grapple == 1) && hp_pct < 50) continue;  // ([U-524] a grapple that pulls the bot in is a dash)
+                if (d->pin_range > 0) {  // [U-524] a pin without a wall behind the target does nothing: keep it
+                    bool wall = false;
+                    for (int a = 0; a < 64 && !wall; a += 8)
+                        for (std::int32_t r = 32; r <= d->pin_range && !wall; r += 32) {
+                            const int cx = (enemy->ux() + std::int32_t(std::int64_t(kDirs[std::size_t(a)].x) * r / kOne)) / kCellUnits;
+                            const int cy = (enemy->uy() + std::int32_t(std::int64_t(kDirs[std::size_t(a)].y) * r / kOne)) / kCellUnits;
+                            if (Grid::in_bounds(cx, cy) && grid.at(cx, cy).wall() != Wall::None && !grid.at(cx, cy).temp_walkable()) wall = true;
+                        }
+                    if (!wall) continue;
+                }
                 if (cast_at(s, *enemy)) return;
             }
             if (hp_pct < 55)
