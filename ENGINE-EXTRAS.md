@@ -304,3 +304,21 @@ Status column: `accepted · Claude idea` (Hubert can still `change` / `drop` any
 | [X-262] | Sounds | make_sounds.py at 44.1 kHz with fades; own sound for each CC, grapple, pin, mud, embers. [U-525] |
 | [X-263] | Server versions | Version by content (version_id); the client saves "Server vN DATE" only when the content is new; protocol 29. [U-525] |
 | [X-264] | Pendrive bundle | tools/make_bundle.sh <folder>: game, local champions, Windows programs of that commit, install scripts for Linux, Windows, macOS, checksums. [U-526] |
+| [X-265] | Mud ground | Surface::Mud: slows walkers 20 %, earth can be bent, half a water source, it stays. In the map maker; banks of ponds on the base map; edge of the Foggy Swamp. [U-527] |
+| [X-266] | Map maker | 12 symmetries of painting (team mirror, axes, diagonals, four turns, all eight, free axis, turning copies, movable centre). View turns by quarters; "make it the default" turns the map's data. Per map and per player: my base at the bottom. [U-528][U-532] |
+| [X-267] | Makers in the window | Champion, map, item, loadout, unit makers run inside the game window from the menu (Window::attach), and as programs. With a running server they open as programs (same tables). Test in practice goes straight in. [U-529] |
+| [X-268] | Menu | Three equal columns of five, a row of three under them. [U-530] |
+| [X-269] | Hitbox and model | World::size_pct = the hitbox, model_pct = the picture. hitbox_size and model_scale in a .champ; model_size stays both. Practice size keys change only the hitbox. In the maker model size and sheet numbers are behind Special switches. [U-536] |
+| [X-270] | Drawn hitboxes | Champion maker: draw around the body (the biggest circles that fit, at most 6), draw a skill's shape (simplified to at most 24 corners; radius from the drawing). Protocol 30. [U-536] |
+| [X-271] | Champion maker view | Drag turns the model and its hitbox through the 8 directions; slider for the camera angle. Own Q, F, G buttons on the champion page. [U-531][U-535] |
+| [X-272] | Fire colours | Element lists show Fire - Red 600 ... Blue 3333; auto_heat on autoattacks: damage and colour; the element stays fire. [U-534] |
+| [X-273] | Item maker | kItems is a table in use: built-in + item.<name>.<key> lines of a game version. New items, parts, any stat, icon in the version's pack. [U-535] |
+| [X-274] | Loadout maker | setup.<kind>.<name>.<key> lines: keystones, trees, nodes, shards, runes, quints, masteries. A new keystone gives a stat. [U-535] |
+| [X-275] | Unit maker | unit.<name>.<key> lines: % of the usual numbers, body, up to 3 skills. World::unit_cast_skills: a bot casts what is ready, free, at the nearest enemy; a monster only at who it fights. [U-546] |
+| [X-276] | Server address | bind_ip (listen on), public_ip (shown and copied; it belongs to the router), Find my public IP (a STUN request on click). [U-537] |
+| [X-277] | Look size of skills | vis.size: how big a skill looks; the hit stays; the developer view shows the real size. cc_sweet_only: effect and knock only on the sweet spot. [U-538][U-539] |
+| [X-278] | Small fixes | D attack-move takes neutral monsters; autoattack lines only in the developer view or for melee; the companion glides and does not flicker between idle and walk. [U-542][U-543][U-545] |
+| [X-279] | Base map | A plan: clearings around camps, paths joining camps and lanes, forests with natural edges, rocks at corners, curved rivers, natural coasts. Gameplay positions unchanged. [U-544] |
+| [X-280] | Item sorting | Most stats and gold efficiency, of all stats or the chosen ones; a stat's price comes from the cheapest item that gives only it. [U-547] |
+| [X-281] | Lobby stage | My champion in the middle, allies at the sides and behind. [U-548] |
+| [X-282] | Director | F9: camera (zoom, angle, height, turn, position, follow), what is shown; in replays also time (speed, jump, timeline; backwards restarts and runs fast) and camera key sequences (save, load, loop). F10: video through ffmpeg. Reset to normal. [U-549] |

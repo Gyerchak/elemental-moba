@@ -287,14 +287,20 @@ clang 22 and GCC 16 (`README.md` → Build / Play).
 - Open idea: the maker builds a 3D model from a picture (tools/art/art_models.py) with one button
 
 ## M29 — For later [U-521] (2026-11-06)
-- [ ] Original map graphics in much better quality, same kind of quality levels as champions
-- [ ] Settings: allow / disallow animations and effects; own effects of any kind
-- [ ] Champion icons and splash arts: higher quality, more original, less sloppy
+- [x] Original map graphics in much better quality, same kind of quality levels as champions
+- [x] Settings: allow / disallow animations and effects; own effects of any kind
+- [~] Champion icons and splash arts (icons all, splash 49 of 72; finish with hq_art.py splash): higher quality, more original, less sloppy
 - [ ] Everything made locally; then another bug hunt
-- [ ] Fire heat levels [U-523]: red 600, red 800, orange 1000 (basic), yellow 1400, white, blue 2000, 2500, 3000, 3333: own graphic and physics each; heat in fire sweet spots
+- [x] Fire heat levels [U-523]: red 600, red 800, orange 1000 (basic), yellow 1400, white, blue 2000, 2500, 3000, 3333: own graphic and physics each; heat in fire sweet spots
 - [ ] All skill graphics better, with settings under the champion graphics [U-523]
-- [ ] Ice dash / water arms: attach to walls or champions, pull self or grab them; metal cables too; pin into a wall (near walls only: fast move, then CC; displacement + airborne) [U-524]
-- [ ] CC time rules per skill: stack / refresh / refresh if longer; LoL sleep; every kind of fear in lol.cpp [U-524]
+- [x] Ice dash / water arms: attach to walls or champions, pull self or grab them; metal cables too; pin into a wall (near walls only: fast move, then CC; displacement + airborne) [U-524]
+- [x] CC time rules per skill: stack / refresh / refresh if longer; LoL sleep; every kind of fear in lol.cpp [U-524]
 - [ ] Update maker, graphics, effects, locale; bug checks; Windows and macOS work like Linux; push [U-524]
 - [ ] Missing effects, sfx, sounds; better sounds; missing models for own champions; basic + alternative texture pack; packs change anything [U-525]
-- [ ] Server versions saved as "server v1 DATE", new only when the content changed [U-525]
+- [x] Server versions saved as "server v1 DATE", new only when the content changed [U-525]
+
+## M30 — Makers, director, plan of the map (2026-11-06)
+- [x] Mud ground, symmetries, turning maps, makers in the window, menu, hitbox apart from model, drawn hitboxes, fire colours, item, loadout and unit makers, server address, item sorting, lobby stage, replay and practice director, base map plan [U-527..U-549]
+- [ ] Structures with art-based models (towers and nexus are still the old shapes)
+- [ ] Own sound for each monster and minion kind
+- [ ] Real perspective camera: the picture is sprites, so the camera can tilt and zoom, and the map turn by half turns in a match
