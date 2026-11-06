@@ -969,6 +969,7 @@ void GameView::frame(NetClient& net, double now_s, Ui& ui) {
     const bool space_held = held[set_.keys[std::size_t(Action::CenterSelf)]] && !(SDL_GetModState() & SDL_KMOD_CTRL) && !chat_open_;
     const SDL_MouseButtonFlags mb = SDL_GetMouseState(nullptr, nullptr);
     const bool both_held = set_.both_buttons_center && (mb & SDL_BUTTON_LMASK) && (mb & SDL_BUTTON_RMASK);
+    if (SDL_getenv("EM_DIRECTOR")) dir_.open = true;  // (to check it without a person)
     director_camera(net, now_ms);  // [U-549]
     if ((cam_lock_ || space_held || both_held) && mine && !dir_.follow && !dir_.seq_play) {
         view_.cx = mine->x;

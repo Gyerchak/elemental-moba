@@ -93,8 +93,8 @@ def pack(mp, skin, sk, work: Path, base: Path):
     total = sum(n for n, _ in frames.values())
     px = mp["px"]
     while True:
-        wrap = max(1, 4096 // px)
-        if math.ceil(total / wrap) * 8 * px <= 4096 or px <= 48:
+        wrap = max(1, mp.get("max_sheet", 4096) // px)
+        if math.ceil(total / wrap) * 8 * px <= mp.get("max_sheet", 4096) or px <= 48:
             break
         px -= 4
     dst = ROOT / "resourcepacks" / "default" / "champions" / mp["champion"] / "skins" / skin

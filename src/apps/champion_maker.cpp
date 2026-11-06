@@ -1836,12 +1836,14 @@ void Maker::preview(float x, float y, float w, float h) {
             }
         }
         // the test dummies: red when the hitbox touches them now, as in the game
+        int dummies_hit = 0;
         for (int i = 0; i < 5; ++i) {
             const Dir dd = kDirs[std::size_t(i * 13 + 4) & 63];
             const float rr = 240.f + float(i) * 110.f;
             const std::int32_t tx = ux + std::int32_t(float(dd.x) / kOne * rr), ty = uy + std::int32_t(float(dd.y) / kOne * rr);
             const Circle c{tx, ty, 30};
             const bool hit = life_ <= 1.f && armed && (poly ? touches(pl, c) : touches(s, c));
+            dummies_hit += hit;
             ground_fill(r, v, float(tx), float(ty), 30, hit ? Rgba{255, 70, 60, 200} : Rgba{120, 120, 135, 170}, 16);
             ground_ring(r, v, float(tx), float(ty), 30, {220, 220, 230, 200}, 16);
         }
@@ -1884,6 +1886,12 @@ void Maker::preview(float x, float y, float w, float h) {
         }
         // ---- the timeline
         SDL_SetRenderClipRect(r, nullptr);
+        {   // [U-533] what the numbers mean, at a glance
+            const float cd_s = float(d.cd_ms) / 1000.f;
+            const std::string facts = trf("Damage {} per hit, every {:.1f} s = {:.0f} per second, cost {}. Hits {} of 5 test dummies now", d.dmg, cd_s, cd_s > 0 ? float(d.dmg) / cd_s : float(d.dmg), d.cost, dummies_hit);
+            fill_rect(r, x, y + h - 72, w, 24, {22, 24, 32, 200});
+            text(r, x + 8, y + h - 66, fit_text(facts, w - 16), {230, 230, 200});
+        }
         const float ty = y + h - 40;
         fill_rect(r, x, ty - 6, w, 46, {22, 24, 32, 240});
         if (button(r, ui, x + 8, ty, 70, 28, playing_ ? tr("Pause") : tr("Play"), playing_)) playing_ = !playing_;

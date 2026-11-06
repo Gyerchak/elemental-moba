@@ -99,7 +99,7 @@ void GameView::director_reset() {
 void GameView::draw_director(NetClient& net, std::int64_t now_ms, Ui& ui) {
     Director& d = dir_;
     if (!d.open || d.rec) return;
-    const float pw = 380, px = view_.sw - pw - 8, py = 40, ph = view_.sh - 110;
+    const float pw = 500, px = view_.sw - pw - 8, py = 40, ph = view_.sh - 110;
     fill_rect(r_, px, py, pw, ph, {16, 18, 28, 235});
     rect(r_, px, py, pw, ph, {255, 190, 110, 255});
     text(r_, px + 10, py + 8, net.spectator ? tr("Replay director") : tr("Practice camera"), {255, 220, 150}, 2);

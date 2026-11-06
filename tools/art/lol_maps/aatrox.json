@@ -5,9 +5,10 @@
  "credit": "Old Aatrox mod by lavei3 / Scrafty (runeforge.dev, CC-BY-NC-4.0, non-commercial). League of Legends assets (c) Riot Games. Local use only.",
  "height": 3.3,
  "ortho": 3.9,
- "px": 112,
+ "px": 176,
  "anchor": 0.86,
- "max_frames": 5,
+ "max_frames": 6,
+ "max_sheet": 8192,
  "wrap": 16,
  "skins": {
   "old_aatrox": {

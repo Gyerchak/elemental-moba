@@ -33,7 +33,7 @@ void App::menu() {
     const float cx = float(w) / 2;
     text(ren_, cx - text_w("ELEMENTAL MOBA", 5) / 2, 50, "ELEMENTAL MOBA", {255, 170, 70}, 5);
     const std::string sub = std::format("{} — {} {} ({})", tr("placeholder build"), tr("version"), set_.version, version_id(set_.version));  // [U-375]
-    text(ren_, cx - text_w(sub, 1.5f) / 2, 100, sub, {170, 170, 190}, 1.5f);
+    text(ren_, cx - text_w(sub, 1.5f) / 2, 112, sub, {170, 170, 190}, 1.5f);
 
     // [U-530] three equal columns of five buttons, the same gaps everywhere; a row of three under them
     const float gap = 10, col_gap = 24, bh = 44;

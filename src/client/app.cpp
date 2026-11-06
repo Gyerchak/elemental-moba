@@ -217,6 +217,7 @@ int App::run() {
         if (start_server(c, &err)) connect_local(c.port);
         else status_ = err;
     }
+    if (const char* m = SDL_getenv("EM_OPEN_MAKER")) open_maker_ = std::atoi(m);  // (to check a maker inside the window without a person; with EM_TOOL_SHOT)
     while (!quit_) {
         if (open_maker_) run_maker();  // [U-529]
         ui_.clicked = ui_.rclicked = ui_.backspace = ui_.enter = false;
@@ -299,6 +300,13 @@ int App::run() {
             if (++shots_taken_ >= std::max(1, opt_.shots)) shot_done_ = true, quit_ = true;
         }
         if (view_ && screen_ == Screen::Game) view_->record_frame(now_s_);  // [U-549]
+        if (const char* shot = SDL_getenv("EM_MENU_SHOT"); shot && screen_ == Screen::Menu && ++menu_frames_ == 20) {  // (a picture of the menu, then quit)
+            if (SDL_Surface* s = SDL_RenderReadPixels(ren_, nullptr)) {
+                SDL_SaveBMP(s, shot);
+                SDL_DestroySurface(s);
+            }
+            quit_ = true;
+        }
         SDL_RenderPresent(ren_);
         gfx::end_frame_text();
         if (set_.fps_limit > 0) {  // [U-488] FPS limit: wait out the rest of the frame

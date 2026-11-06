@@ -481,6 +481,7 @@ bool World::can_cast_now(const Unit& u, Slot s, std::string* why, std::int32_t s
         return no("swimming: no spells (only water mobility skills)");  // [U-188]
     const bool recast = d->casts > 1 && a.mc.casts_used > 0 && a.mc.casts_used < d->casts && now_ms <= a.mc.window_end_ms;
     if (!recast && a.cd_end_ms > now_ms && !u.no_cooldowns) return no("cooldown");
+    if (u.casts) return true;  // [U-546] a minion, monster or structure with skills: they cost it nothing
     const std::int64_t cost = water_free && u.stats.resource == ResourceKind::Water ? (only_mud_source(u, sx, sy) ? resolved(u, s).cost * elements::kMudWaterPct : 0)
                                                                                      : resolved(u, s).cost * 100;  // [U-513] from mud: half
     if (u.stats.resource == ResourceKind::Water && cost > u.res_max)
