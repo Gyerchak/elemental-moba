@@ -92,10 +92,21 @@ int Sprites::pump(int max_uploads) {
         std::unique_ptr<SpriteSheet> s = std::move(d.sheet);
         if (d.pic) {
             if (s && !s->anims.empty())
-                if (SDL_Texture* t = SDL_CreateTextureFromSurface(res_->renderer(), d.pic)) {
-                    SDL_SetTextureScaleMode(t, scale_ < 0.99f ? SDL_SCALEMODE_NEAREST : SDL_SCALEMODE_LINEAR);
-                    s->tex = t, s->owned = true, s->tex_scale = scale_ < 0.99f ? scale_ : 1.f;
+            {
+                float ts = scale_ < 0.99f ? scale_ : 1.f;
+                SDL_Texture* t = SDL_CreateTextureFromSurface(res_->renderer(), d.pic);
+                for (int tries = 0; !t && tries < 2 && d.pic; ++tries) {  // [U-540] too big for this graphics card: half the size, not no model
+                    SDL_Surface* half = SDL_ScaleSurface(d.pic, std::max(1, d.pic->w / 2), std::max(1, d.pic->h / 2), SDL_SCALEMODE_LINEAR);
+                    if (!half) break;
+                    SDL_DestroySurface(d.pic);
+                    d.pic = half, ts /= 2;
+                    t = SDL_CreateTextureFromSurface(res_->renderer(), d.pic);
                 }
+                if (t) {
+                    SDL_SetTextureScaleMode(t, ts < 0.99f ? SDL_SCALEMODE_NEAREST : SDL_SCALEMODE_LINEAR);
+                    s->tex = t, s->owned = true, s->tex_scale = ts;
+                }
+            }
             SDL_DestroySurface(d.pic);
         }
         if (!s || !s->tex) {  // [U-499] bigger than the GPU allows …: say so instead of failing silently
@@ -134,6 +145,21 @@ const SpriteSheet* Sprites::get_dir(const std::string& dir) {
             }
         }
         if (!s->tex) s->tex = res_->texture(dir + "/sheet.png");
+        if (!s->tex) {  // [U-540] too big for this graphics card: half the size, not no model
+            const std::string png = res_->file(dir + "/sheet.png");
+            if (SDL_Surface* full = png.empty() ? nullptr : SDL_LoadPNG(png.c_str())) {
+                for (float ts = 0.5f; !s->tex && ts >= 0.25f; ts /= 2) {
+                    if (SDL_Surface* small = SDL_ScaleSurface(full, std::max(1, int(float(full->w) * ts)), std::max(1, int(float(full->h) * ts)), SDL_SCALEMODE_LINEAR)) {
+                        if (SDL_Texture* t = SDL_CreateTextureFromSurface(res_->renderer(), small)) {
+                            SDL_SetTextureScaleMode(t, SDL_SCALEMODE_NEAREST);
+                            s->tex = t, s->owned = true, s->tex_scale = ts;
+                        }
+                        SDL_DestroySurface(small);
+                    }
+                }
+                SDL_DestroySurface(full);
+            }
+        }
         if (!s->tex && !s->anims.empty())  // [U-499] e.g. bigger than the GPU allows: say so (logs/models.txt) instead of failing silently
             if (std::error_code ec; std::filesystem::create_directories("logs", ec), true)
                 if (std::ofstream lg("logs/models.txt", std::ios::app); lg) lg << dir << "/sheet.png could not be loaded: " << SDL_GetError() << '\n';
