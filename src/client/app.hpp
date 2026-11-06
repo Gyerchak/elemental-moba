@@ -164,7 +164,7 @@ private:
     // ---- state
     double match_start_s_ = -1, loading_since_ = -1, over_since_ = -1;
     bool quit_ = false, shot_done_ = false, ingame_menu_ = false;
-    int open_maker_ = 0;                // [U-529] 1 champion, 2 map, 3 item, 4 loadout: opens inside this window
+    int open_maker_ = 0;                // [U-529] 1 champion, 2 map, 3 item, 4 loadout, 5 unit: opens inside this window
     void run_maker();
     int options_page_ = 0;
     int bind_wait_ = -1;             // Controls page: waiting for a key for this action

@@ -325,9 +325,9 @@ void App::run_maker() {
     const int which = open_maker_;
     open_maker_ = 0;
     if (server_) {  // [U-529] a server runs in this program and uses the same tables: the maker gets its own window
-        constexpr const char* kProgram[] = {"em_champion_maker", "em_map_maker", "em_item_maker", "em_loadout_maker"};
+        constexpr const char* kProgram[] = {"em_champion_maker", "em_map_maker", "em_item_maker", "em_loadout_maker", "em_unit_maker"};
         std::string err;
-        if (!tool::open_program(kProgram[std::clamp(which - 1, 0, 3)], &err)) status_ = err;
+        if (!tool::open_program(kProgram[std::clamp(which - 1, 0, 4)], &err)) status_ = err;
         return;
     }
     tool::ToolExit ex;
@@ -335,6 +335,7 @@ void App::run_maker() {
         case 1: ex = makers::champion_embedded(win_, ren_); break;
         case 2: ex = makers::map_embedded(win_, ren_); break;
         case 3: ex = makers::item_embedded(win_, ren_); break;
+        case 5: ex = makers::unit_embedded(win_, ren_); break;
         default: ex = makers::loadout_embedded(win_, ren_); break;
     }
     ui_.down = false, ui_.clicked = false, ui_.drag = -1, ui_.focus = -1;

@@ -31,6 +31,7 @@ inline constexpr const char* kOfficialVersion = "official-0.1";
 // [U-535] the lines of a version file, one by one (what the item maker and the loadout maker preview)
 struct ItemDef;
 std::string apply_item_line(const std::string& name, const std::string& key, const std::string& value);
+std::string apply_unit_line(const std::string& name, const std::string& key, const std::string& value);  // [U-546]
 std::string apply_setup_text(const std::string& kind, const std::string& name, const std::string& key, const std::string& value);
 [[nodiscard]] std::vector<std::string> item_number_keys();
 [[nodiscard]] std::int32_t item_number(const ItemDef& d, const std::string& key);

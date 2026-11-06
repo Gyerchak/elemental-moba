@@ -227,6 +227,8 @@ struct Unit {
     std::int32_t slide_x = 0, slide_y = 0, prev_x = 0, prev_y = 0;  // [U-52] sliding on ice (sub per tick)
     std::array<std::int16_t, 12> practice_size{};  // [U-517] practice tool: +% of each skill's size
     std::int32_t practice_model = 0;               // [U-517] practice tool: +model size (100 = 1 %)
+    bool casts = false;                            // [U-546] a minion, monster or structure with skills
+    std::int64_t next_cast_scan_ms = 0;
     std::int32_t practice_hitbox = 0;              // [U-536] practice tool: the hitbox alone (1 = 1 %)
     std::int64_t flask_until = 0;  // [U-81] immortal heal window
     std::int32_t flask_revive = 0; // revive heals left
@@ -686,6 +688,8 @@ public:
     std::vector<Companion> companions;          // [U-407]
     void step_companions();
     void call_companion(Unit& u);  // [U-364] Lion Turtle stacks per team (permanent)
+    void apply_unit_tweak(Unit& u);             // [U-546]
+    void unit_cast_skills(Unit& u);             // [U-546]
     void apply_monster_growth(Unit& m);         // [U-365] stats for its respawn count
     [[nodiscard]] bool natural_wall(int cx, int cy) const;  // [U-360] a map rock (no timer brings it down)
     void lava_melts_walls();

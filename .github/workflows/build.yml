@@ -27,11 +27,11 @@ jobs:
       - name: Build
         run: |
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
-          cmake --build build --target elemental_moba em_server em_champion_maker em_map_maker em_item_maker em_loadout_maker
+          cmake --build build --target elemental_moba em_server em_champion_maker em_map_maker em_item_maker em_loadout_maker em_unit_maker
       - name: Collect
         run: |
           mkdir -p dist
-          cp build/elemental_moba.exe build/em_server.exe build/em_champion_maker.exe build/em_map_maker.exe build/em_item_maker.exe build/em_loadout_maker.exe dist/
+          cp build/elemental_moba.exe build/em_server.exe build/em_champion_maker.exe build/em_map_maker.exe build/em_item_maker.exe build/em_loadout_maker.exe build/em_unit_maker.exe dist/
           ldd build/elemental_moba.exe | grep -i ucrt64 | awk '{print $3}' | xargs -I{} cp {} dist/
       - uses: actions/upload-artifact@v4
         with:
@@ -48,7 +48,7 @@ jobs:
           export CXX="$(brew --prefix llvm)/bin/clang++"
           export LDFLAGS="-L$(brew --prefix llvm)/lib/c++ -Wl,-rpath,$(brew --prefix llvm)/lib/c++"
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
-          cmake --build build --target elemental_moba em_server em_champion_maker em_map_maker em_item_maker em_loadout_maker
+          cmake --build build --target elemental_moba em_server em_champion_maker em_map_maker em_item_maker em_loadout_maker em_unit_maker
       - uses: actions/upload-artifact@v4
         with:
           name: elemental-moba-macos-programs
@@ -59,3 +59,4 @@ jobs:
             build/em_map_maker
             build/em_item_maker
             build/em_loadout_maker
+            build/em_unit_maker

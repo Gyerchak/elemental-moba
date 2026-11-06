@@ -1,4 +1,5 @@
 // Headless bot-vs-bot match: proves the sim runs to a winner [X-21]. Usage: sim_run [minutes] [seed]
+#include "game/versions.hpp"
 #include <chrono>
 #include <cstdlib>
 #include <algorithm>
@@ -35,6 +36,9 @@ int main(int argc, char** argv) {
     const int ts = cur_map().team_size;  // [U-420] 5 v 5, 3 v 3 …
     // [U-469] EM_CUSTOM=1: the own champions (custom_champions/*.champ) play too — the first players of each team
     std::vector<int> own;
+    if (const char* v = std::getenv("EM_VERSION")) {  // [U-546] a game version plays
+        if (const std::string e = apply_version(v); !e.empty()) std::println("version: {}", e);
+    }
     if (std::getenv("EM_CUSTOM")) {
         std::error_code ec;
         for (const auto& f : std::filesystem::directory_iterator("custom_champions", ec)) {

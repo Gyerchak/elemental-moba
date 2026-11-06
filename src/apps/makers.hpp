@@ -11,9 +11,11 @@ int champion_main(int argc, char** argv);
 int map_main(int argc, char** argv);
 int item_main(int argc, char** argv);
 int loadout_main(int argc, char** argv);
+int unit_main(int argc, char** argv);
 [[nodiscard]] tool::ToolExit champion_embedded(SDL_Window* win, SDL_Renderer* ren);
 [[nodiscard]] tool::ToolExit map_embedded(SDL_Window* win, SDL_Renderer* ren);
 [[nodiscard]] tool::ToolExit item_embedded(SDL_Window* win, SDL_Renderer* ren);
 [[nodiscard]] tool::ToolExit loadout_embedded(SDL_Window* win, SDL_Renderer* ren);
+[[nodiscard]] tool::ToolExit unit_embedded(SDL_Window* win, SDL_Renderer* ren);
 
 }  // namespace em::makers

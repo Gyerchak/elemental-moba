@@ -1,5 +1,6 @@
 // [X-13][X-59] The champion roster and the special-skill list. One file per champion in this folder.
 #include "game/loadout/loadout.hpp"
+#include "game/mobs/unit_tweaks.hpp"
 #include <algorithm>
 #include <array>
 #include <vector>
@@ -157,6 +158,7 @@ void restore_official_numbers() {  // built-in champions, Q options and specials
     std::ranges::copy(kQ, q_store().begin());
     restore_setup();  // [U-483] runes / masteries / keystones / trees back to the defaults
     restore_items();  // [U-535] own items of a version are gone
+    unit_tweaks().clear();  // [U-546]
 }
 Element q_option_element(int q) {
     if (q >= int(kQ.size()) && q < int(q_store().size())) return base_element(q_store()[std::size_t(q)].sub);  // [U-520]

@@ -54,6 +54,7 @@ void World::spawn_structures() {
 }
 
 void World::step_turret(Unit& u) {
+    unit_cast_skills(u);  // [U-546]
     if (u.kind == UnitKind::Inhibitor) return;
     Unit* cur = find(u.order.target);
     const bool ok = u.order.kind == OrderKind::Attack && cur && cur->alive && targetable(*cur) && edge_gap(u, *cur) <= u.attack_range &&

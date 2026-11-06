@@ -40,13 +40,22 @@ constexpr Seg kRivers[] = {
     {{252, 420}, {334, 346}},   // bot jungle → sea
 };
 constexpr double kRiverHalfWidth = 3.5;
-// [U-269] forest paths: every jungle pond → the nearest outer lane and the mid lane (Claude idea layout)
+// [U-544] the jungle as a plan: every camp stands in its own clearing with two ways out, paths join the camps to each other and to the lanes.
+// Numbers of the camps: maps.cpp (camps, aggro_camps, buff_camps).
+constexpr P kClearings[] = {{110, 300}, {150, 410}, {230, 430}, {80, 360}, {190, 360}, {130, 250}, {270, 400}, {60, 250}, {150, 300}, {174, 442}};
+constexpr double kClearingRadius = 15;
 constexpr Seg kForestPaths[] = {
-    {{100, 262}, {28, 262}},  {{100, 262}, {175, 337}},
-    {{252, 420}, {252, 484}}, {{252, 420}, {172, 340}},
-    {{165, 425}, {165, 484}}, {{165, 425}, {126, 386}},
+    // top jungle
+    {{28, 250}, {60, 250}},   {{60, 250}, {130, 250}},  {{130, 250}, {150, 300}}, {{150, 300}, {110, 300}}, {{110, 300}, {80, 360}},
+    {{80, 360}, {28, 360}},   {{150, 300}, {205, 306}}, {{80, 360}, {115, 396}},  {{130, 250}, {100, 262}},
+    // bottom jungle
+    {{150, 483}, {174, 442}}, {{174, 442}, {150, 410}}, {{150, 410}, {115, 396}}, {{150, 410}, {190, 360}}, {{190, 360}, {205, 306}},
+    {{190, 360}, {270, 400}}, {{270, 400}, {230, 430}}, {{230, 430}, {230, 483}}, {{270, 400}, {252, 420}}, {{174, 442}, {230, 430}},
 };
-constexpr double kPathHalfWidth = 1.6, kRoadHalfWidth = 3;
+// rock outcrops at the corners of the paths: places to hide behind, not a maze
+struct Rock { P at; double core; };
+constexpr Rock kRocks[] = {{{95, 225}, 3.0}, {{168, 262}, 2.4}, {{55, 310}, 2.6}, {{130, 345}, 3.2}, {{178, 322}, 2.0}, {{118, 430}, 2.6}, {{205, 395}, 3.0}, {{262, 450}, 2.4}, {{190, 462}, 2.2}, {{305, 430}, 2.8}};
+constexpr double kPathHalfWidth = 2.6, kRoadHalfWidth = 3;
 
 double dist(P a, P b) { return std::hypot(a.x - b.x, a.y - b.y); }
 
@@ -75,6 +84,20 @@ constexpr std::uint32_t hash(int x, int y, std::uint32_t salt) {
     return std::uint32_t(z ^ (z >> 31));
 }
 
+// [U-544] smooth noise: forests, coasts and rivers with natural edges (the same on every machine)
+double smooth_noise(double x, double y, double scale, std::uint32_t salt) {
+    const double fx = x / scale, fy = y / scale;
+    const int ix = int(std::floor(fx)), iy = int(std::floor(fy));
+    auto r = [&](int a, int b) { return double(hash(a, b, salt) % 1000) / 999.0; };
+    auto ease = [](double t) { return t * t * (3 - 2 * t); };
+    const double tx = ease(fx - ix), ty = ease(fy - iy);
+    return (r(ix, iy) * (1 - tx) + r(ix + 1, iy) * tx) * (1 - ty) + (r(ix, iy + 1) * (1 - tx) + r(ix + 1, iy + 1) * tx) * ty;
+}
+double forest_noise(P p) { return 0.6 * smooth_noise(p.x, p.y, 22, 21) + 0.28 * smooth_noise(p.x, p.y, 10, 22) + 0.12 * smooth_noise(p.x, p.y, 5, 23); }
+P wobbled(P p, double amount) {  // a point pushed aside a little: straight lines drawn with it curve
+    return {p.x + (smooth_noise(p.x, p.y, 30, 31) - 0.5) * amount, p.y + (smooth_noise(p.x, p.y, 30, 32) - 0.5) * amount};
+}
+
 std::pair<int, int> canonical(int x, int y) {
     const int mx = M - x, my = M - y;
     if (y > x || (y == x && x <= mx)) return {x, y};
@@ -86,51 +109,38 @@ Cell make_cell(int cx, int cy) {
     Cell c;  // land, elevation 0, walkable [U-83: no elevation anywhere]
     c.set_surface(Surface::Land);
 
-    const double sea_d = std::abs(p.x - p.y) / std::sqrt(2.0);
+    const double sea_d = std::abs(p.x - p.y) / std::sqrt(2.0) + (smooth_noise(p.x, p.y, 14, 34) - 0.5) * 7;  // [U-544] a coast, not a ruler
     const double lane_d = dist_to_lanes(p);
-    const double base_d = dist(p, kFireBase);
-    const double pole_d = dist(p, kNorthPole);
+    const double base_d = dist(p, kFireBase) + (dist(p, kFireBase) > kBaseStone + 4 ? (smooth_noise(p.x, p.y, 12, 35) - 0.5) * 12 : 0);  // [U-544] the core stays round
+    const double pole_d = dist(p, kNorthPole) + (smooth_noise(p.x, p.y, 12, 36) - 0.5) * 8;
     const double mid_d = std::abs(p.x + p.y - M) / std::sqrt(2.0);
 
-    // 1. Jungle [U-89]: groves of trees + bushes, kept off the lanes.
-    if (lane_d > kLaneHalfWidth + 3) {
-        const bool grove = hash(cx / 9, cy / 9, 1) % 100 < 45;
-        // [U-346] some groves are ROCK outcrops instead: a rock-wall core (no walking, no seeing through) and a
-        // stone hill one level up around it, with a few trees. They sit where trees already blocked the way.
-        // [U-358] never in the base, on the pole or by the sea: those areas clear the grove later, which used to
-        // leave invisible blocked rock cores around the bases
-        const bool rocks = grove && hash(cx / 9, cy / 9, 7) % 100 < 30 && base_d > kBaseSand + 6 && dist(p, {double(M) - kFireBase.x, double(M) - kFireBase.y}) > kBaseSand + 6 &&
-                           pole_d > kPoleRadius + 6 && sea_d > kSeaHalfWidth + kBeach + 4;
-        if (rocks) {
-            // [U-359] varied shapes: most are a single rock, some small, long, thick or a pair (Claude idea mix)
-            const std::uint32_t g = hash(cx / 9, cy / 9, 11), shape = g % 10;
-            const double gx = (cx / 9) * 9 + 3.0 + double(g / 10 % 4), gy = (cy / 9) * 9 + 3.0 + double(g / 40 % 4);
-            const double ang = double(g / 160 % 8) * 0.3927;  // 8 directions
-            const double ux = cx + 0.5 - gx, uy = cy + 0.5 - gy;
-            double along = ux * std::cos(ang) + uy * std::sin(ang), across = -ux * std::sin(ang) + uy * std::cos(ang);
-            double core = 0.75;                                          // 0-4: a single rock
-            if (shape == 5 || shape == 6) core = 1.5;                    // small
-            else if (shape == 7) along /= 2.6, core = 1.2;               // long
-            else if (shape == 8) core = 2.6;                             // thick
-            else if (shape == 9) along = std::abs(along) - 2.0, core = 0.9;  // a pair
-            const double d = std::hypot(along, across);
-            c.set_surface(Surface::Stone);
-            if (d < core) {
+    // 1. Jungle [U-544]: forests with natural edges, thick along the lanes, a clearing around every camp, paths with bushes beside them, rocks at the corners.
+    const P curved = wobbled(p, 9);
+    double path_d = 1e9;
+    for (Seg sg : kForestPaths) path_d = std::min(path_d, dist_to_segment(curved, sg));
+    if (lane_d > kLaneHalfWidth + 3 && base_d > kBaseSand + 4 && pole_d > kPoleRadius + 4) {
+        const double f = forest_noise(p), edge = lane_d - kLaneHalfWidth;
+        double clear_d = 1e9;
+        for (P camp : kClearings) clear_d = std::min(clear_d, dist(p, camp) - kClearingRadius);
+        const double want = edge < 9 ? 0.40 : 0.47;  // (the forest closes in along the lanes)
+        const bool open = clear_d <= 0 || path_d <= kPathHalfWidth + 1;
+        if (!open && f > want && hash(cx, cy, 2) % 100 < 88) c.set_tree(Tree::Alive);
+        else if (!open && f > want - 0.05 && hash(cx / 3, cy / 3, 3) % 100 < 45) c.set_bush(Bush::Alive);
+        else if (path_d > kPathHalfWidth + 1 && path_d < kPathHalfWidth + 3.5 && hash(cx / 4, cy / 4, 4) % 100 < 28) c.set_bush(Bush::Alive);
+        for (const Rock& rk : kRocks) {
+            const double d = dist(p, rk.at) + (smooth_noise(p.x, p.y, 3, 33) - 0.5) * 1.6;
+            if (d < rk.core) {
+                c.set_surface(Surface::Stone), c.set_tree(Tree::None), c.set_bush(Bush::None);
                 c.set_walk(Walk::Blocked);
                 c.set_wall(Wall::Stone);  // [U-362] a real rock: skills hit it (and can break it [U-360])
                 c.set_elevation(2);
                 c.set_vision_fog(SenseBlock::Full);
                 c.set_skill_fog(SenseBlock::Full);
-            } else if (d < core + 1.6) {
+            } else if (d < rk.core + 2.2) {
+                c.set_surface(Surface::Stone), c.set_tree(Tree::None), c.set_bush(Bush::None);
                 c.set_elevation(1);
-                if (hash(cx, cy, 8) % 100 < 20) c.set_tree(Tree::Alive);
-            } else if (hash(cx, cy, 2) % 100 < 60) {
-                c.set_tree(Tree::Alive);
             }
-        } else if (grove && hash(cx, cy, 2) % 100 < 75) {
-            c.set_tree(Tree::Alive);
-        } else if (hash(cx / 4, cy / 4, 3) % 100 < 9) {
-            c.set_bush(Bush::Alive);
         }
     }
     // 2. Sea [U-85] deep water [?-08] with beaches [X-42].
@@ -143,17 +153,24 @@ Cell make_cell(int cx, int cy) {
     if (mid_d < kLaneHalfWidth + 6 && sea_d < kSeaHalfWidth + kBeach) c.set_surface(Surface::Land);
     // 4. Ponds and shallow rivers [U-88][U-89].
     bool river = false;
-    for (P pond : kPonds) river |= dist(p, pond) < kPondRadius;
-    for (Seg s : kRivers) river |= dist_to_segment(p, s) < kRiverHalfWidth;
+    for (P pond : kPonds) river |= dist(p, pond) + (smooth_noise(p.x, p.y, 5, 37) - 0.5) * 4 < kPondRadius;
+    for (Seg s : kRivers) river |= dist_to_segment(wobbled(p, 11), s) < kRiverHalfWidth;
+    // [U-527][U-544] mud on the banks of the ponds
+    bool bank = false;
+    for (P pond : kPonds) bank |= dist(p, pond) < kPondRadius + 4.5 && smooth_noise(p.x, p.y, 4, 38) > 0.42;
+    if (bank && !river && c.wall() == Wall::None && c.surface() == Surface::Land) {
+        c.set_surface(Surface::Mud);
+        c.set_tree(Tree::None);
+        c.set_bush(Bush::None);
+    }
     if (river && c.surface() != Surface::DeepWater) {
         c.set_surface(Surface::Water);
         c.set_tree(Tree::None);
         c.set_bush(Bush::None);
     }
     // 4b. Forest paths through the jungle [U-269] (not over water)
-    bool on_path = false;
-    for (Seg s : kForestPaths) on_path |= dist_to_segment(p, s) < kPathHalfWidth;
-    if (on_path && c.surface() != Surface::Water && c.surface() != Surface::DeepWater && sea_d >= kSeaHalfWidth + kBeach) {
+    const bool on_path = path_d < kPathHalfWidth;
+    if (on_path && c.wall() == Wall::None && c.surface() != Surface::Water && c.surface() != Surface::DeepWater && sea_d >= kSeaHalfWidth + kBeach) {
         c.set_surface(Surface::ForestPath);
         c.set_tree(Tree::None);
         c.set_bush(Bush::None);

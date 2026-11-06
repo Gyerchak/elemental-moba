@@ -73,10 +73,7 @@ void App::menu() {
     if (button(ren_, ui_, x2, row(1), bw, bh, tr("Map maker"))) open_maker_ = 2;       // [U-518]
     if (button(ren_, ui_, x2, row(2), bw, bh, tr("Item maker"))) open_maker_ = 3;      // [U-535]
     if (button(ren_, ui_, x2, row(3), bw, bh, tr("Loadout maker"))) open_maker_ = 4;   // [U-535]
-    if (button(ren_, ui_, x2, row(4), bw, bh, tr("Server app"))) {                     // [U-511] its own program: it keeps running without the game
-        std::string err;
-        if (!tool::open_program("em_server", &err)) status_ = err;
-    }
+    if (button(ren_, ui_, x2, row(4), bw, bh, tr("Unit maker"))) open_maker_ = 5;      // [U-546]
     // ---- the row under the columns
     const float by = row(5) + gap;
     if (button(ren_, ui_, x0, by, bw, bh, tr("Options"))) back_ = Screen::Menu, go(Screen::Options);          // [U-208]

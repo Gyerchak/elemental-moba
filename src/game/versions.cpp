@@ -11,6 +11,8 @@
 #include "core/numbers.hpp"
 #include "game/content.hpp"
 #include "game/loadout/loadout.hpp"
+#include "game/mobs/monsters.hpp"
+#include "game/mobs/unit_tweaks.hpp"
 #include <span>
 #include <vector>
 #include <cstdlib>
@@ -442,6 +444,59 @@ std::string version_description(const std::string& name) {
     return {};
 }
 
+// ---------------------------------------------------------------- [U-546] units set like champions
+std::vector<UnitTweak>& unit_tweaks() {
+    static std::vector<UnitTweak> v;
+    return v;
+}
+const UnitTweak* tweak_of(const std::string& name) {
+    for (const UnitTweak& t : unit_tweaks())
+        if (t.name == name) return &t;
+    return nullptr;
+}
+std::vector<std::string> tweakable_units() {
+    std::vector<std::string> out{"Melee Minion", "Ranged Minion", "Siege Minion", "Super Minion", "Turret", "Inhibitor", "Nation Shrine"};
+    for (const MonsterDef& m : kMonsters) out.emplace_back(m.name);
+    return out;
+}
+std::string apply_unit_line(const std::string& name, const std::string& key, const std::string& v) {
+    const auto names = tweakable_units();
+    if (std::ranges::find(names, name) == names.end()) return std::format("no unit named '{}'", name);
+    auto it = std::ranges::find_if(unit_tweaks(), [&](const UnitTweak& t) { return t.name == name; });
+    if (it == unit_tweaks().end()) unit_tweaks().push_back({.name = name}), it = unit_tweaks().end() - 1;
+    UnitTweak& t = *it;
+    if (key == "body") {
+        const BodyDef* b = v == "Humanoid" ? &kHumanoidBody : v == "Slim" ? &kSlimBody : v == "Broad" ? &kBroadBody : v == "Beast" ? &kBeastBody : nullptr;
+        if (!b && v != "Usual") return "body: Usual / Humanoid / Slim / Broad / Beast";
+        t.body = b;
+        return {};
+    }
+    if (key.starts_with("skill") && key.size() == 6 && key[5] >= '1' && key[5] <= '3') {
+        const SkillDef* found = nullptr;
+        for (const ChampionDef& c : champions())
+            for (const SkillDef* s : {&c.p, &c.w, &c.e, &c.r, &c.t, &c.y, &c.q_own, &c.f_own, &c.g_own})
+                if (!found && s->name == v) found = s;
+        for (const SkillDef& s : q_options())
+            if (!found && s.name == v) found = &s;
+        for (const SkillDef& s : specials())
+            if (!found && s.name == v) found = &s;
+        if (!found && !v.empty()) return std::format("no skill named '{}'", v);
+        t.skills[std::size_t(key[5] - '1')] = found;
+        return {};
+    }
+    const int x = std::clamp(std::atoi(v.c_str()), 1, 2000);
+    if (key == "hp") t.hp = x;
+    else if (key == "attack") t.attack = x;
+    else if (key == "defence") t.defence = x;
+    else if (key == "elemental_defence") t.elemental_defence = x;
+    else if (key == "move_speed") t.move_speed = x;
+    else if (key == "attack_speed") t.attack_speed = x;
+    else if (key == "attack_range") t.attack_range = x;
+    else if (key == "size") t.size = x;
+    else return std::format("unknown key '{}' for a unit", key);
+    return {};
+}
+
 std::string apply_item_line(const std::string& name, const std::string& key, const std::string& v) { return item_line(name, key, v); }
 std::vector<std::string> item_number_keys() {
     std::vector<std::string> out;
@@ -507,6 +562,14 @@ std::string apply_version(const std::string& name, int* changes) {
                 break;
             }
             if (const std::string e = apply_setup_line(what.substr(0, d3), what.substr(d3 + 1), key, v); !e.empty()) {
+                error = std::format("line {}: {}", line_no, e);
+                break;
+            }
+            ++n;
+            continue;
+        }
+        if (kind == "unit") {  // [U-546] unit.<name>.<key>
+            if (const std::string e = apply_unit_line(what, key, v); !e.empty()) {
                 error = std::format("line {}: {}", line_no, e);
                 break;
             }

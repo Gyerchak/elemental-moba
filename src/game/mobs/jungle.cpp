@@ -4,6 +4,7 @@
 #include "game/match/maps.hpp"
 #include "game/mobs/monsters.hpp"
 #include "game/mobs/rules.hpp"
+#include "game/mobs/unit_tweaks.hpp"
 #include "game/world.hpp"
 
 namespace em {
@@ -47,6 +48,59 @@ void World::apply_monster_growth(Unit& m) {
     const MonsterDef& d = kMonsters[std::size_t(m.mob)];
     m.stats.health.base = d.hp + std::int32_t(std::int64_t(d.hp) * d.hp_growth_pct * m.deaths / 100);
     m.stats.attack.base = d.attack + std::int32_t(std::int64_t(d.attack) * d.attack_growth_pct * m.deaths / 100);
+    if (const UnitTweak* t = tweak_of(m.name)) {  // [U-546]
+        m.stats.health.base = std::int32_t(std::int64_t(m.stats.health.base) * t->hp / 100);
+        m.stats.attack.base = std::int32_t(std::int64_t(m.stats.attack.base) * t->attack / 100);
+    }
+}
+
+// [U-546] set like a champion by the game version: the numbers, the body, the skills
+void World::apply_unit_tweak(Unit& u) {
+    static constexpr const char* kMinion[] = {"Melee Minion", "Ranged Minion", "Siege Minion", "Super Minion"};
+    const UnitTweak* t = tweak_of(u.kind == UnitKind::Minion ? std::string(kMinion[std::min<int>(int(u.mtype), 3)]) : u.name);
+    if (!t) return;
+    auto pct = [](std::int32_t& v, int p) { v = std::int32_t(std::int64_t(v) * p / 100); };
+    pct(u.stats.health.base, t->hp), pct(u.stats.attack.base, t->attack), pct(u.stats.defence.base, t->defence), pct(u.stats.elemental_defence.base, t->elemental_defence);
+    pct(u.stats.move_speed.base, t->move_speed), pct(u.as100, t->attack_speed), pct(u.attack_range, t->attack_range);
+    u.stats.model_size += (t->size - 100) * 100;
+    if (t->body) u.body = t->body;
+    u.hp = u.stats.health.total();
+    u.stats.resource = ResourceKind::None;  // (its skills cost nothing)
+    static constexpr Slot kSlots[] = {Slot::W, Slot::E, Slot::R};
+    for (std::size_t i = 0; i < t->skills.size(); ++i)
+        if (const SkillDef* d = t->skills[i]) {
+            u.skill[std::size_t(kSlots[i])] = d;
+            u.ab[std::size_t(kSlots[i])].rank = 1;
+            u.casts = true;
+        }
+}
+
+// [U-546] a bot like the others: what is ready goes at the nearest enemy it can reach
+void World::unit_cast_skills(Unit& u) {
+    if (!u.casts || !u.alive || u.casting || now_ms < u.next_cast_scan_ms) return;
+    u.next_cast_scan_ms = now_ms + 250;
+    if (!u.st.can_cast()) return;
+    const std::int8_t keep = u.champ;
+    u.champ = 0;  // (the casting rules read a champion's table: their champion-only parts ask for the kind first)
+    for (Slot s : {Slot::R, Slot::E, Slot::W}) {
+        const SkillDef* d = u.skill[std::size_t(s)];
+        if (!d || !can_cast_now(u, s)) continue;
+        const ResolvedAbility r = resolved(u, s);
+        const std::int64_t reach = std::max<std::int64_t>(120, std::int64_t(r.range) + r.radius);
+        const Unit* best = nullptr;
+        std::int64_t bd = reach * reach;
+        for (const Unit& o : units) {
+            if (!o.alive || o.team == u.team || !targetable(o) || !visible_to(u.team, o)) continue;
+            if (u.team == Team::Neutral && (o.id != u.aggro)) continue;  // a monster only at who it fights
+            if (o.team == Team::Neutral && u.team != Team::Neutral) continue;
+            if (const std::int64_t dd = dist2(o.ux(), o.uy(), u.ux(), u.uy()); dd <= bd) bd = dd, best = &o;
+        }
+        if (!best) continue;
+        start_cast(u, {OrderKind::Cast, best->id, best->ux(), best->uy(), std::uint8_t(s)});
+        if (u.casting) finish_cast(u);
+        break;
+    }
+    u.champ = keep;
 }
 
 // [U-82][U-147] Jungle: passive spirits / animals, aggressive camps [X-97], the Face Stealer [X-55].
@@ -89,6 +143,7 @@ void World::spawn_jungle() {
 }
 
 void World::step_monster(Unit& u) {
+    unit_cast_skills(u);  // [U-546]
     // [X-97] aggressive monsters pick the closest non-neutral unit near their camp
     if (u.aggressive && !u.aggro && now_ms >= u.next_scan_ms) {
         u.next_scan_ms = now_ms + 250;

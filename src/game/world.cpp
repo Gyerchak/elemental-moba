@@ -31,6 +31,7 @@ std::uint32_t World::random() {  // xorshift32, deterministic [X-04]
 }
 
 Unit& World::spawn_unit(Unit u) {
+    if (u.kind != UnitKind::Champion) apply_unit_tweak(u);  // [U-546]
     u.id = next_id++;
     index[u.id] = units.size();
     units.push_back(std::move(u));

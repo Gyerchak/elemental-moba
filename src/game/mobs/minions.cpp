@@ -83,6 +83,7 @@ rules::MinionPriority World::minion_priority(const Unit& me, const Unit& enemy) 
 }
 
 void World::step_minion(Unit& u) {
+    unit_cast_skills(u);  // [U-546]
     const auto& R = rules::kMinion;
     const auto& lane = lane_path(u.lane);
     const bool fire = u.team == Team::FireNation;
