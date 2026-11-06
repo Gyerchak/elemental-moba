@@ -227,6 +227,36 @@ void App::custom_champions() {
 }  // namespace em
 
 namespace em {
+// [X-19] the replays on this computer, newest first
+void App::replays_screen() {
+    int w = 0, h = 0;
+    SDL_GetRenderOutputSize(ren_, &w, &h);
+    const float H = float(h);
+    text(ren_, 20, 14, tr("Replays"), {255, 200, 120}, 3);
+    text(ren_, 20, 52, tr("Every match is saved in the replays folder. A replay plays only on the same build of the game."), {170, 170, 190});
+    std::vector<std::pair<std::string, std::uintmax_t>> files;
+    std::error_code ec;
+    for (const auto& e : std::filesystem::directory_iterator("replays", ec))
+        if (e.path().extension() == ".emr") files.push_back({e.path().filename().string(), e.file_size(ec)});
+    std::ranges::sort(files, std::greater<>{});
+    replays_scroll_ = std::max(0.f, replays_scroll_ - ui_.wheel * 40);
+    const float top = 84, bottom = H - 64;
+    const SDL_Rect clip{0, int(top), w, int(bottom - top)};
+    SDL_SetRenderClipRect(ren_, &clip);
+    float y = top - replays_scroll_;
+    std::string chosen;
+    for (const auto& [f, size] : files) {
+        if (y > top - 30 && y < bottom && button(ren_, ui_, 20, y, 560, 28, f) && hover(ui_, 0, top, float(w), bottom - top)) chosen = f;
+        if (y > top - 30 && y < bottom) text(ren_, 590, y + 9, std::format("{} KB", size / 1024), {170, 170, 190});
+        y += 32;
+    }
+    SDL_SetRenderClipRect(ren_, nullptr);
+    if (files.empty()) text(ren_, 20, top, tr("No replays yet: play a match first."), {200, 200, 210});
+    if (!status_.empty()) text(ren_, 20, H - 84, status_, {255, 160, 120});
+    if (!chosen.empty()) start_replay((std::filesystem::path("replays") / chosen).string());
+    if (button(ren_, ui_, 20, H - 52, 200, 36, tr("Back"))) go(Screen::Menu);
+}
+
 // [U-397] every interaction of the systems, generated from the game's own tables (game/reference/interactions.cpp)
 void App::interactions() {
     int w = 0, h = 0;

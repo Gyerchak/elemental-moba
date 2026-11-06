@@ -2,6 +2,7 @@
 #include "client/draw.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <string>
 #include <unordered_map>
@@ -294,9 +295,56 @@ void text(SDL_Renderer* r, float x, float y, std::string_view s, Rgba c, float s
 }
 
 void fill_shape(SDL_Renderer* r, const View& v, const Shape& s, Rgba fill) {
-    // overlapping alpha circles would look patchy → draw at full alpha into the union by
-    // drawing each circle with the same colour (alpha stacks a little, which reads as "depth")
-    for (int i = 0; i < s.n; ++i) fill_ellipse(r, v.sx(float(s.c[i].x)), v.sy(float(s.c[i].y)), v.rx(float(s.c[i].r)), v.ry(float(s.c[i].r)), fill);
+    // [U-522] one clean shape: the union of the circles, row by row, each screen pixel exactly once (overlapping
+    // see-through circles showed every part darker on top of the others)
+    if (s.n == 0) return;
+    if (s.n == 1) {
+        fill_ellipse(r, v.sx(float(s.c[0].x)), v.sy(float(s.c[0].y)), v.rx(float(s.c[0].r)), v.ry(float(s.c[0].r)), fill);
+        return;
+    }
+    int sw = 0, sh = 0;
+    SDL_GetCurrentRenderOutputSize(r, &sw, &sh);
+    float top = 1e9f, bottom = -1e9f;
+    struct E { float x, y, rx, ry; };
+    std::array<E, kMaxCircles> es{};
+    int n = 0;
+    for (int i = 0; i < s.n; ++i) {
+        const E e{v.sx(float(s.c[i].x)), v.sy(float(s.c[i].y)), v.rx(float(s.c[i].r)), v.ry(float(s.c[i].r))};
+        if (!sane(e.x, e.y) || !(e.rx > 0) || !(e.ry > 0) || !std::isfinite(e.rx) || !std::isfinite(e.ry)) continue;
+        es[std::size_t(n++)] = e;
+        top = std::min(top, e.y - e.ry), bottom = std::max(bottom, e.y + e.ry);
+    }
+    if (n == 0) return;
+    const int y0 = std::max(0, int(std::floor(top))), y1 = std::min(sh > 0 ? sh - 1 : 100'000, int(std::ceil(bottom)));
+    static thread_local std::vector<SDL_FRect> rows;
+    rows.clear();
+    std::array<std::pair<float, float>, kMaxCircles> spans{};
+    for (int y = y0; y <= y1; ++y) {
+        const float py = float(y) + 0.5f;
+        int m = 0;
+        for (int i = 0; i < n; ++i) {
+            const E& e = es[std::size_t(i)];
+            const float t = (py - e.y) / e.ry;
+            if (t <= -1 || t >= 1) continue;
+            const float half = e.rx * std::sqrt(1 - t * t);
+            spans[std::size_t(m++)] = {e.x - half, e.x + half};
+        }
+        if (m == 0) continue;
+        std::sort(spans.begin(), spans.begin() + m);
+        float a = spans[0].first, b = spans[0].second;
+        for (int i = 1; i <= m; ++i) {
+            if (i < m && spans[std::size_t(i)].first <= b) {
+                b = std::max(b, spans[std::size_t(i)].second);
+                continue;
+            }
+            if (b > 0 && (sw <= 0 || a < float(sw))) rows.push_back({std::max(a, 0.f), float(y), (sw > 0 ? std::min(b, float(sw)) : b) - std::max(a, 0.f), 1.f});
+            if (i < m) a = spans[std::size_t(i)].first, b = spans[std::size_t(i)].second;
+        }
+    }
+    if (rows.empty()) return;
+    set_color(r, fill);
+    SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
+    SDL_RenderFillRects(r, rows.data(), int(rows.size()));
 }
 
 void outline_shape(SDL_Renderer* r, const View& v, const Shape& s, Rgba edge, float thickness) {

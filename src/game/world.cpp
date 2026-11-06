@@ -933,6 +933,11 @@ void World::command(std::uint32_t id, const Cmd& c) {
 
 void World::step() {
     if (over) return;
+    if (now_ms % 15'000 < std::int64_t(1'000 / cfg.tick_hz) && timeline.size() < 12'000)  // [U-371]
+        for (const Unit& u : units)
+            if (u.kind == UnitKind::Champion)
+                timeline.push_back({u.id, std::int32_t(now_ms), std::int32_t(u.stat_gold), std::int32_t(u.xp), std::int32_t(u.stat_dmg_champs), std::int32_t(u.stat_dmg_taken),
+                                    std::int32_t(u.stat_healing), std::int32_t(u.cs)});
     // [U-287] optional timing of every part (profile = true)
     using clk = std::chrono::steady_clock;
     auto t = clk::now();

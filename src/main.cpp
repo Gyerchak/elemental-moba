@@ -75,6 +75,8 @@ int main(int argc, char** argv) {
         else if (a == "--autotest") opt.autotest_s = std::atoi(next().c_str());
         else if (a == "--shot") opt.shot = next();
         else if (a == "--lang") opt.lang = next();  // [U-508] this run only
+        else if (a == "--replay") opt.replay = next();                 // [X-19]
+        else if (a == "--spectate") opt.spectate = true;               // [X-20]
         else if (a == "--practice-map") opt.practice_map = next();     // [U-518] the map maker's test button
         else if (a == "--practice-with") opt.practice_file = next();  // [U-510] the champion maker's test button
         else if (a == "--quality") opt.quality = std::atoi(next().c_str());  // [U-502] this run only: 0 … 3

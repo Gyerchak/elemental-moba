@@ -82,7 +82,10 @@ void App::multiplayer() {
             status_ = std::format("{} {}", tr("copied:"), s.address);
         }
         if (hover(ui_, x, y, 840, 54) && ui_.clicked) {
-            if (sel) connect_to(s.address);  // double click = join
+            if (sel) {  // double click = join
+                net_.password = s.password;
+                connect_to(s.address);
+            }
             selected_server_ = int(i);
             ui_.clicked = false;
         }
@@ -102,8 +105,8 @@ void App::multiplayer() {
     }
     y = std::max(y + 10, float(h) - 130);
     const float bw = 205;
-    if (button(ren_, ui_, x, y, bw, 34, tr("Join server"), false, selected_server_ >= 0)) connect_to(set_.servers[std::size_t(selected_server_)].address);
-    if (button(ren_, ui_, x + 211, y, bw, 34, tr("Direct connect"))) edit_index_ = -2, edit_name_.clear(), edit_addr_ = direct_addr_, go(Screen::ServerEdit);
+    if (button(ren_, ui_, x, y, bw, 34, tr("Join server"), false, selected_server_ >= 0)) net_.password = set_.servers[std::size_t(selected_server_)].password, connect_to(set_.servers[std::size_t(selected_server_)].address);
+    if (button(ren_, ui_, x + 211, y, bw, 34, tr("Direct connect"))) edit_index_ = -2, edit_name_.clear(), edit_pass_.clear(), edit_addr_ = direct_addr_, go(Screen::ServerEdit);
     if (button(ren_, ui_, x + 422, y, bw, 34, tr("Add server"))) edit_index_ = -1, edit_name_ = tr("My server"), edit_addr_ = "127.0.0.1:7777", go(Screen::ServerEdit);
     if (button(ren_, ui_, x + 633, y, bw, 34, tr("Refresh"))) refresh();
     y += 42;
@@ -111,6 +114,7 @@ void App::multiplayer() {
         edit_index_ = selected_server_;
         edit_name_ = set_.servers[std::size_t(selected_server_)].name;
         edit_addr_ = set_.servers[std::size_t(selected_server_)].address;
+        edit_pass_ = set_.servers[std::size_t(selected_server_)].password;
         go(Screen::ServerEdit);
     }
     if (button(ren_, ui_, x + 211, y, bw, 34, tr("Delete"), false, selected_server_ >= 0)) {
@@ -137,14 +141,24 @@ void App::server_edit() {  // add / edit / direct connect
     }
     const bool go_now = text_field(ren_, ui_, 32, x, y, 520, edit_addr_, tr("Server address (host:port)"));
     y += 60;
+    text_field(ren_, ui_, 33, x, y, 520, edit_pass_, tr("Password (if the server has one)"));  // [U-374]
+    y += 60;
+    if (direct && button(ren_, ui_, x + 270, y, 250, 36, tr("Only watch"))) {  // [X-20]
+        direct_addr_ = edit_addr_;
+        net_.password = edit_pass_;
+        watch_next_ = true;
+        connect_to(edit_addr_);
+        return;
+    }
     if (button(ren_, ui_, x, y, 250, 36, direct ? tr("Join server") : tr("Done")) || go_now) {
         if (direct) {
             direct_addr_ = edit_addr_;
+            net_.password = edit_pass_;
             connect_to(edit_addr_);
             return;
         }
-        if (edit_index_ < 0) set_.servers.push_back({edit_name_, edit_addr_});
-        else set_.servers[std::size_t(edit_index_)] = {edit_name_, edit_addr_};
+        if (edit_index_ < 0) set_.servers.push_back({edit_name_, edit_addr_, edit_pass_});
+        else set_.servers[std::size_t(edit_index_)] = {edit_name_, edit_addr_, edit_pass_};
         set_.save();
         infos_.clear();
         go(Screen::Multiplayer);
@@ -164,7 +178,8 @@ void App::host(bool dedicated) {
     text_field(ren_, ui_, 42, x + 440, y, 120, port_, tr("UDP port"));
     text_field(ren_, ui_, 43, x + 580, y, 90, tick_, tr("Tick rate (Hz)"));
     y += 54;
-    text_field(ren_, ui_, 44, x, y, 670, host_motd_, tr("Message of the day"));
+    text_field(ren_, ui_, 44, x, y, 440, host_motd_, tr("Message of the day"));
+    text_field(ren_, ui_, 45, x + 460, y, 210, host_pass_, tr("Password (empty = none)"));  // [U-374]
     y += 44;
     auto toggle = [&](std::string_view label, bool& v) {
         if (button(ren_, ui_, x, y, 670, 26, std::format("{}: {}", label, v ? tr("ON") : tr("OFF")), v)) v = !v;
@@ -202,6 +217,7 @@ void App::host(bool dedicated) {
         c.version = set_.version;  // [U-95]
         c.name = host_name_;
         c.motd = host_motd_;
+        c.password = host_pass_;
         c.port = std::uint16_t(std::clamp(std::atoi(port_.c_str()), 1024, 65'535));
         c.tick_hz = std::uint32_t(std::clamp(std::atoi(tick_.c_str()), 16, 256));
         c.force_server_textures = force_tex_;

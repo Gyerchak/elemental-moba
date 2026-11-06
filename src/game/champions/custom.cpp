@@ -537,6 +537,9 @@ std::string parse_text(const std::string& text, ChampionDef& out) {
             }
             else if (f == "needs_range") ok = num(sk.needs_range, 32, 3'000);
             else if (f == "light_ms") ok = num(sk.light_ms, 0, 60'000);
+            else if (f == "burrow") { std::int32_t b = 0; ok = num(b, 0, 1); sk.burrow = b != 0; }  // [U-50]
+            else if (f == "lock_ms") ok = num(sk.lock_ms, 0, 60'000);    // [U-347]
+            else if (f == "lock_slots") ok = num(sk.lock_slots, 0, 511);
             else if (f == "reach_height") ok = num(sk.reach_height, -1, 2'000);
             else if (f == "destroys_trees") ok = num(sk.destroys_trees, -1, 1);
             else if (f == "burns_ground") ok = num(sk.burns_ground, -1, 1);

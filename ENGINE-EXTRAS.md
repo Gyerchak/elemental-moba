@@ -288,3 +288,13 @@ Status column: `accepted · Claude idea` (Hubert can still `change` / `drop` any
 | [X-246] | Sky | Start 18:00 (night begins). Exact new moon 25:00 real; eclipse only at a new moon: 25:00-26:00, darkest 25:30 (noon); next at 85:00. Comet 29:00. Full moon 55:00. |
 | [X-247] | Practice sizes | `-` / `_` and `=` / `+`: the last used skill, with Ctrl the model, 5 % a step; Ctrl+Shift+R resets; Ctrl+Shift+S saves into the own champion's file, or a "<name> Tuned" copy for a built-in one (Q and specials stay a test). |
 | [X-248] | Bug hunt | Burst / Field with a chosen shape got no width / length; repeated clouds merge (at most 400); air bending only blows real clouds (not puddles, ice, mud, portal arrivals); mud does not block vision. |
+| [X-249] | Map maker | em_map_maker (src/apps/map_maker.cpp), also in the game menu: paints every cell field (ground, height, walking, walls, trees, bushes, 5 sense blocks) with brush, rectangle, line, fill, scatter, mirror; places every object; lanes + structures; waves, features, own textures and music; checks playability. custom_maps/<id>.emap (game/match/map_file.cpp); servers send them on join; a file with a built-in id replaces that map. |
+| [X-250] | Open and save | Both makers open built-in and own content; Save as new never overwrites; Overwrite asks a second click. replaces = 1 in a .champ replaces the built-in champion (put back by reset). |
+| [X-251] | Own Q / F / G | q. f. g. keys in a .champ: the skill joins the tables at the end, only its owner may pick it. |
+| [X-252] | Models from files | tools/art/model_from_file.py: full-body picture or .glb .gltf .fbx .obj through Blender to sheet.png + sheet.txt; a button in the champion maker. |
+| [X-253] | Soft ground | paint_cell blends a cell into different neighbours with a little noise; a changed cell repaints its neighbours. |
+| [X-254] | Post-game | Graphs (gold, XP, gold lead, damage dealt / taken, healing, CS) with legend and crosshair; chat; Alt: damage record (before defence, stopped, best hit, best autoattack, minions, monsters). Alt also opens the stats panel and item parts. |
+| [X-255] | Plan items | Ice sliding [U-52]; Burrow, skill locks, quiet stat [U-50][U-347][U-345]; Ice Pillar [U-49]; Dark Avatar Vael [U-07]; server password [U-374]. |
+| [X-256] | Spectators and replays | --spectate / Only watch: a chosen team's vision, O switches. Replays are commands + seed + checksums (replays/*.emr, about 1.5 KB for a minute of bots), run again by the engine: [ ] speed, P pause; menu Replays. |
+| [X-257] | Hitbox fill | fill_shape draws the union row by row: one clean shape, no darker overlaps. |
+| [X-258] | Windows | GitHub Actions builds the Windows programs (.github/workflows/build.yml). |

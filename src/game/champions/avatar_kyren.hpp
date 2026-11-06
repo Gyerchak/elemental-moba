@@ -32,4 +32,18 @@ inline constexpr ChampionDef kAvatarKyren{.name = "Avatar Kyren", .element = Ele
  .colour = 0x70e0ff, .role = Role::Mage, .avatar = true, .unique_group = 1,
  .q_pool = {"Air Blade", "Rock Throw", "Fire Bolt"}};  // [U-270] Q from three elements
 
+// [U-07] the Dark Avatar: the same set in another hand (shares unique_group: one of the two per game). Claude idea numbers.
+inline constexpr ChampionDef kDarkAvatar = [] {
+    ChampionDef c = kAvatarKyren;
+    c.name = "Dark Avatar Vael";
+    c.dark = true;
+    c.colour = 0x7a3cff;
+    c.hp += 3'000, c.attack += 300;
+    c.y.name = "Dark State";
+    c.y.desc = "Black eyes: fly, +50 % power, +25 % skill size, +25 % move speed for 6 s";
+    c.t.name = "Dark Spiral";
+    c.p.name = "Dark Cycle";
+    return c;
+}();
+
 }  // namespace em::data

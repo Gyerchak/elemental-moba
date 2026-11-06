@@ -116,10 +116,31 @@ void App::stop_server() {
 }
 
 void App::connect_local(std::uint16_t port) {
+    if (opt_.replay.empty() && !replay_starting_) net_.spectator = false;
+    replay_starting_ = false;
     net_.connect("127.0.0.1", port, set_.name, secret_, set_.version, set_.show_other_skins);
     ready_ = false;
     pick_champ_ = opt_.autotest_s ? opt_.champ : -1;
     go(Screen::ChampSelect);
+}
+
+// [X-19] a replay runs on its own small server here; I am its viewer
+void App::start_replay(const std::string& file) {
+    net::ServerConfig c;
+    c.version = set_.version;
+    c.port = std::uint16_t(7790 + std::random_device{}() % 200);
+    c.loopback_only = true;
+    c.replay_file = file;
+    c.ranked = false;
+    c.record_replays = false;
+    std::string err;
+    if (!start_server(c, &err)) {
+        status_ = tr(err);
+        return;
+    }
+    net_.spectator = true;
+    replay_starting_ = true;
+    connect_local(c.port);
 }
 
 void App::connect_to(const std::string& address_in) {
@@ -128,6 +149,8 @@ void App::connect_to(const std::string& address_in) {
     const auto c = address.rfind(':');
     const std::string host = c == std::string::npos ? address : address.substr(0, c);
     const int port = c == std::string::npos ? net::kDefaultPort : std::atoi(address.c_str() + c + 1);
+    net_.spectator = watch_next_ || opt_.spectate;  // [X-20]
+    watch_next_ = false;
     net_.connect(host, std::uint16_t(std::clamp(port, 1, 65'535)), set_.name, 0, set_.version, set_.show_other_skins);
     pick_champ_ = -1;
     ready_ = false;
@@ -148,7 +171,8 @@ int App::run() {
     using clock = std::chrono::steady_clock;
     const auto t0 = clock::now();
     audio_.play_music(res_.music("menu"));
-    if (opt_.autotest_s > 0 && !opt_.join_host.empty()) {  // automated client against a running server
+    if (!opt_.replay.empty()) start_replay(opt_.replay);  // [X-19]
+    else if (opt_.autotest_s > 0 && !opt_.join_host.empty()) {  // automated client against a running server
         connect_to(std::format("{}:{}", opt_.join_host, opt_.join_port));
     } else if (opt_.autotest_s > 0) {  // automated practice run [U-100]
         net::ServerConfig c;
@@ -359,6 +383,7 @@ void App::frame(double now_s) {
         case Screen::ChampionInfo: champion_info(); break;
         case Screen::CustomChampions: custom_champions(); break;
         case Screen::Interactions: interactions(); break;
+        case Screen::Replays: replays_screen(); break;
         case Screen::Game: {
             gfx::Ui dead = ui_;  // the match keeps running under the menu, but clicks belong to the menu
             dead.clicked = dead.rclicked = false;

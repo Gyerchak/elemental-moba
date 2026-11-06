@@ -169,7 +169,7 @@ bool Settings::load(const std::string& path) {
         else if (k == "server") {
             clear_lists();
             const auto p = split(v, '|');
-            if (p.size() == 2) servers.push_back({p[0], p[1]});
+            if (p.size() >= 2) servers.push_back({p[0], p[1], p.size() > 2 ? p[2] : ""});
         } else if (k == "setup") {
             clear_lists();
             const auto p = split(v, '|');
@@ -310,7 +310,7 @@ void Settings::save(const std::string& path) const {
         << "\nvol_ui=" << vol_ui << "\nvol_ambient=" << vol_ambient << "\nvol_voice=" << vol_voice << '\n';
     out << "# ---- friends, servers, setups, champions, builds, custom champions\n";
     for (const auto& f : friends) out << "friend=" << f << '\n';
-    for (const auto& s : servers) out << "server=" << s.name << '|' << s.address << '\n';
+    for (const auto& s : servers) out << "server=" << s.name << '|' << s.address << '|' << s.password << '\n';
     for (const auto& s : setups) {
         out << "setup=" << s.name << '|' << int(s.loadout.keystone) << '|' << int(s.loadout.tree);
         for (auto n : s.loadout.nodes) out << '|' << int(n);

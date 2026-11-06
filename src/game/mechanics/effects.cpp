@@ -367,7 +367,7 @@ void World::step_effects() {
             }
             if (!walkable_at(*owner, e.x, e.y)) {
                 // [U-471] through_walls: the dash goes on over the wall, the dasher lands on the first free spot behind it
-                if (!e.def->through_walls || e.travel_left <= 0) e.dead = true;
+                if ((!e.def->through_walls && !e.def->burrow) || e.travel_left <= 0) e.dead = true;
                 if (e.dead) continue;
             } else {
                 owner->x = e.x;
@@ -385,7 +385,7 @@ void World::step_effects() {
         }
         // [U-184] skills marked through_walls ignore walls, objects and trees
         // [U-346] dashes stop at walls too — only air dashes (over the air) and skills marked through_walls pass
-        const bool air_dash = e.def && e.def->kind == SkillKind::Dash && base_element(e.sub) == Element::Air;
+        const bool air_dash = e.def && e.def->kind == SkillKind::Dash && (base_element(e.sub) == Element::Air || e.def->burrow);  // ([U-50] under the walls)
         if (e.kind != FxKind::Lantern && !(e.def && (air_dash || e.def->through_walls))) {
             const Cell c = grid.at(cx, cy);
             const AttackInfo ai{.sub = e.sub, .elevated = owner && owner->flying()};

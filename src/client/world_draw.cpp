@@ -476,7 +476,7 @@ void GameView::draw_units(NetClient& net, double now_s) {
         if (view_.hz > 0) {
             // footprint = the real hitbox on the ground: a grey shadow at the chosen opacity [U-176]
             const std::uint8_t ha = std::uint8_t(std::clamp(set_.hitbox_opacity, 0, 100) * 255 / 100);
-            for (int i = 0; i < body.n; ++i) ground_fill(r_, view_, float(body.c[i].x), float(body.c[i].y), float(body.c[i].r), {110, 110, 110, ha}, 18);
+            fill_shape(r_, view_, body, {110, 110, 110, ha});  // [U-522] one clean shape
             if (u.id == net.my_unit) outline_shape(r_, view_, body, {255, 230, 80, std::uint8_t(std::max<int>(ha, 60))}, 1.f);
             if (anim == AnimSlot::Swim) ground_ring(r_, view_, du.x, du.y, 50 + 10 * float(std::sin(now_s * 4)), {200, 230, 255, 160}, 24);
             if (sheet) {  // [U-258] the Blender model, as a sprite

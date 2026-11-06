@@ -117,7 +117,8 @@ void World::step_senses() {
                 if (now_ms - o.last_move_ms >= 400) continue;  // [U-466] standing still = silent
                 const bool loud = o.casting || o.windup_end_ms > 0;  // (moving while casting: a louder wave, same range)
                 if (visible_to(team, o)) continue;
-                if (!heard(o.ux(), o.uy(), kHearRange)) continue;
+                // [U-345] quiet ones are heard from nearer
+                if (!heard(o.ux(), o.uy(), std::int64_t(kHearRange) * std::clamp(10'000 - o.stats.quiet, 0, 10'000) / 10'000)) continue;
                 const std::int32_t jx = std::int32_t(mix_hash(o.id + 9, std::uint32_t(now_ms / 400)) % 81) - 40;
                 const std::int32_t jy = std::int32_t(mix_hash(o.id + 99, std::uint32_t(now_ms / 400)) % 81) - 40;
                 waves.push_back({{loud ? WaveKind::SoundLoud : WaveKind::Sound, o.ux() + jx, o.uy() + jy}, now_ms, team, 0});

@@ -14,6 +14,7 @@ template <class F>
 void each_field(ServerConfig& c, F&& f) {
     f("name", c.name);
     f("motd", c.motd);
+    f("password", c.password);
     f("version", c.version);
     f("port", c.port);
     f("tick_hz", c.tick_hz);
@@ -38,6 +39,8 @@ void each_field(ServerConfig& c, F&& f) {
     f("queue_mode", c.queue_mode);
     f("queue_min", c.queue_min);
     f("allow_own_emotes", c.allow_own_emotes);
+    f("allow_spectators", c.allow_spectators);
+    f("record_replays", c.record_replays);
 }
 void read_into(std::string& dst, const std::string& v) { dst = v; }
 void read_into(bool& dst, const std::string& v) { dst = v == "1" || v == "yes" || v == "true"; }

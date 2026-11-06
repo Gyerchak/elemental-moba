@@ -60,6 +60,7 @@ struct ChampPrefs {     // [U-178][U-180] per champion (by name, so the roster o
 };
 struct ServerEntry {    // [U-212] Minecraft-like server list
     std::string name, address;  // address = host:port
+    std::string password;       // [U-374] remembered
 };
 struct Build {          // [U-220] own item builds
     std::string name;

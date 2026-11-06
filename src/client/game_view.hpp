@@ -114,6 +114,7 @@ private:
     // [U-257] textured ground
     static constexpr int kGroundPx = 4, kGroundTextures = 17;
     [[nodiscard]] bool stats_open() const { return expand_stats_ || (SDL_GetModState() & SDL_KMOD_ALT); }  // [U-520] Alt expands it too
+    int replay_before_pause_ = 100;                   // [X-19]
     std::vector<std::pair<int, int>> changed_cells_;  // [U-520]
     const Grid* net_seen_for_paint_ = nullptr;
     std::vector<std::uint32_t> map_raw_;  // the cell each ground block was painted from

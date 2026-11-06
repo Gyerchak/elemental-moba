@@ -37,6 +37,8 @@ struct AppOptions {
     bool windowed = false;     // force a window (tests / two screens)
     int quality = -1, effects = -1;  // [U-502] --quality / --effects: this run only
     std::string lang;                 // [U-508] --lang: this run only
+    std::string replay;               // [X-19] --replay <file>: play it
+    bool spectate = false;            // [X-20] --spectate: the --join only watches
     std::string practice_map;         // [U-518] --practice-map <id>: straight into practice on this map
     std::string practice_file;        // [U-510] --practice-with <file.champ>: straight into practice with this own champion
     int shots = 1;             // [U-446] autotest: this many screenshots, one per frame
@@ -53,7 +55,7 @@ private:
     enum class Screen {
         Menu, Options, Multiplayer, ServerEdit, HostMatch, HostServer, ServerRunning,
         ChampSelect, Loading, Game, PostGame,
-        Items, Setups, ChampionInfo, CustomChampions, Interactions,
+        Items, Setups, ChampionInfo, CustomChampions, Interactions, Replays,
     };
     // ---- app.cpp
     void frame(double now_s);
@@ -62,6 +64,10 @@ private:
     void stop_server();
     void connect_local(std::uint16_t port);
     void connect_to(const std::string& address);  // host:port
+    void start_replay(const std::string& file);   // [X-19]
+    void replays_screen();
+    bool watch_next_ = false, replay_starting_ = false;
+    float replays_scroll_ = 0;
     void go(Screen s);
     // ---- screens/menu.cpp
     void menu();
@@ -131,7 +137,10 @@ private:
     bool queue_mode_ = false; // [U-423] dedicated server option
     bool ranked_ = true, matchmaking_ = true, pick_timer_ = true;  // [U-276]
     std::uint8_t platforms_ = net::kAllPlatforms;
-    std::string direct_addr_ = "127.0.0.1:7777", edit_name_, edit_addr_;
+    std::string direct_addr_ = "127.0.0.1:7777", edit_name_, edit_addr_, edit_pass_, host_pass_;  // [U-374]
+    // [U-371] post-game
+    int graph_kind_ = 0;
+    std::string post_chat_;
     int edit_index_ = -1, selected_server_ = -1;
     std::vector<std::future<ServerInfo>> pings_;
     std::vector<ServerInfo> infos_;

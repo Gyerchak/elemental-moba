@@ -219,11 +219,17 @@ void World::apply_hit(Unit* src, Unit& dst, std::int32_t hund, SubElement sub, b
     if (dst.stats.resource == ResourceKind::Rage) dst.res = std::min(dst.res_max, dst.res + hund * kRageTakenPct / 100);
     if (src && src->stats.resource == ResourceKind::Rage && src != &dst) src->res = std::min(src->res_max, src->res + hund * kRageDealtPct / 100);
     // ---- statistics [U-179]
+    if (src && src->kind == UnitKind::Champion) {  // [U-371]
+        if (dst.kind == UnitKind::Minion) src->stat_dmg_minions += hund / 100;
+        if (dst.kind == UnitKind::Monster || dst.kind == UnitKind::Boss) src->stat_dmg_monsters += hund / 100;
+    }
     const std::int64_t pre_hit = tag.from == DmgFrom::Burn ? hund / 100 : std::max<std::int64_t>(last_pre_, before_shield / 100);  // [U-520] (a burn has no defence)
     if (dst.kind == UnitKind::Champion) dst.stat_dmg_taken += hund / 100, dst.stat_taken_pre += pre_hit;
     if (src && src->kind == UnitKind::Champion && dst.kind == UnitKind::Champion) {
         src->stat_dmg_champs += hund / 100;
         src->stat_dealt_pre += pre_hit;
+        src->stat_high_hit = std::max(src->stat_high_hit, hund / 100);  // [U-371]
+        if (is_auto) src->stat_high_auto = std::max(src->stat_high_auto, hund / 100);
         dst.stat_dmg_from_champs += hund / 100;  // [U-296]
     }
     // ---- keystone: Elemental Surge — 3 skill hits on the same champion within 3 s [U-177]

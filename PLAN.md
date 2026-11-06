@@ -285,3 +285,9 @@ clang 22 and GCC 16 (`README.md` → Build / Play).
 - [x] em_champion_maker [U-510]; em_server [U-511]; mud [U-513]; fire lights [U-514]; sky [U-515]; practice sizes [U-517]
 - [ ] Polish: tool and server text machine draft; Polish voices still espeak-ng until a Piper Polish voice is installed [U-512]
 - Open idea: the maker builds a 3D model from a picture (tools/art/art_models.py) with one button
+
+## M29 — For later [U-521] (2026-11-06)
+- [ ] Original map graphics in much better quality, same kind of quality levels as champions
+- [ ] Settings: allow / disallow animations and effects; own effects of any kind
+- [ ] Champion icons and splash arts: higher quality, more original, less sloppy
+- [ ] Everything made locally; then another bug hunt

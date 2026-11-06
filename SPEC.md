@@ -727,6 +727,8 @@ Additions outside the plan live in `ENGINE-EXTRAS.md`, never here.
 - [U-518] **Map maker / editor** on the same principles as the champion tool: everything about a map can be set; loads existing maps; saves by default as new, or overwrites. Its own program and also in the game's start menu.
 - [U-519] The champion maker too: loads existing champions; saves by default as new, or overwrites.
 - [U-520] Do everything else in the plan that was not done, to the end, without stopping.
+- [U-521] **For later:** the original map's graphics in much better quality, adjustable with the same kind of levels as champions; coming settings: allow / disallow animations and effects, own effects of any kind; then look for bugs again. Champion icons and splash arts in higher quality, more original, less sloppy. Everything made locally.
+- [U-522] Hitboxes must not show as circles lying on top of each other: one clean, unified shape of the combined parts.
 
 ---
 *Hubert continues editing the plan later — new ideas get the next free `[U-xx]` number.*

@@ -52,6 +52,9 @@ void Server::start_match() {
     mc.mode = cfg_.mode;              // [U-454]
     mc.seed = std::uint32_t(std::chrono::steady_clock::now().time_since_epoch().count() | 1);
     world_ = std::make_unique<World>(mc);
+    replay_ = {};  // [X-19]
+    replay_.config = mc;
+    replay_saved_ = false;
     world_->profile = true;  // [U-469] the watchdog below names the slow part
     // [U-276] skill-based matchmaking: humans are split into two teams of equal strength (snake draft by MMR)
     if (cfg_.ranked && cfg_.matchmaking && !cfg_.practice) {
@@ -92,6 +95,7 @@ void Server::start_match() {
         taken[std::size_t(champ)] = true;
         p.unit = world_->add_champion(Team(team), champ, p.slot.q, p.slot.f, p.slot.g, cfg_.players_are_bots, p.slot.id,
                                       p.slot.name, p.slot.loadout);
+        replay_note_champion({std::uint8_t(team), std::uint8_t(cfg_.players_are_bots), champ, p.slot.q, p.slot.f, p.slot.g, p.slot.id, p.slot.name, p.slot.loadout});  // [X-19]
         ++count[team];
     }
     const int per_team = std::max({cur_map().team_size, count[0], count[1]});  // [U-420] 5 v 5, 3 v 3 …
@@ -99,14 +103,17 @@ void Server::start_match() {
         for (; count[team] < per_team; ++count[team]) {
             const int champ = next_random();  // [U-449] random bots (were always the same, from the end of the list)
             taken[std::size_t(champ)] = true;
-            world_->add_champion(Team(team), champ, -1, -1, -1, true, -1,
-                                 std::format("Bot {}", champions()[std::size_t(champ)].name), bot_loadout(champ));
+            const std::string bot_name = std::format("Bot {}", champions()[std::size_t(champ)].name);
+            const Loadout bot_lo = bot_loadout(champ);
+            world_->add_champion(Team(team), champ, -1, -1, -1, true, -1, bot_name, bot_lo);
+            replay_note_champion({std::uint8_t(team), 1, champ, -1, -1, -1, -1, bot_name, bot_lo});  // [X-19]
         }
+    replay_.rng = world_->rng;  // [X-19] the replay continues from here
     in_match = true;
     feed_sent_ = 0;
     over_ms_ = -1;
     for (Player& p : players_)
-        if (p.connected && p.joined && p.unit) send_match_start(p);  // [U-423] (waiting players have no unit)
+        if (p.connected && p.joined && (p.unit || p.spectator)) send_match_start(p);  // [U-423] (waiting players have no unit)
     send_skins();
     if (cfg_.allow_own_emotes) send_own_emotes();  // [U-414] a server option, separate from skins
     send_lobby();
@@ -117,7 +124,7 @@ void Server::send_match_start(Player& p) {
     w.put(Msg::MatchStart);
     w.put(p.unit);
     const Unit* me = world_->find(p.unit);
-    w.put<std::uint8_t>(me ? std::uint8_t(me->team) : 0);
+    w.put<std::uint8_t>(me ? std::uint8_t(me->team) : p.spec_team);
     w.put<std::uint32_t>(cfg_.tick_hz);
     w.put<std::int64_t>(cfg_.start_ms);
     w.put<std::uint8_t>(cfg_.practice);
@@ -156,8 +163,10 @@ void Server::send_all_cells(Player& p) {  // reconnect / late start: every cell 
 void Server::send_snapshot(Player& p) {
     const World& W = *world_;
     const Unit* me = W.find(p.unit);
-    if (!me) return;
-    const Team team = me->team;
+    static const Unit kNobody{};  // [X-20] a spectator: nobody's numbers, the chosen team's vision
+    if (!me && !p.spectator) return;
+    const Team team = me ? me->team : Team(p.spec_team);
+    if (!me) me = &kNobody;
     Writer w;
     w.put(Msg::Snapshot);
     w.put<std::uint64_t>(W.tick);
@@ -653,6 +662,7 @@ void Server::send_own_emotes() {
 
 // ---------------------------------------------------------------- end of the match [U-179]
 void Server::finish_match() {
+    save_replay();  // [X-19]
     if (over_ms_ < 0) {
         over_ms_ = world_->now_ms;
         Writer w;
@@ -671,6 +681,13 @@ void Server::finish_match() {
                 rated.push_back(res);
             }
             ratings_.apply(rated, int(world_->winner));
+        }
+        {  // [U-371] the graphs
+            Writer tl;
+            tl.put(Msg::Timeline);
+            tl.put<std::uint32_t>(std::uint32_t(world_->timeline.size()));
+            for (const World::TimelinePoint& q : world_->timeline) tl.put(NetTimeline{q.unit, q.ms, q.gold, q.xp, q.dealt, q.taken, q.healing, q.cs});
+            broadcast(tl, true);
         }
         Writer f;
         f.put(Msg::FinalStats);
@@ -691,6 +708,8 @@ void Server::finish_match() {
                 r.dmg_champs = std::int32_t(u.stat_dmg_champs);
                 r.dmg_taken = std::int32_t(u.stat_dmg_taken);
                 r.dealt_pre = std::int32_t(u.stat_dealt_pre), r.taken_pre = std::int32_t(u.stat_taken_pre);
+                r.highest_hit = u.stat_high_hit, r.highest_auto = u.stat_high_auto;  // [U-371]
+                r.dmg_minions = std::int32_t(u.stat_dmg_minions), r.dmg_monsters = std::int32_t(u.stat_dmg_monsters);
                 r.healing = std::int32_t(u.stat_healing);
                 r.shielding = std::int32_t(u.stat_shielding);
                 r.keystone_impact = std::int32_t(u.stat_keystone);

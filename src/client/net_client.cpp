@@ -198,6 +198,14 @@ void NetClient::send_own_emote(std::uint8_t idx, const std::vector<std::uint8_t>
     send_raw(w, true);
 }
 
+void NetClient::send_spectate() {  // [X-20]
+    Writer w;
+    w.put(Msg::Spectate);
+    w.put<std::uint8_t>(std::uint8_t(spec_team));
+    w.put<std::uint16_t>(std::uint16_t(replay_speed));
+    send_raw(w, true);
+}
+
 void NetClient::send_lobby_config(int map_index, int rules, int game_mode, int feats) {
     Writer w;
     w.put(Msg::LobbyConfig);
@@ -234,6 +242,8 @@ void NetClient::poll(double now_s) {
             w.put(secret_);
             w.put<std::uint8_t>(this_platform());  // [U-213]
             w.put<std::uint8_t>(allow_skins_);     // [U-98]
+            w.str(password);                       // [U-374]
+            w.put<std::uint8_t>(spectator ? 1 : 0);  // [X-20]
             send_raw(w, true);
         } else if (p.event == 2) {
             if (state != State::Rejected) state = State::Disconnected;
@@ -508,6 +518,13 @@ void NetClient::handle(const std::uint8_t* data, std::size_t n, double now_s) {
             reset_custom_champions();
             for (const ChampionDef& d : defs) register_champion(d);
             custom_from_server = int(defs.size());
+            break;
+        }
+        case Msg::Timeline: {  // [U-371]
+            const std::uint32_t cnt = std::min<std::uint32_t>(r.get<std::uint32_t>(), 12'000);
+            timeline.resize(cnt);
+            for (auto& q : timeline) q = r.get<NetTimeline>();
+            if (r.bad()) timeline.clear();
             break;
         }
         case Msg::FinalStats: {

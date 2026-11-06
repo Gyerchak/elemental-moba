@@ -585,6 +585,12 @@ void GameView::handle_event(const SDL_Event& e, NetClient& net) {
         const bool shift = (e.key.mod & SDL_KMOD_SHIFT) != 0;
         const bool alt = (e.key.mod & SDL_KMOD_ALT) != 0;
         const SDL_Scancode sc = e.key.scancode;
+        if (net.spectator) {  // [X-20] watching: O whose vision, [ ] speed, P pause
+            if (sc == SDL_SCANCODE_O) net.spec_team = 1 - net.spec_team, net.my_team = net.spec_team, net.send_spectate(), net.grid_dirty = true;
+            if (sc == SDL_SCANCODE_P) replay_before_pause_ = net.replay_speed ? net.replay_speed : replay_before_pause_, net.replay_speed = net.replay_speed ? 0 : replay_before_pause_, net.send_spectate();
+            if (sc == SDL_SCANCODE_LEFTBRACKET) net.replay_speed = std::max(25, net.replay_speed / 2), net.send_spectate();
+            if (sc == SDL_SCANCODE_RIGHTBRACKET) net.replay_speed = std::min(800, std::max(25, net.replay_speed) * 2), net.send_spectate();
+        }
         // practice cheats [U-100]: Ctrl+Shift+N no cooldowns, +G gold, +L level
         if (ctrl && shift) {
             if (sc == SDL_SCANCODE_D && net.practice) {  // [U-507] developer view, in the practice tool only
@@ -998,7 +1004,14 @@ void GameView::frame(NetClient& net, double now_s, Ui& ui) {
     gfx::flush_text(r_);
     play_sounds(net);
     draw_indicator(net);
-    draw_hud(net, now_s, ui);
+    if (net.spectator) {  // [X-20] nobody's panel: what is watched and the keys
+        const std::string line = trf("Watching: {} side   O = the other side   [ ] = speed {} %   P = pause", tr(net.my_team == 0 ? "Fire" : "Earth"), net.replay_speed);
+        fill_rect(r_, 0, view_.sh - 26, view_.sw, 26, {0, 0, 0, 170});
+        text(r_, 12, view_.sh - 20, line, {235, 235, 240}, 1.2f);
+        mouse_on_hud_ = false;
+    } else {
+        draw_hud(net, now_s, ui);
+    }
 
     // mouse orders (after the HUD had its chance to eat the click)
     if (mouse_on_hud_) ui.clicked = ui.rclicked = false;

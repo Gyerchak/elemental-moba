@@ -17,7 +17,9 @@
 namespace em::net {
 
 inline constexpr std::size_t kLongStrMax = 16'000'000;  // [U-518] own champion files up to 64 KB, own maps up to 16 MB
-inline constexpr std::uint16_t kProtocol = 24;  // 24: own maps are sent to players [U-518]
+inline constexpr std::uint16_t kProtocol = 26;  // 26: spectators, replays [X-19][X-20]
+//inline constexpr std::uint16_t kProtocol = 25;  // 25: server password, match timeline [U-371][U-374]
+//inline constexpr std::uint16_t kProtocol = 24;  // 24: own maps are sent to players [U-518]
 //inline constexpr std::uint16_t kProtocol = 23;  // 23: mud, polygon skills, skill pictures [U-510][U-513]
 //  // 22: companion cooldown on the HUD [U-508]  // 21: damage types + record, companion / body [U-491..U-495]  // 20: snapshot wall order fixed + end marker [U-487]  // 19: animation info (stage, form, dash) [U-486]  // 18: heal / shield / buff power, polymorph, setup per version [U-483][U-484]  // 17: healing received [U-481]  // 16: switchable Dota features, version mods [U-478]  // 15: LoL AP / magic pen, Dota attributes + statuses [U-474..U-476]  // 14: crits, skill powers, sweet spots + shapes [U-461..U-471]  // 13: cast stages, chains, skill visuals, proc + recast timers [U-456..U-459]  // 12: maps, lobby owner / queue, charges [U-420..U-433]  // 11: rule sets, own emotes [U-414][U-416]  // 7: ten item slots [U-322]; 8: cast sources [U-340]; 9: camps, jungle buffs [U-364..U-366]; 10: bounties, companions [U-407][U-413]
 inline constexpr std::uint32_t kSnapshotEnd = 0x5EA1ED07;  // [U-487] last 4 bytes of every snapshot
@@ -31,6 +33,7 @@ enum class Msg : std::uint8_t {
     StatusQuery,   // [U-212] server list ping: answered with StatusReply, no join
     Ban,           // [U-181] ban one champion in the ban phase
     SkinUpload,    // [U-200] my skin image for this match (Minecraft-like)
+    Spectate,      // [X-20] whose vision I watch (team), replay speed % (0 = pause)
     EmoteUpload,   // [U-414] one of my own emotes (picture + optional sound), separate from skins
     LobbyConfig,   // [U-422] the owner sets the map + rule set (u8 map, u8 ruleset)
     TransferOwner, // [U-422] the owner hands the lobby to another player (u8 slot id)
@@ -45,6 +48,7 @@ enum class Msg : std::uint8_t {
     CustomChampions,  // [U-277] the server's own champion files (sent on joining)
     CustomMaps,       // [U-518] the server's own maps (sent on joining)
     EmoteData,     // [U-414] another player's own emote (only when the server allows own emotes)
+    Timeline,      // [U-371] numbers of every champion over the match, for the graphs
 };
 
 // [U-414] own emotes: up to 4 per player, a PNG ≤ 96 KB (≤ 256 × 256) + an optional WAV ≤ 256 KB; emote slots 6…9
@@ -183,6 +187,13 @@ struct FinalRow {
     std::int16_t lp_delta, pad3;  // [U-276] LP won / lost (0 = not rated)
     std::int32_t lp_after;        //         LP now (−1 = not rated)
     std::int32_t dealt_pre, taken_pre;  // [U-520] the same damage before any defence
+    std::int32_t highest_hit, highest_auto, dmg_minions, dmg_monsters;  // [U-371]
+};
+
+// [U-371] one point of a champion's graphs
+struct NetTimeline {
+    std::uint32_t unit;
+    std::int32_t ms, gold, xp, dealt, taken, healing, cs;
 };
 
 // [U-341] a wall piece that just fell (the client animates it once)

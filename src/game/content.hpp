@@ -264,6 +264,9 @@ struct SkillDef {
     std::array<std::int8_t, 24> poly{};  // Geo::Custom: forward, side pairs in % of radius (at most 12 corners)
     std::uint8_t npoly = 0;
     std::uint16_t needs = 0;       // kNeed… bits
+    bool burrow = false;           // [U-50] Dash: under the ground: cannot be seen or hit on the way, passes walls and units
+    std::int32_t lock_ms = 0;      // [U-347] casting it puts my other skills on cooldown this long …
+    std::uint16_t lock_slots = 0;  // … only these (bit per key: 1 P, 2 Q, 4 W, 8 E, 16 R, 32 T, 64 Y, 128 F, 256 G; 0 = all others)
     std::int16_t needs_range = 240;    // [U-406] Boulder: lift the stone right beside the caster (not at the cursor)  // [U-388] segments in a line wall (0 = from the width; metal: 1 — metal is rare)
 };
 

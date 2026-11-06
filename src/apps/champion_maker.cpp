@@ -194,6 +194,8 @@ const std::vector<Page>& skill_pages() {
             SI("charge_ms", "Charge comes back (ms)", charge_ms, 0, 120000, 500, ""),
             SI("charge_gap_ms", "Between charges (ms)", charge_gap_ms, 0, 5000, 50, ""),
             SI("self_root_ms", "Roots you after (ms)", self_root_ms, -1, 3000, 50, "-1 = the usual: 300 ms for skills that shape the ground"),
+            SI("lock_ms", "Locks other skills (ms)", lock_ms, 0, 20000, 100, "Casting it puts your other skills on cooldown this long"),
+            Field{"lock_slots", "Which ones it locks", FT::Mask, 0, 0, 0, "Empty = all the others", [](const SkillDef& s) { return int(s.lock_slots); }, {"P", "Q", "W", "E", "R", "T", "Y", "F", "G"}, {}, false},
         }},
         {"Shape", {}},  // own page: the shape buttons
         {"Change with time", {}},  // own page: the keys
@@ -219,6 +221,7 @@ const std::vector<Page>& skill_pages() {
             Field{"hits", "Can hit", FT::Mask, 0, 0, 0, "Empty = everything", [](const SkillDef& s) { return int(s.hits); }, kCatNames},
             SB("through_walls", "Through walls", through_walls, "Passes walls, objects and trees"),
             SB("pass_units", "Dash through units", pass_units, "A dash does not stop at units"),
+            SB("burrow", "Dash under the ground", burrow, "Cannot be seen or hit on the way, passes walls and units"),
             SB("teleport", "Real teleport", teleport, "Blink: a teleport instead of a very fast dash"),
             SI("control", "Mouse control", control, 0, 2, 1, "While the key is held: 1 steer the projectile, 2 draw a wall"),
             SI("steer_turn", "Steering speed", steer_turn, 0, 8000, 100, ""),
@@ -1489,7 +1492,7 @@ void Maker::preview(float x, float y, float w, float h) {
     // ---- the model and its hitbox
     const Shape body = place_body(*cur_.body, ux, uy, aim, 0, 100 + cur_.model_size / 100);
     {
-        for (int i = 0; i < body.n; ++i) ground_fill(r, v, float(body.c[std::size_t(i)].x), float(body.c[std::size_t(i)].y), float(body.c[std::size_t(i)].r), {255, 255, 255, 40}, 18);
+        fill_shape(r, v, body, {255, 255, 255, 40});  // [U-522] one clean shape
         outline_shape(r, v, body, {255, 230, 80, 255}, 1.5f);
     }
     if (model_.loaded) {

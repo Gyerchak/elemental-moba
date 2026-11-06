@@ -77,6 +77,7 @@ struct Stats {
     //         LoL-modified: buff power % (EVERY buff I give: heals, shields, hastes, form bonuses, item active buffs,
     //         and the effects of the jungle buffs I carry). 100 = 1 %
     std::int32_t self_heal = 0, heal_shield_power = 0, buff_power = 0;
+    std::int32_t quiet = 0;  // [U-345] others hear me less: 100 = 1 %
     // [U-476] Dota 2 (dota.cpp): attributes (hundredths of a point), regen per second (hundredths), magic resistance
     // and evasion (100 = 1 %), bash (chance / stun ms / damage), damage block (flat hundredths, chance), true strike,
     // mana break (mana burned per hit, hundredths), heal amplification
@@ -106,6 +107,7 @@ enum class StatKey : std::uint8_t {
     SkillPower, MagicPower,                                                                 // [U-482] LoL-modified
     ModelSize, ElementalPenetration,                                                        // [U-483] (setup tables)
     SelfHeal, HealShieldPower, BuffPower,                                                   // [U-484]
+    Quiet,                                                                                  // [U-345] others hear me less: 100 = 1 %
     Count
 };
 inline constexpr const char* kStatKeyNames[] = {
@@ -114,7 +116,7 @@ inline constexpr const char* kStatKeyNames[] = {
     "crit_damage", "arcane_power", "martial_power", "skill_amp", "skill_range", "skill_radius", "spellvamp", "on_hit_damage",
     "on_hit_max_hp", "ability_power", "magic_pen", "magic_pen_pct", "strength", "agility", "intelligence", "hp_regen",
     "mana_regen", "magic_resist", "evasion", "bash_chance", "bash_ms", "bash_damage", "damage_block", "block_chance",
-    "true_strike", "mana_break", "heal_amp", "skill_power", "magic_power", "model_size", "elemental_penetration", "self_heal", "heal_shield_power", "buff_power"};
+    "true_strike", "mana_break", "heal_amp", "skill_power", "magic_power", "model_size", "elemental_penetration", "self_heal", "heal_shield_power", "buff_power", "quiet"};
 static_assert(std::size(kStatKeyNames) == std::size_t(StatKey::Count));
 constexpr void add_stat(Stats& s, StatKey k, std::int32_t v) {
     switch (k) {
@@ -167,6 +169,7 @@ constexpr void add_stat(Stats& s, StatKey k, std::int32_t v) {
         case StatKey::ElementalPenetration: s.elemental_penetration += v; break;
         case StatKey::SelfHeal: s.self_heal += v; break;
         case StatKey::HealShieldPower: s.heal_shield_power += v; break;
+        case StatKey::Quiet: s.quiet += v; break;
         case StatKey::BuffPower: s.buff_power += v; break;
         case StatKey::Count: break;
     }
@@ -224,6 +227,7 @@ constexpr std::int64_t stat_value(const Stats& s, StatKey k) {
         case StatKey::ElementalPenetration: return s.elemental_penetration;
         case StatKey::SelfHeal: return s.self_heal;
         case StatKey::HealShieldPower: return s.heal_shield_power;
+        case StatKey::Quiet: return s.quiet;
         case StatKey::BuffPower: return s.buff_power;
         case StatKey::Count: return 0;
     }

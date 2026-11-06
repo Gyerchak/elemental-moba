@@ -67,6 +67,10 @@ void World::finish_cast(Unit& u) {
     if (cycle_bonus) u.cycle_ready = false;
     u.cycle_boost = cycle_bonus;
     cast_skill(u, s, u.cast.x, u.cast.y, u.cast.target);
+    if (d.lock_ms > 0)  // [U-347] the others wait
+        for (std::size_t sl = 0; sl < u.ab.size() && sl < u.skill.size(); ++sl)
+            if (sl != std::size_t(s) && (d.lock_slots == 0 || (d.lock_slots >> sl) & 1))
+                u.ab[sl].cd_end_ms = std::max(u.ab[sl].cd_end_ms, now_ms + d.lock_ms);
     if (water_free && u.cast.sx >= 0) take_from_source(u, u.cast.sx, u.cast.sy);  // [U-339]
     {  // [U-434] shaping the ground holds the bender in place a moment
         const bool shapes = d.kind == SkillKind::Pillar || d.kind == SkillKind::Wall || d.kind == SkillKind::Boulder || d.kind == SkillKind::StonePush;
@@ -217,6 +221,12 @@ void World::cast_skill(Unit& u, Slot slot, std::int32_t tx, std::int32_t ty, std
             e.pierce = true;
             e.end_ms = now_ms + 3'000;
             if (d.sub == SubElement::Fire) u.st.add(StatusKind::Flying, now_ms + 600, 0, u.id);  // jets lift you
+            if (d.burrow) {  // [U-50] under the ground for the whole way (the moving dust still shows where)
+                const std::int64_t ms = std::int64_t(e.travel_left) * 1'000 / kSub / std::max<std::int64_t>(1, r.speed) + 60;
+                u.untargetable_until = std::max(u.untargetable_until, now_ms + ms);
+                u.st.add(StatusKind::Invisible, now_ms + ms, 0, u.id);
+                u.ghost_until = now_ms + ms;
+            }
             spawn_fx(e);
             break;
         }

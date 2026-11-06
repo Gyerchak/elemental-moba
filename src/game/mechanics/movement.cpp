@@ -203,6 +203,24 @@ void World::step_units() {
             }
             continue;
         }
+        {  // [U-52] ice: what stops walking slides on for a moment (glaciers, ice patches; not in the air)
+            const int icx = u.ux() / kCellUnits, icy = u.uy() / kCellUnits;
+            bool on_ice = !u.is_structure() && u.kind != UnitKind::Inhibitor && !u.flying() && Grid::in_bounds(icx, icy) && grid.at(icx, icy).surface() == Surface::Glacier;
+            if (!on_ice && !u.is_structure())
+                for (const Cloud& p : clouds)
+                    if (p.kind == CloudKind::IcePatch && dist2(u.ux(), u.uy(), p.x, p.y) <= std::int64_t(p.radius) * p.radius) on_ice = !u.flying();
+            if (!on_ice) {
+                u.slide_x = u.slide_y = 0;
+            } else if (u.moving) {
+                u.slide_x = u.x - u.prev_x, u.slide_y = u.y - u.prev_y;
+            } else if ((u.slide_x || u.slide_y) && u.st.can_move() && !u.riding) {
+                const std::int32_t nx = u.x + u.slide_x, ny = u.y + u.slide_y;
+                if (walkable_at(u, nx, ny)) u.x = nx, u.y = ny;
+                else u.slide_x = u.slide_y = 0;
+                u.slide_x = u.slide_x * elements::kIceSlideKeep / 64, u.slide_y = u.slide_y * elements::kIceSlideKeep / 64;
+            }
+            u.prev_x = u.x, u.prev_y = u.y;
+        }
         u.moving = false;
         u.st.expire(now_ms);
         if (u.tmp_size_until && u.tmp_size_until <= now_ms) {

@@ -20,6 +20,7 @@ namespace em::net {
 Server::Server(ServerConfig cfg) : cfg_(cfg) { players_.resize(kMaxPlayers); }
 
 Server::~Server() {
+    if (world_) save_replay();  // [X-19] (a match that was left unfinished is still worth having)
     if (host_) enet_host_destroy(host_);
 }
 
@@ -133,6 +134,7 @@ void Server::send_custom_champions(Player& p) {
 }
 
 bool Server::start(std::string* error) {
+    if (!cfg_.replay_file.empty() && !load_replay(error)) return false;  // [X-19]
     if (cfg_.version != current_version()) {  // [U-95] own game version (the hosting client has usually applied it already)
         if (const std::string e = apply_version(cfg_.version); !e.empty()) {
             if (error) *error = std::format("version {}: {}", cfg_.version, e);
@@ -178,6 +180,7 @@ void Server::drop(int pid) {
     if (world_ && p.unit) {  // [X-22] keep the champion: a bot plays it until the player reconnects
         if (Unit* u = world_->find(p.unit)) {
             u->bot = true;
+            replay_note(1, p.unit);  // [X-19]
             world_->add_feed(std::format("{} disconnected (bot takes over)", p.slot.name));
         }
     }
@@ -242,11 +245,18 @@ void Server::run(std::stop_token stop) {
         const auto t0 = clock::now();
         if (clock::now() - next > std::chrono::milliseconds(250)) next = clock::now();  // [U-469] after a stall: drop the lost time
                                                                                        // (no fast-forward burst of ticks)
-        while (clock::now() >= next && steps < 4) {
-            next += tick_len;
+        while (clock::now() >= next && steps < (replaying_ ? 16 : 4)) {
+            // [X-19] a replay can run faster or slower
+            next += replaying_ && replay_speed_pct_ > 0 ? std::chrono::duration_cast<std::remove_cvref_t<decltype(tick_len)>>(tick_len * 100 / replay_speed_pct_) : tick_len;
             ++steps;
             if (!world_) continue;
             const auto s0 = clock::now();
+            if (replaying_) {  // [X-19]
+                if (replay_speed_pct_ == 0) continue;
+                replay_step();
+            } else if (world_->tick % (std::uint64_t(cfg_.tick_hz) * 10) == 0) {
+                replay_note(3, 0, {}, world_checksum());
+            }
             world_->step();
             if (const auto took = clock::now() - s0; took > std::chrono::milliseconds(50)) {  // [U-469] watchdog → logs/slow_ticks.txt
                 std::string parts;
@@ -300,7 +310,7 @@ void Server::run(std::stop_token stop) {
             }
             if (world_->tick % std::uint64_t(std::max(1, cfg_.snap_div)) == 0)
                 for (Player& p : players_)
-                    if (p.connected && p.unit) send_snapshot(p);
+                    if (p.connected && (p.unit || p.spectator)) send_snapshot(p);
             if (world_->over) {  // [U-179] statistics now, back to the lobby a few seconds later
                 finish_match();
                 break;

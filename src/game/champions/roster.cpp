@@ -34,7 +34,8 @@ constexpr auto join(const std::array<ChampionDef, N>&... parts) {
     ((std::ranges::copy(parts, out.begin() + std::ptrdiff_t(i)), i += N), ...);
     return out;
 }
-constexpr auto kRoster = join(kBase, data::kPackA, data::kPackB, data::kPackC, data::kPackD);
+constexpr std::array kLast{data::kDarkAvatar};  // [U-07] (at the end: the other numbers stay)
+constexpr auto kRoster = join(kBase, data::kPackA, data::kPackB, data::kPackC, data::kPackD, kLast);
 
 constexpr auto kSpecials = [] {
     std::array<SkillDef, std::size(data::kSpecialRows)> a{};

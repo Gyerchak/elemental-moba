@@ -1,0 +1,39 @@
+# [U-213][U-520] Windows builds are made here, because development runs on Linux. The ready programs are under the run's Artifacts.
+name: build
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-sdl3
+            mingw-w64-ucrt-x86_64-sdl3-ttf
+            mingw-w64-ucrt-x86_64-enet
+            mingw-w64-ucrt-x86_64-pkgconf
+      - name: Build
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --target elemental_moba em_server em_champion_maker em_map_maker
+      - name: Collect
+        run: |
+          mkdir -p dist
+          cp build/elemental_moba.exe build/em_server.exe build/em_champion_maker.exe build/em_map_maker.exe dist/
+          ldd build/elemental_moba.exe | grep -i ucrt64 | awk '{print $3}' | xargs -I{} cp {} dist/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: elemental-moba-windows-programs
+          path: dist/

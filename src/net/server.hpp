@@ -27,6 +27,10 @@ struct ServerConfig {
     // ---- identity (server list [U-212])
     std::string name = "elemental-moba server";
     std::string motd = "Welcome!";
+    std::string password;                 // [U-374] empty = none
+    bool allow_spectators = true;         // [X-20] players may join to watch
+    bool record_replays = true;           // [X-19] replays/<date>_<map>.emr (small: commands only)
+    std::string replay_file;              // [X-19] this server plays that replay to whoever joins
     std::string version = std::string(kVersion);  // [U-95] the game version this server runs (official or versions/<name>)
     std::uint16_t port = kDefaultPort;
     // ---- simulation
@@ -78,6 +82,19 @@ public:
     std::atomic<bool> in_match{false};
     std::atomic<std::int64_t> match_ms{0};
     std::atomic<double> tick_load{0};  // fraction of the tick budget used
+    struct ReplayChampion {
+        std::uint8_t team = 0, bot = 0;
+        std::int32_t champ = 0, q = -1, f = -1, g = -1, slot_id = -1;
+        std::string name;
+        Loadout loadout;
+    };
+    struct ReplayEvent {
+        std::uint64_t tick = 0;
+        std::uint8_t type = 0;  // 0 command, 1 a bot takes over, 2 the player is back, 3 checksum
+        std::uint32_t unit = 0;
+        Cmd cmd{};
+        std::uint64_t value = 0;
+    };
 
 private:
     struct Player {
@@ -90,6 +107,8 @@ private:
         std::int64_t fail_sent_ms = -1;
         bool connected = false;
         bool joined = false;        // said Hello (a server-list ping never does)
+        bool spectator = false;     // [X-20] only watches
+        std::uint8_t spec_team = 0; // … whose vision it sees
         bool allow_skins = true;    // [U-98] wants other players' skins
         std::uint64_t secret = 0;   // [U-276] identifies the player for the ranking
         std::uint64_t lights_sent_tick = ~0ull;  // [U-280]
@@ -103,6 +122,23 @@ private:
     // [U-277] own champions: (file name, text) in roster order; loaded at start, sent to every joining player
     std::vector<std::pair<std::string, std::string>> custom_files_;
     void send_custom_maps(Player& p);  // [U-518]
+    // [X-19][X-20] server_replay.cpp
+    struct ReplayData {
+        MatchConfig config{};
+        std::uint32_t rng = 1;
+        std::vector<ReplayChampion> champions;
+        std::vector<ReplayEvent> events;
+    } replay_;
+    bool replaying_ = false, replay_saved_ = false, replay_off_ = false;
+    std::size_t replay_next_ = 0;
+    int replay_speed_pct_ = 100;  // 0 = paused
+    [[nodiscard]] std::uint64_t world_checksum() const;
+    void replay_note_champion(const ReplayChampion& c);
+    void replay_note(std::uint8_t type, std::uint32_t unit, const Cmd& c = {}, std::uint64_t value = 0);
+    void save_replay();
+    bool load_replay(std::string* error);
+    void start_replay_match();
+    void replay_step();
     void load_custom_champions();
     void send_custom_champions(Player& p);
     // server_lobby.cpp

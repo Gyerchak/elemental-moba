@@ -80,7 +80,16 @@ void Server::receive(int pid, Reader& r) {
             if (r.bad()) break;
             if (!cfg_.practice && (c.kind == CmdKind::CheatGold || c.kind == CmdKind::CheatLevel || c.kind == CmdKind::CheatNoCooldowns || c.kind == CmdKind::PracticeSize))
                 break;  // [X-24]
+            replay_note(0, p.unit, c);  // [X-19]
             world_->command(p.unit, c);
+            break;
+        }
+        case Msg::Spectate: {  // [X-20]
+            const std::uint8_t team = r.get<std::uint8_t>();
+            const std::uint16_t speed = r.get<std::uint16_t>();
+            if (r.bad() || !p.spectator) break;
+            p.spec_team = std::uint8_t(team & 1);
+            if (replaying_) replay_speed_pct_ = std::clamp<int>(speed, 0, 800);
             break;
         }
         default: break;
@@ -127,6 +136,8 @@ void Server::on_hello(int pid, Reader& r) {
     const std::uint64_t secret = r.get<std::uint64_t>();
     const std::uint8_t platform = r.get<std::uint8_t>();
     const bool allow_skins = r.get<std::uint8_t>() != 0;
+    const std::string password = r.str();  // [U-374]
+    const bool watching = r.get<std::uint8_t>() != 0 || !cfg_.replay_file.empty();  // [X-20]
     auto reject = [&](std::string_view why) {
         Writer w;
         w.put(Msg::Reject);
@@ -136,6 +147,7 @@ void Server::on_hello(int pid, Reader& r) {
         enet_peer_disconnect_later(p.peer, 0);
     };
     if (proto != kProtocol) return reject("protocol mismatch — update the game");
+    if (!cfg_.password.empty() && password != cfg_.password && !(cfg_.host_secret != 0 && secret == cfg_.host_secret)) return reject("wrong password");  // [U-374]
     // [U-95] the client falls back to the server's version itself; we only refuse unknown ones
     if (version != cfg_.version) return reject(std::format("server runs version {}", cfg_.version));
     if (!(cfg_.allowed_platforms & platform))  // [U-213]
@@ -169,11 +181,20 @@ void Server::on_hello(int pid, Reader& r) {
                 old.peer->data = reinterpret_cast<void*>(std::intptr_t(i));
                 p = Player{};
                 if (Unit* u = world_->find(old.unit)) u->bot = false;
+                replay_note(2, old.unit);  // [X-19]
                 welcome(old, i);
                 send_match_start(old);
                 world_->add_feed(std::format("{} reconnected", name));
                 return;
             }
+        }
+        if (watching && cfg_.allow_spectators) {  // [X-20] watch the running match
+            p.joined = true, p.spectator = true, p.allow_skins = allow_skins, p.secret = secret;
+            p.slot.id = std::uint8_t(pid), p.slot.name = name, p.slot.plays = false;
+            ++players;
+            welcome(p, pid);
+            send_match_start(p);
+            return;
         }
         return reject("match already running");
     }
@@ -197,10 +218,12 @@ void Server::on_hello(int pid, Reader& r) {
         if (o.connected && o.joined && &o != &p) ++n[std::clamp<int>(o.slot.team, 0, 1)];
     p.slot.team = std::int8_t(n[0] <= n[1] ? 0 : 1);
     p.slot.champ = -1;
+    if (watching && cfg_.allow_spectators) p.spectator = true, p.slot.plays = false;  // [X-20]
     ++players;
     welcome(p, pid);
     send_chat(Chat::System, "server", std::format("{} joined", name), nullptr, nullptr);
     send_lobby();
+    if (replaying_ && !world_) start_replay_match();  // [X-19] the first viewer starts it
 }
 
 bool Server::champion_banned(int champ) const {

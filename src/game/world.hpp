@@ -214,6 +214,7 @@ struct Unit {
     std::int64_t transform_until = 0;   // [U-456] a Transform skill is active …
     std::int16_t transform_attack_pct = 0, transform_heal_pct = 0;  // … with these
     std::int64_t lotus_until = 0;
+    std::int32_t slide_x = 0, slide_y = 0, prev_x = 0, prev_y = 0;  // [U-52] sliding on ice (sub per tick)
     std::array<std::int16_t, 12> practice_size{};  // [U-517] practice tool: +% of each skill's size
     std::int32_t practice_model = 0;               // [U-517] practice tool: +model size (100 = 1 %)
     std::int64_t flask_until = 0;  // [U-81] immortal heal window
@@ -250,6 +251,8 @@ struct Unit {
     std::int8_t surge_count = 0;
     std::int64_t surge_ms = 0, stoneheart_ready_ms = 0, chirush_until = 0;
     // ---- statistics for the post-game screen [U-179]
+    std::int32_t stat_high_hit = 0, stat_high_auto = 0;   // [U-371]
+    std::int64_t stat_dmg_minions = 0, stat_dmg_monsters = 0;
     std::int64_t stat_dealt_pre = 0, stat_taken_pre = 0;  // [U-520] the same damage before any defence
     std::int64_t stat_dmg_champs = 0, stat_dmg_taken = 0, stat_healing = 0, stat_shielding = 0, stat_gold = 0;
     std::int64_t stat_keystone = 0;  // what the keystone did (see KeystoneDef::impact)
@@ -617,6 +620,8 @@ public:
     LightMap light;
     std::vector<LightOut> lights;          // rebuilt at 16 Hz, team-neutral [U-117]
     std::uint64_t lights_tick = 0;         // [U-280] tick of the last lights rebuild (the server sends lights only then)
+    struct TimelinePoint { std::uint32_t unit; std::int32_t ms, gold, xp, dealt, taken, healing, cs; };
+    std::vector<TimelinePoint> timeline;   // [U-371] every 15 s: the graphs after the match
     std::vector<TimedLight> glows;         // [U-256] lights that stay a while (skill afterglow, burning trees)
     std::vector<LightOut> lava_lights_;    // [U-256] glowing magma, rebuilt every 2 s
     std::int64_t lava_lights_ms_ = -10'000;

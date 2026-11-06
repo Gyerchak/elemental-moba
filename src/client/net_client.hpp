@@ -136,6 +136,11 @@ public:
     std::vector<LocalReward> rewards;  // [U-159]
     std::unordered_map<std::uint32_t, std::vector<std::uint8_t>> skins;  // unit id → BMP [U-200]
     std::vector<net::FinalRow> final_stats;  // [U-179]
+    std::vector<net::NetTimeline> timeline;  // [U-371]
+    std::string password;                    // [U-374] of the next server I join
+    bool spectator = false;                  // [X-20] the next join only watches
+    int spec_team = 0, replay_speed = 100;   // whose vision, replay speed % (0 = pause)
+    void send_spectate();
     std::vector<LocalAnnounce> announces;    // [U-263] newest last (the whole match: the announcements window)
     struct WallAnim {  // [U-341]
         net::NetWallBreak b;

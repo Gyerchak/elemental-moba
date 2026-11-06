@@ -167,6 +167,8 @@ void draw_panel(tool::Window& win, Panel& p) {
     text_field(r, ui, 2, x + 440, y, 120, p.port_s, tr("UDP port"));
     y += 42;
     text_field(r, ui, 3, x, y, colw, p.cfg.motd, tr("Message of the day"));
+    y += 42;
+    text_field(r, ui, 10, x, y, 420, p.cfg.password, tr("Password (empty = anyone can join)"));
     y += 38;
     head(tr("Game"));
     {
@@ -199,6 +201,8 @@ void draw_panel(tool::Window& win, Panel& p) {
     toggle(tr("Force server-only textures"), p.cfg.force_server_textures);
     toggle(tr("Own champions: their files are sent to everyone who joins"), p.cfg.allow_custom_champions);
     toggle(tr("Players' own emotes are passed on (separate from skins)"), p.cfg.allow_own_emotes);
+    toggle(tr("People may join to watch"), p.cfg.allow_spectators);
+    toggle(tr("Save a replay of every match (replays folder)"), p.cfg.record_replays);
     text(r, x, y + 6, tr("Allowed systems:"), {200, 200, 210});
     {
         float px = x + 170;
