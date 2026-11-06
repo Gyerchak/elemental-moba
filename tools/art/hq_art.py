@@ -145,6 +145,13 @@ def main():
         for i, (k, v) in enumerate(ALT_LOOK.items()):
             make(RAW / "alt" / f"{k}.png", f"seamless tileable flat top-down game texture of {v}, even lighting, no shadows, no objects in the middle", 768, 768, 7500 + i)
     champs = champions()
+    if "customs" in what:  # [U-525] full-body pictures for own champions that have no model yet (tools/art/art_models.py makes the model)
+        for i, (cid, look) in enumerate({"ash_monk": "a monk firebender in grey ash robes", "sky_monk_tenzo": "a tall airbender monk in yellow and orange robes, bald, blue arrow tattoos",
+                                         "taliyah": "a young desert earthbender woman, woven blue and gold clothes, long dark braid"}.items()):
+            dst = ROOT / "art" / "raw" / "champion_front" / f"{cid}.png"
+            if not dst.exists():
+                make(RAW / "front" / f"{cid}.png", f"one single figure, full body, front view, standing straight, arms slightly out, {look}, plain flat white background, even lighting, no text, hand painted fantasy game art", 768, 1024, 6000 + i)
+                shutil.copy(RAW / "front" / f"{cid}.png", dst)
     if "icons" in what:
         for i, (cid, (el, name, desc)) in enumerate(champs.items()):
             make(RAW / "icons" / f"{cid}.png", f"close portrait bust of {who(cid, el, name, desc)}, strong rim light, dark painted background, {STYLE}", 768, 768, 8000 + i)

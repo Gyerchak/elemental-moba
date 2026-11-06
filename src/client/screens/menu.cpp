@@ -20,7 +20,7 @@ void App::menu() {
         fill_rect(ren_, dx, dy, dw, 180, {30, 32, 44, 255});
         rect(ren_, dx, dy, dw, 180, {255, 190, 110, 255});
         text(ren_, dx + 16, dy + 14, fit_text(trf("This server plays the game version {}", version_offer_), dw - 32, 2), {255, 220, 150}, 2);
-        text(ren_, dx + 16, dy + 52, fit_text(tr("Download its settings (text files) and join? Pictures of that version are not downloaded."), dw - 32), {220, 220, 230});
+        text(ren_, dx + 16, dy + 52, fit_text(tr("Download it and join? It is saved as a new version with the name of the server, a number and the date."), dw - 32), {220, 220, 230});
         if (button(ren_, ui_, dx + 16, dy + 110, 300, 44, tr("Download and join"))) {
             version_offer_.clear();
             net_.fetch_version = true;
