@@ -298,3 +298,9 @@ Status column: `accepted · Claude idea` (Hubert can still `change` / `drop` any
 | [X-256] | Spectators and replays | --spectate / Only watch: a chosen team's vision, O switches. Replays are commands + seed + checksums (replays/*.emr, about 1.5 KB for a minute of bots), run again by the engine: [ ] speed, P pause; menu Replays. |
 | [X-257] | Hitbox fill | fill_shape draws the union row by row: one clean shape, no darker overlaps. |
 | [X-258] | Windows | GitHub Actions builds the Windows programs (.github/workflows/build.yml). |
+| [X-259] | Heat of fire | kHeat in content.hpp: 9 levels, each with own damage, speed, burn, light, ice melting and colours; a skill sets heat and sweet_heat; white and hotter makes steam of ground water. [U-523] |
+| [X-260] | CC rules | A skill keeps the longer time, adds times, or starts again (cc_rule). Sleep with a drowsy start, Charm, Taunt, Terrify; StatusKind now uses all 32 bits. [U-524] |
+| [X-261] | Grapples and pins | SkillDef grapple (1 me, 2 unit, 3 halfway) and pin_range: start_pull / step_pull, airborne on the way. Structures, bosses and debuff immune units do not move. Bots keep a pin until a wall is near and do not grapple in when low. [U-524] |
+| [X-262] | Sounds | make_sounds.py at 44.1 kHz with fades; own sound for each CC, grapple, pin, mud, embers. [U-525] |
+| [X-263] | Server versions | Version by content (version_id); the client saves "Server vN DATE" only when the content is new; protocol 29. [U-525] |
+| [X-264] | Pendrive bundle | tools/make_bundle.sh <folder>: game, local champions, Windows programs of that commit, install scripts for Linux, Windows, macOS, checksums. [U-526] |

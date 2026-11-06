@@ -114,6 +114,22 @@ std::vector<std::string> interaction_lines() {
                   rules::champion_kill_xp(0), rules::champion_kill_xp(1) - rules::champion_kill_xp(0)));
     l("A champion who hit the victim in the last 10 s gets the kill even when a turret / minion / monster lands the last hit");
 
+    h("Sleep, charm, taunt, fear, grapples and pins");
+    l("The same effect again on a unit follows the skill's rule: keeps the longer time (usual), adds the times together, or starts the time again");
+    l("Sleep: first drowsy (slowed), then asleep; asleep cannot act; a hit wakes it and is stronger; a burn does not wake it");
+    l("Charm: walks to the one who charmed it. Taunt: walks to the one who taunted it and attacks it. Fear: runs away from the source. Terrify: runs around in panic");
+    l("A grapple is a projectile that catches the first wall or unit: it pulls you there, pulls the unit to you, or both meet halfway");
+    l("A pin throws the target into a wall close by (airborne on the way), then the effect starts; without a wall nearby it does nothing");
+    l("Structures, bosses and debuff immune units are not moved by grapples or pins; a grapple that meets them pulls only you, if it is one that pulls you");
+
+    h("Mud and the heat of fire");
+    l(std::format("Mud lasts {} s; it is a water source at {} % strength and it counts as earth; fire or lava on it makes it normal ground at once",
+                  elements::kMudMs / 1000, elements::kMudWaterPct));
+    l(std::format("Fire leaves embers that glow for {:.1f} s and fade", elements::kFireEmberMs / 1000.0));
+    for (const HeatLevel& hl : kHeat)
+        l(std::format("{:<12} damage {:>3} %   speed {:>3} %   burn {:>3} %   light {:>3} %   melts ice {:>3} %", hl.name, hl.dmg_pct, hl.speed_pct, hl.burn_pct, hl.light_pct, hl.melt_pct));
+    l("White fire and hotter turns water on the ground into steam and melts ice patches; the sweet spot of a skill may burn at its own heat");
+
     h("Jungle");
     for (const MonsterDef& m : kMonsters)
         l(std::format("{:<18} {:>6} HP  {:>4} gold  {:>4} XP  respawn {:>3} s{}{}{}", m.name, m.hp / 100, m.gold, m.xp, m.respawn_ms / 1000,

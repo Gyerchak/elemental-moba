@@ -95,6 +95,30 @@
 - Champion kill: bounty 300 gold (+100 per kill in a row, max 1000; −50 per death in a row, min 100); assisters share 50 %; XP 140 + 30 × level, shared nearby
 - A champion who hit the victim in the last 10 s gets the kill even when a turret / minion / monster lands the last hit
 
+## Sleep, charm, taunt, fear, grapples and pins
+
+- The same effect again on a unit follows the skill's rule: keeps the longer time (usual), adds the times together, or starts the time again
+- Sleep: first drowsy (slowed), then asleep; asleep cannot act; a hit wakes it and is stronger; a burn does not wake it
+- Charm: walks to the one who charmed it. Taunt: walks to the one who taunted it and attacks it. Fear: runs away from the source. Terrify: runs around in panic
+- A grapple is a projectile that catches the first wall or unit: it pulls you there, pulls the unit to you, or both meet halfway
+- A pin throws the target into a wall close by (airborne on the way), then the effect starts; without a wall nearby it does nothing
+- Structures, bosses and debuff immune units are not moved by grapples or pins; a grapple that meets them pulls only you, if it is one that pulls you
+
+## Mud and the heat of fire
+
+- Mud lasts 15 s; it is a water source at 50 % strength and it counts as earth; fire or lava on it makes it normal ground at once
+- Fire leaves embers that glow for 3.5 s and fade
+- Red 600      damage  70 %   speed  85 %   burn  60 %   light  60 %   melts ice  40 %
+- Red 800      damage  85 %   speed  92 %   burn  80 %   light  80 %   melts ice  70 %
+- Orange 1000  damage 100 %   speed 100 %   burn 100 %   light 100 %   melts ice 100 %
+- Yellow 1400  damage 115 %   speed 106 %   burn 125 %   light 120 %   melts ice 140 %
+- White 1600   damage 130 %   speed 112 %   burn 150 %   light 140 %   melts ice 180 %
+- Blue 2000    damage 150 %   speed 118 %   burn 180 %   light 160 %   melts ice 240 %
+- Blue 2500    damage 170 %   speed 124 %   burn 210 %   light 180 %   melts ice 300 %
+- Blue 3000    damage 190 %   speed 130 %   burn 240 %   light 200 %   melts ice 380 %
+- Blue 3333    damage 210 %   speed 136 %   burn 270 %   light 220 %   melts ice 460 %
+- White fire and hotter turns water on the ground into steam and melts ice patches; the sweet spot of a skill may burn at its own heat
+
 ## Jungle
 
 - Wandering Spirit     1400 HP    70 gold   140 XP  respawn 120 s  spirit (passes through units)
@@ -107,10 +131,11 @@
 - Platypus Bear        2600 HP   100 gold   220 XP  respawn 150 s  → Ember buff
 - Knowledge Seeker     2200 HP   100 gold   220 XP  respawn 150 s  spirit (passes through units)  → Wisdom buff
 - Dark Spirit          1600 HP    90 gold   180 XP  respawn 180 s  spirit (passes through units)
+- Swamp Monster        8000 HP   200 gold   500 XP  respawn 360 s  → Wisdom buff  → 300 gold for every team champion
 - Lion Turtle          9000 HP   200 gold   500 XP  respawn 360 s  → team +4 % power per stack
 - Sun Dragons          7500 HP   150 gold   450 XP  respawn 420 s  → 250 gold for every team champion
 - Every respawn: +hp_growth % HP, +attack_growth % attack, more gold and XP (per monster in monsters.hpp)
 
 ## Travel companions (recall)
 
-- The chosen animal runs from the base at 1000 units/s, carries the champion home at the same speed; it cannot be stopped or cancelled; the rider can be hit
+- The chosen animal runs from the base at 1500 units/s, carries the champion home at the same speed; it cannot be stopped or cancelled; the rider can be hit
