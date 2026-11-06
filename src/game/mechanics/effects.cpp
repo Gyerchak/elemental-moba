@@ -15,6 +15,12 @@ void World::effect_hits(Effect& e) {
     // [U-513] fire on mud: at once it is normal ground
     if ((fire_family(e.sub) && e.sub != SubElement::Lightning) || e.sub == SubElement::Lava)
         std::erase_if(clouds, [&](const Cloud& c) { return c.kind == CloudKind::Mud && touches(sh, Circle{c.x, c.y, c.radius}); });
+    if (e.heat >= 5)  // [U-523] white fire and hotter: water on the ground turns to steam, ice patches melt
+        for (Cloud& c : clouds)
+            if ((c.kind == CloudKind::Puddle || c.kind == CloudKind::IcePatch) && touches(sh, Circle{c.x, c.y, c.radius})) {
+                if (c.kind == CloudKind::IcePatch) c.kind = CloudKind::Puddle;
+                else c.kind = CloudKind::Steam, c.until_ms = now_ms + elements::kSteamMs;
+            }
     const bool is_poly = geo_is_poly(Geo(e.geo));  // [U-510] exact polygon hit test
     const Poly pl = is_poly ? fx_poly(e.kind, e.ux(), e.uy(), e.radius, e.width, e.length, e.dir, Geo(e.geo), e.def ? e.def->poly.data() : nullptr,
                                       e.def ? e.def->npoly : 0) : Poly{};
@@ -85,6 +91,12 @@ void World::effect_hits(Effect& e) {
                 case SweetZone::Auto: break;
             }
             if (sweet) dmg = dmg * (100 + sweet_pct) / 100;
+            // [U-523] the sweet part may burn at another heat than the rest of the skill
+            if (sweet && e.sweet_heat)
+                if (const HeatLevel* hs = heat_of(e.sweet_heat)) {
+                    const HeatLevel* hb = heat_of(e.heat);
+                    dmg = dmg * hs->dmg_pct / (hb ? hb->dmg_pct : 100);
+                }
         }
         hit_flags_ = sweet ? kHitSweet : 0;
         if (e.combo == Combo::Firestorm) dmg = dmg * (100 + elements::kAirEmpowersFirePct) / 100;  // [U-241]
@@ -132,7 +144,23 @@ void World::effect_hits(Effect& e) {
                     }
                 }
         if (!o.alive) continue;
-        apply_cc(e.src, e.owner, o, e.cc, e.cc_ms, e.cc_val, e.sub);
+        // [U-524] a grapple caught a unit; a pin needs a wall nearby; sleep may come after a drowsy moment
+        if (e.def && e.def->grapple) {
+            grapple_hit(e, &o, o.ux(), o.uy());
+            if (!e.pierce) {
+                e.dead = true;
+                return;
+            }
+        }
+        const bool pinned = e.def && e.def->pin_range > 0 && o.team != e.team && pin_to_wall(e, o);
+        const bool wants_pin = e.def && e.def->pin_range > 0;
+        if (e.cc == StatusKind::Sleep && e.def && e.def->sleep_delay_ms > 0 && o.team != e.team && !o.st.has(StatusKind::DebuffImmune) && o.kind != UnitKind::Boss && !o.is_structure()) {
+            apply_cc(e.src, e.owner, o, StatusKind::Drowsy, e.def->sleep_delay_ms, e.def->drowsy_slow, e.sub);
+            o.sleep_at = now_ms + e.def->sleep_delay_ms, o.sleep_ms = e.cc_ms, o.sleep_val = e.cc_val, o.sleep_src = e.owner;
+        } else if (!wants_pin) {
+            apply_cc(e.src, e.owner, o, e.cc, e.cc_ms, e.cc_val, e.sub, e.def ? e.def->cc_rule : 0);
+        }
+        (void)pinned;
         // [U-241] water soaks, fire dries
         if (fire_family(e.sub)) {
             if (e.sub != SubElement::Lightning) dry(o);  // ([U-286][U-508] water conducts lightning: it stays wet)
@@ -388,6 +416,11 @@ void World::step_effects() {
         const bool air_dash = e.def && e.def->kind == SkillKind::Dash && (base_element(e.sub) == Element::Air || e.def->burrow);  // ([U-50] under the walls)
         if (e.kind != FxKind::Lantern && !(e.def && (air_dash || e.def->through_walls))) {
             const Cell c = grid.at(cx, cy);
+            if (e.def && e.def->grapple && c.wall() != Wall::None && !c.temp_walkable()) {  // [U-524] it catches the wall
+                grapple_hit(e, nullptr, e.ux(), e.uy());
+                e.dead = true;
+                continue;
+            }
             const AttackInfo ai{.sub = e.sub, .elevated = owner && owner->flying()};
             // [U-227] trees: burn (fire / lava) or break (skills marked destroys_trees)
             const bool destroys = e.def && e.def->destroys_trees >= 0 ? e.def->destroys_trees > 0 : fire_family(e.sub) || e.sub == SubElement::Lava;

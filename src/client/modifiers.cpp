@@ -47,7 +47,12 @@ constexpr Look kStatus[] = {
     {"BRK", "Break", "passives switched off", {150, 110, 90}, true},
     {"IMM", "Debuff immune", "no new crowd control or debuffs", {255, 210, 90}, false},
     {"PLY", "Polymorph", "a harmless critter: no autoattacks, no skills, −60 move speed", {230, 150, 230}, true},  // [U-484]
-    {"INV", "Invisible", "enemies cannot see it (true sight can); attacking or casting ends it", {170, 170, 230}, false},  // [U-478]
+    {"INV", "Invisible", "enemies cannot see it (true sight can); attacking or casting ends it", {170, 170, 230}, false},
+    {"SLP", "Asleep", "cannot act; damage wakes it", {150, 150, 240}, true},  // [U-524]
+    {"DRW", "Drowsy", "slowed, soon falls asleep", {180, 180, 240}, true},
+    {"CHM", "Charmed", "walks to the one who charmed it", {255, 140, 200}, true},
+    {"TNT", "Taunted", "walks to the one who taunted it and attacks it", {240, 120, 70}, true},
+    {"TRF", "Terrified", "runs around in panic", {160, 70, 120}, true},  // [U-478]
 };
 static_assert(std::size(kStatus) == std::size_t(StatusKind::Count));
 

@@ -120,12 +120,16 @@ struct Settings {
     bool fx_blend = true, fx_shadows = true, fx_glow = true, fx_lights = true, fx_bloom = true, fx_grade = true, fx_vignette = true,
          fx_sharpen = true, fx_water = true;
     int fx_particles = 3;                  // 0 off, 1 low, 2 medium, 3 high
+    int fx_skills = 3;                     // [U-523] skill look: 0 flat, 1 core, 2 + glow, 3 full
+    bool fx_own_pictures = true;           // [U-521] pictures and sounds of own champions' skills
+    bool fx_animations = true;             // [U-521] unit animations play (off: first frame of each, less work)
     void apply_fx_preset(int preset) {
         fx_preset = preset;
         fx_blend = fx_shadows = preset >= 1;
         fx_glow = fx_lights = fx_grade = fx_water = preset >= 2;
         fx_bloom = fx_vignette = fx_sharpen = preset >= 3;
         fx_particles = preset >= 3 ? 3 : preset == 2 ? 2 : 0;
+        fx_skills = preset;
     }
     // ---- skins / resource packs [U-97][U-98][U-197]
     std::string resource_pack = "default";

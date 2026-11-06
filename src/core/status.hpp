@@ -38,6 +38,11 @@ enum class StatusKind : std::uint8_t {
     DebuffImmune,  // [U-476] Dota 2 (debuff immunity): no new crowd control / debuffs land
     Polymorph,     // [U-484] LoL: no autoattacks, no skills, −60 move speed (it can still walk)
     Invisible,     // [U-478] feature Invisibility: enemies do not see it, except with true sight; attacking / casting ends it
+    Sleep,         // [U-524] LoL: cannot act; damage wakes it (the waking hit is `value` % stronger); no tenacity change
+    Drowsy,        // [U-524] LoL: slowed by `value` %, then it falls asleep
+    Charm,         // [U-524] LoL: walks to the one who charmed it, cannot act
+    Taunt,         // [U-524] LoL: walks to the one who taunted it and attacks it, no skills
+    Terrify,       // [U-524] LoL: runs around in panic, in changing directions, cannot act
     Count
 };
 
@@ -47,6 +52,7 @@ enum class StatusKind : std::uint8_t {
         case StatusKind::Mute: case StatusKind::Airborne: case StatusKind::Frozen: case StatusKind::Blind:
         case StatusKind::Bloodbound: case StatusKind::Fear: case StatusKind::Disarm: case StatusKind::Subdue:
         case StatusKind::Hex: case StatusKind::Break: case StatusKind::Polymorph:
+        case StatusKind::Sleep: case StatusKind::Drowsy: case StatusKind::Charm: case StatusKind::Taunt: case StatusKind::Terrify:
             return true;
         default:
             return false;
@@ -69,15 +75,24 @@ public:
 
     // [U-127] CC durations scaled by attacker CC amplify and target tenacity.
     // Same kind again: keep the longer time and the stronger value.
+    // [U-524] rule: 0 the usual: keeps the longer time; 1 STACK: the new time is added to what is left;
+    //               2 REFRESH: the time starts again, even if that makes it shorter
     constexpr void apply(StatusKind k, std::int64_t now_ms, std::int64_t base_ms, std::int32_t value,
-                         std::uint32_t source, const Stats& attacker, const Stats& target) {
+                         std::uint32_t source, const Stats& attacker, const Stats& target, int rule = 0) {
         const std::int64_t ms = is_cc(k) ? cc_duration_ms(base_ms, attacker, target, ignores_tenacity(k)) : base_ms;
+        if (rule != 0)
+            for (int i = 0; i < n_; ++i)
+                if (s_[i].kind == k) {
+                    s_[i].until_ms = rule == 1 ? std::max(s_[i].until_ms, now_ms) + ms : now_ms + ms;
+                    s_[i].value = std::max(s_[i].value, value), s_[i].source = source;
+                    return;
+                }
         add(k, now_ms + ms, value, source);
     }
     constexpr void add(StatusKind k, std::int64_t until_ms, std::int32_t value, std::uint32_t source) {
         // [U-508] graded statuses: a strong short one and a weak long one live side by side (the strongest counts, each
         // ends at its own time). Before, they merged, so 99 % for 0.2 s + 10 % for 5 s made 99 % for 5 s.
-        const bool graded = k == StatusKind::Slow || k == StatusKind::Haste || k == StatusKind::Blind || k == StatusKind::Fear;
+        const bool graded = k == StatusKind::Slow || k == StatusKind::Haste || k == StatusKind::Blind || k == StatusKind::Fear || k == StatusKind::Drowsy;
         for (int i = 0; i < n_; ++i)
             if (s_[i].kind == k && (k != StatusKind::Burn || s_[i].source == source)) {
                 if (graded && s_[i].value != value && (s_[i].value > value) != (s_[i].until_ms > until_ms) && s_[i].until_ms != until_ms)
@@ -122,18 +137,24 @@ public:
         return v;
     }
     [[nodiscard]] constexpr bool hard_cc() const {
-        return has(StatusKind::Stun) || has(StatusKind::Airborne) || has(StatusKind::Frozen) ||
-               has(StatusKind::Bloodbound) || has(StatusKind::Fear);
+        return locked() || has(StatusKind::Taunt);
+    }
+    [[nodiscard]] constexpr bool locked() const {  // everything except the taunted (they still attack)
+        return has(StatusKind::Stun) || has(StatusKind::Airborne) || has(StatusKind::Frozen) || has(StatusKind::Bloodbound) || has(StatusKind::Fear) ||
+               has(StatusKind::Sleep) || has(StatusKind::Charm) || has(StatusKind::Terrify);
+    }
+    [[nodiscard]] constexpr bool driven() const {  // [U-524] its feet are not its own (lol.cpp)
+        return has(StatusKind::Fear) || has(StatusKind::Charm) || has(StatusKind::Taunt) || has(StatusKind::Terrify);
     }
     [[nodiscard]] constexpr bool can_move() const { return !hard_cc() && !has(StatusKind::Root); }
     // [U-474] only the HARD crowd control here. Which skills / autoattacks are blocked by silence (LoL: lol.cpp) or by
     // chi block / disarm / subdue (own: bending_cc.cpp) depends on the skill → World::skill_block_reason / auto_allowed.
     // [U-476] hex (Dota) / [U-484] polymorph (LoL): no skills AND no autoattacks
     [[nodiscard]] constexpr bool can_cast() const { return !hard_cc() && !has(StatusKind::Hex) && !has(StatusKind::Polymorph); }
-    [[nodiscard]] constexpr bool can_attack() const { return !hard_cc() && !has(StatusKind::Hex) && !has(StatusKind::Polymorph); }
+    [[nodiscard]] constexpr bool can_attack() const { return !locked() && !has(StatusKind::Hex) && !has(StatusKind::Polymorph); }
     // Move speed % after slows / hastes. Slows don't stack: strongest wins.
     [[nodiscard]] constexpr std::int32_t move_speed_pct() const {
-        const std::int32_t pct = std::max(10, 100 - std::max(value(StatusKind::Slow), value(StatusKind::Fear)) + value(StatusKind::Haste));  // [U-508] fear's own slow
+        const std::int32_t pct = std::max(10, 100 - std::max({value(StatusKind::Slow), value(StatusKind::Fear), value(StatusKind::Drowsy)}) + value(StatusKind::Haste));  // [U-508] fear's own slow
         return has(StatusKind::Swimming) ? pct / 2 : pct;  // [U-188] swimming is slow
     }
     // Shield soaks damage first. Returns damage left after the shield.

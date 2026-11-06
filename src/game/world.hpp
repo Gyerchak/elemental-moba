@@ -214,6 +214,16 @@ struct Unit {
     std::int64_t transform_until = 0;   // [U-456] a Transform skill is active …
     std::int16_t transform_attack_pct = 0, transform_heal_pct = 0;  // … with these
     std::int64_t lotus_until = 0;
+    // [U-524] thrown / pulled somewhere (grapple, grab, pin): nothing else moves it until it arrives; then pend_cc
+    bool pulled = false;
+    std::int32_t pull_x = 0, pull_y = 0, pull_step = 0;  // sub, sub per tick
+    StatusKind pend_cc = StatusKind::Count;
+    std::int32_t pend_ms = 0, pend_val = 0;
+    std::uint32_t pend_src = 0;
+    std::uint8_t pend_sub = 0;
+    std::int64_t sleep_at = 0;      // [U-524] drowsy until then
+    std::int32_t sleep_ms = 0, sleep_val = 0;
+    std::uint32_t sleep_src = 0;
     std::int32_t slide_x = 0, slide_y = 0, prev_x = 0, prev_y = 0;  // [U-52] sliding on ice (sub per tick)
     std::array<std::int16_t, 12> practice_size{};  // [U-517] practice tool: +% of each skill's size
     std::int32_t practice_model = 0;               // [U-517] practice tool: +model size (100 = 1 %)
@@ -317,6 +327,7 @@ struct Effect {
     std::uint32_t target = 0;  // homing (autos, tower shots)
     const SkillDef* def = nullptr;
     bool crit = false;        // [U-463] a critical autoattack on its way
+    std::uint8_t heat = 0, sweet_heat = 0;  // [U-523]
     std::uint8_t geo = 0, sweet_zone = 0, sweet_size = 0;  // [U-461][U-462] Geo / SweetZone of this cast (0 = Auto)
     std::int32_t inner = 0;   // [U-462] Ring / Arc hole
     std::int16_t sweet = -1;  // [U-456] this cast stage's own sweet spot (-1 = the skill's)
@@ -383,6 +394,7 @@ struct Tether {  // [U-456] a chain from a skill hit: still in the area at `unti
     std::int32_t dmg = 0;  // the second hit when it pulls (= the first hit)
     SubElement sub = SubElement::Physical;
     bool physical = true;
+    bool to_anchor = false;  // [U-524] only a line (a grapple): from the caster to the anchor
 };
 struct ElevLayer {  // [U-440] one raise of the ground on one cell: they ADD UP and each ends on its own
     std::int16_t x = 0, y = 0;
@@ -597,6 +609,10 @@ public:
     [[nodiscard]] bool only_mud_source(const Unit& u, std::int32_t sx, std::int32_t sy) const;  // [U-513] bent from mud: half the water
     [[nodiscard]] std::string_view missing_need(const Unit& u, const SkillDef& d) const;  // [U-510] what the skill relies on and is not here
     void animate_hitbox(Effect& e);  // [U-510] SkillDef::keys
+    void start_pull(Unit& u, std::int32_t to_x, std::int32_t to_y, std::int32_t speed);  // [U-524] sub, units per s
+    bool step_pull(Unit& u);                                                              // true while it flies
+    bool pin_to_wall(const Effect& e, Unit& o);                                           // [U-524]
+    void grapple_hit(Effect& e, Unit* unit, std::int32_t x, std::int32_t y);              // [U-524] x, y in units
     [[nodiscard]] bool rock_source_at(std::int32_t x, std::int32_t y) const;  // a puddle is used up, an ice wall melts a bit
     [[nodiscard]] static bool water_skill(const SkillDef& d) { return base_element(d.sub) == Element::Water; }
     [[nodiscard]] bool elevated(const Unit& u) const;       // flying or riding water → melee / ground can't hit
@@ -727,7 +743,7 @@ public:
     }
     void heal(Unit& u, std::int32_t hundredths, const Unit* from = nullptr);  // [U-484] from = who gives it
     void apply_cc(const Stats& src_stats, std::uint32_t src_id, Unit& dst, StatusKind k, std::int32_t ms,
-                  std::int32_t value, SubElement sub = SubElement::Physical);
+                  std::int32_t value, SubElement sub = SubElement::Physical, int rule = 0);
     void knock(Unit& dst, std::int32_t from_x, std::int32_t from_y, std::int32_t dist_units, std::uint32_t src_id = 0);
     static constexpr std::int32_t kKnockSpeed = 1'200;  // [U-368] units / s: a displacement holds the unit dist / speed
     static constexpr std::uint8_t kCcDisplaced = 254;   // [U-368] TakenHit::cc marker for a displacement
@@ -742,6 +758,7 @@ public:
     bool lol_crit(const Unit& u, std::int32_t& dmg);
     void lol_on_hit(Unit& u, Unit& target, bool physical);
     bool lol_fear_step(Unit& u);
+    void lol_step_sleep(Unit& u);  // [U-524]
     [[nodiscard]] bool lol_silenced(const Unit& u) const;
     static void lol_modified_power(Stats& s, const ChampionDef& c);  // [U-482] skill / magic power → ability power
     [[nodiscard]] std::int64_t lol_healing(const Unit& u, std::int64_t hundredths) const;

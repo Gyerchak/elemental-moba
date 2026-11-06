@@ -160,6 +160,7 @@ void World::cast_skill(Unit& u, Slot slot, std::int32_t tx, std::int32_t ty, std
     e.owner = u.id;
     e.def = &d;
     e.geo = std::uint8_t(d.geo), e.inner = d.inner;  // [U-461][U-462] the shape rule + the sweet spot
+    e.heat = d.heat, e.sweet_heat = d.sweet_heat;    // [U-523]
     e.sweet_zone = std::uint8_t(d.sweet_zone), e.sweet_size = std::uint8_t(d.sweet_size);
     if (d.casts > 1 && u.cast_stage < d.stages.size() && d.stages[u.cast_stage].kind != SkillKind::None) {
         const SkillDef::CastStage& st = d.stages[u.cast_stage];
@@ -196,6 +197,12 @@ void World::cast_skill(Unit& u, Slot slot, std::int32_t tx, std::int32_t ty, std
     e.src = u.stats;
     e.tick_ms = d.tick_ms;
     e.light = std::int32_t(r.light_radius);
+    if (const HeatLevel* hl = heat_of(d.heat)) {  // [U-523] temperature: strength, speed, burn, light
+        e.damage = e.damage * hl->dmg_pct / 100;
+        r.speed = r.speed * hl->speed_pct / 100;
+        if (e.cc == StatusKind::Burn) e.cc_val = e.cc_val * hl->burn_pct / 100;
+        e.light = e.light * hl->light_pct / 100;
+    }
     if (e.light > 0) e.light_until = 0;  // set when the effect ends
     if (e.geo != std::uint8_t(Geo::Auto)) e.width = std::int32_t(r.width), e.length = std::int32_t(r.range);  // [U-462][U-510] a chosen shape uses its own numbers at every kind
     const std::int32_t speed_sub = std::int32_t(std::max<std::int64_t>(1, r.speed) * kSub / cfg.tick_hz);

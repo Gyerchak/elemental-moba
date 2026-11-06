@@ -16,7 +16,7 @@ void World::heal(Unit& u, std::int32_t hundredths, const Unit* from) {
 }
 
 void World::apply_cc(const Stats& src_stats, std::uint32_t src_id, Unit& dst, StatusKind k, std::int32_t ms,
-                     std::int32_t value, SubElement sub) {
+                     std::int32_t value, SubElement sub, int rule) {
     if (k == StatusKind::Count || ms <= 0 || !dst.alive) return;
     if (dst.is_structure()) return;
     if (dst.st.has(StatusKind::DebuffImmune) && (is_cc(k) || k == StatusKind::Burn || k == StatusKind::Grievous || k == StatusKind::Wet))
@@ -31,7 +31,7 @@ void World::apply_cc(const Stats& src_stats, std::uint32_t src_id, Unit& dst, St
     }
     // [U-190] swimming: freezing / slowing CC lasts 50 % longer
     if (dst.st.has(StatusKind::Swimming) && (k == StatusKind::Frozen || k == StatusKind::Slow)) ms = ms * 3 / 2;
-    dst.st.apply(k, now_ms, ms, value, src_id, src_stats, dst.stats);  // [U-127]
+    dst.st.apply(k, now_ms, ms, value, src_id, src_stats, dst.stats, rule);  // [U-127][U-524]
     if (dst.kind == UnitKind::Champion && is_cc(k)) {  // [U-343] the death recap lists crowd control too
         const Unit* src = find(src_id);
         TakenHit h{now_ms, src_id, dmg_tag_, 0, 0, std::uint8_t(sub), false};
@@ -158,6 +158,12 @@ void World::deal_damage(Unit* src, Unit& dst, std::int32_t points, SubElement su
 
 void World::apply_hit(Unit* src, Unit& dst, std::int32_t hund, SubElement sub, bool physical, bool is_auto) {
     if (!dst.alive || hund <= 0) return;
+    // [U-524] LoL sleep: a hit (not a burn) wakes it, and the waking hit is stronger
+    if (dst.st.has(StatusKind::Sleep) && dmg_tag_.from != DmgFrom::Burn) {
+        hund = std::int32_t(std::int64_t(hund) * (100 + dst.st.value(StatusKind::Sleep)) / 100);
+        dst.st.remove(StatusKind::Sleep);
+    }
+    if (dst.sleep_at && dmg_tag_.from != DmgFrom::Burn) dst.sleep_at = 0, dst.st.remove(StatusKind::Drowsy);  // (woken before it fell asleep)
     // [U-286] wet + fire: the first fire hit (skill, autoattack or burn) loses 25 %, and the water is gone.
     // Lightning is not part of this: water conducts it (+25 %, effects.cpp).
     if (fire_family(sub) && sub != SubElement::Lightning && dst.st.has(StatusKind::Wet) && dmg_type_ < 2) {  // ([U-492] absolute ignores it)
@@ -547,6 +553,7 @@ void World::on_kill(Unit* killer, Unit& dead) {
     dead.casting = false;
     // [U-508] the body keeps no shields, burns, hastes … (they were drawn on it), a channel dies with its channeller
     dead.st.clear();
+    dead.pulled = false, dead.sleep_at = 0, dead.pend_cc = StatusKind::Count;  // [U-524]
     dead.burn_acc = 0;
     dead.windup_end_ms = 0;
     if (dead.channel_end_ms) {

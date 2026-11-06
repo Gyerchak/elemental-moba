@@ -58,7 +58,7 @@ def graph(prompt, prefix, seed):
 
 def art():
     RAW.mkdir(parents=True, exist_ok=True)
-    out_dir = Path.home() / "ComfyUI" / "output"
+    out_dir = Path(os.environ.get("EM_COMFY_OUT", Path.home() / "ComfyUI" / "output"))  # ComfyUI's --output-directory
     for n, (mid, what) in enumerate(MOBS.items()):
         dst = RAW / f"{mid}.png"
         if dst.exists():

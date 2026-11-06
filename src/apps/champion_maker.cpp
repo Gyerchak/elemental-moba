@@ -130,7 +130,7 @@ const std::vector<std::string_view> kSubNames = {"Water", "Ice", "Wood", "Blood"
 const std::vector<std::string_view> kGeoNames = {"Auto", "Circle", "Ring", "Line", "Rect", "Cone", "Arc", "Square", "Triangle", "Ellipse", "Diamond", "Hexagon", "Star", "Custom"};
 const std::vector<std::string_view> kZoneNames = {"Auto", "Centre", "Edge", "Tip", "Band"};
 const std::vector<std::string_view> kCcNames = {"Stun", "Root", "Slow", "Silence", "ChiBlock", "Airborne", "Frozen", "Blind", "Burn", "Shield", "Haste", "Flying", "Bloodbound", "Channel", "Swimming", "WaterRide",
-                                                "Redirect", "Wet", "Grievous", "Fear", "Disarm", "Subdue", "Hex", "Break", "DebuffImmune", "Polymorph", "Invisible", "None"};
+                                                "Redirect", "Wet", "Grievous", "Fear", "Disarm", "Subdue", "Hex", "Break", "DebuffImmune", "Polymorph", "Invisible", "Sleep", "Drowsy", "Charm", "Taunt", "Terrify", "None"};
 const std::vector<std::string_view> kPassiveNames = {"None", "InnerFlame", "Static", "Rooted", "MetalSkin", "Molten", "Tide", "Frostbite", "LightFeet", "MistForm", "ChiFlow", "SeismicSense", "HeatSense", "FireInHand", "Lantern", "WindSense", "ElementalCycle"};
 const std::vector<std::string_view> kCatNames = {"Champion", "Minion", "SiegeMinion", "SuperMinion", "Monster", "EpicMonster", "Turret", "Inhibitor", "Shrine"};
 const std::vector<std::string_view> kNeeds(std::begin(kNeedNames), std::end(kNeedNames));
@@ -148,6 +148,8 @@ const std::vector<Page>& skill_pages() {
             Field{"kind", "Type", FT::Enum, 0, 0, 0, "What it does: Bolt flies and stops, Wave flies through, Burst hits at a point after a delay, Field stays, Cone is instant in front, Dash moves you …", [](const SkillDef& s) { return int(s.kind); }, kKindNames},
             Field{"sub", "Element / modifier", FT::Enum, 0, 0, 0, "Decides colour, sounds, resist, every element rule (Physical = no element)", [](const SkillDef& s) { return int(s.sub); }, kSubNames},
             SB("arcane", "Non-elemental magic", arcane, "Magic without an element: chi block and disarm do not stop it"),
+            Field{"heat", "Heat of fire", FT::Enum, 0, 0, 0, "Hotter: stronger, faster, brighter, burns longer, melts more. Its colour shows it", [](const SkillDef& s) { return int(s.heat); }, {"Usual", "Red 600", "Red 800", "Orange 1000", "Yellow 1400", "White 1600", "Blue 2000", "Blue 2500", "Blue 3000", "Blue 3333"}},
+            Field{"sweet_heat", "Heat in the sweet spot", FT::Enum, 0, 0, 0, "The sweet part of the shape can burn hotter than the rest", [](const SkillDef& s) { return int(s.sweet_heat); }, {"Same", "Red 600", "Red 800", "Orange 1000", "Yellow 1400", "White 1600", "Blue 2000", "Blue 2500", "Blue 3000", "Blue 3333"}},
             Field{"dmg_type", "Damage type", FT::Enum, 0, 0, 0, "Normal, True (ignores defence), Absolute (also ignores reductions)", [](const SkillDef& s) { return int(s.dmg_type); }, {"Normal", "True", "Absolute"}},
             SI("true_pct", "% as that type", true_pct, 0, 100, 5, "This % of the damage is the type above, the rest normal"),
             SB("targeted", "Click on an enemy", targeted, "Point and click instead of aiming (one per kit)"),
@@ -205,6 +207,13 @@ const std::vector<Page>& skill_pages() {
             SI("cc_ms_rank", "Lasts per rank (ms)", cc_ms_rank, -2000, 2000, 50, ""),
             SI("cc_val", "Strength", cc_val, 0, 2000, 5, "Slow %, burn hundredths of HP per second, blind %, chi block mask (1 water 2 earth 4 fire 8 air, 0 all)"),
             SI("cc_val_rank", "Strength per rank", cc_val_rank, -200, 200, 5, ""),
+            Field{"cc_rule", "The same effect again", FT::Enum, 0, 0, 0, "Keeps the longer time, adds the times together, or starts the time again", [](const SkillDef& s) { return int(s.cc_rule); }, {"Keeps the longer", "Adds up", "Starts again"}},
+            SI("sleep_delay_ms", "Sleep: drowsy first (ms)", sleep_delay_ms, 0, 5000, 50, "Effect Sleep: slowed this long, then asleep; a hit wakes it"),
+            SI("drowsy_slow", "Sleep: drowsy slow %", drowsy_slow, 0, 95, 5, ""),
+            SI("pin_range", "Pin: reach to a wall", pin_range, 0, 1000, 10, "A wall this close: the target is thrown into it, airborne on the way, then gets the effect above. No wall: no effect"),
+            SI("pin_ms", "Pin: held for (ms)", pin_ms, 0, 5000, 50, ""),
+            Field{"grapple", "Grapple", FT::Enum, 0, 0, 0, "A projectile that catches the first wall or unit: arms of water, a line of ice, a cable", [](const SkillDef& s) { return int(s.grapple); }, {"No", "Pulls me there", "Pulls the unit to me", "We meet halfway"}},
+            SI("grapple_speed", "Grapple speed", grapple_speed, 100, 5000, 50, ""),
             SI("knock", "Push distance", knock, 0, 1200, 10, "Pushes what it hits"),
             SI("knock_rank", "Push per rank", knock_rank, -300, 300, 10, ""),
             SI("dispel", "Dispel", dispel, 0, 2, 1, "1 basic, 2 strong: cleans the caster, strips buffs from enemies hit"),

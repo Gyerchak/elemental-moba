@@ -154,6 +154,9 @@ bool Settings::load(const std::string& path) {
         else if (k == "fx_sharpen") fx_sharpen = b;
         else if (k == "fx_water") fx_water = b;
         else if (k == "fx_particles") fx_particles = std::clamp(to_int(v, 3), 0, 3);
+        else if (k == "fx_skills") fx_skills = std::clamp(to_int(v, 3), 0, 3);
+        else if (k == "fx_own_pictures") fx_own_pictures = v == "1";
+        else if (k == "fx_animations") fx_animations = v == "1";
         else if (k == "resource_pack") resource_pack = v;
         else if (k == "show_other_skins") show_other_skins = b;
         else if (k == "force_own_skins") force_own_skins = b;
@@ -303,7 +306,7 @@ void Settings::save(const std::string& path) const {
         << "\nshow_rewards=" << show_rewards << "\nshow_names=" << show_names << "\ncolourblind=" << colourblind
         << "\nminimap=" << minimap << "\nshow_chat=" << show_chat << "\ntree_models=" << tree_models << "\nrender_quality=" << render_quality << "\nfx_preset=" << fx_preset << "\nfx_blend=" << fx_blend << "\nfx_shadows=" << fx_shadows
         << "\nfx_glow=" << fx_glow << "\nfx_lights=" << fx_lights << "\nfx_bloom=" << fx_bloom << "\nfx_grade=" << fx_grade << "\nfx_vignette=" << fx_vignette
-        << "\nfx_sharpen=" << fx_sharpen << "\nfx_water=" << fx_water << "\nfx_particles=" << fx_particles << '\n';
+        << "\nfx_sharpen=" << fx_sharpen << "\nfx_water=" << fx_water << "\nfx_particles=" << fx_particles << "\nfx_skills=" << fx_skills << "\nfx_own_pictures=" << (fx_own_pictures ? 1 : 0) << "\nfx_animations=" << (fx_animations ? 1 : 0) << '\n';
     out << "# ---- skins / resource packs\nresource_pack=" << resource_pack << "\nshow_other_skins=" << show_other_skins
         << "\nforce_own_skins=" << force_own_skins << "\nserver_skins_only=" << server_skins_only << '\n';
     out << "# ---- sound (0-100)\nvol_master=" << vol_master << "\nvol_music=" << vol_music << "\nvol_effects=" << vol_effects

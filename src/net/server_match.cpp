@@ -271,6 +271,7 @@ void Server::send_snapshot(Player& p) {
             const SkillDef::Visual& v = e.def->vis;
             n.vcol = v.colour, n.vfill = v.fill, n.vglow = v.glow, n.vtrail = v.trail, n.vflash = v.flash, n.vpart = v.particles, n.vmark_ms = v.mark_ms;
             n.sfrom = e.def->sweet_from;  // [U-510]
+            n.pad4 = e.heat, n.pad3 = e.sweet_heat;  // [U-523]
             if (e.geo == std::uint8_t(Geo::Custom)) {
                 NetFxPoly fp{};
                 fp.id = e.id, fp.n = e.def->npoly;
@@ -300,7 +301,7 @@ void Server::send_snapshot(Player& p) {
             const Unit* s = W.find(t.src);
             const Unit* d = W.find(t.dst);
             if (!s || !d || (!W.visible_to(team, *s) && !W.visible_to(team, *d))) continue;
-            ts.push_back({s->ux(), s->uy(), d->ux(), d->uy(), t.ax, t.ay, std::int16_t(t.radius), std::uint8_t(s->team),
+            ts.push_back({s->ux(), s->uy(), t.to_anchor ? t.ax : d->ux(), t.to_anchor ? t.ay : d->uy(), t.ax, t.ay, std::int16_t(t.radius), std::uint8_t(s->team),
                           std::uint8_t(t.def ? t.def->sub : SubElement::Physical), std::int32_t(t.until_ms - W.now_ms),
                           t.def ? t.def->tether_ms : 1});
         }

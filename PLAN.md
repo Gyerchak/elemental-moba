@@ -293,3 +293,8 @@ clang 22 and GCC 16 (`README.md` → Build / Play).
 - [ ] Everything made locally; then another bug hunt
 - [ ] Fire heat levels [U-523]: red 600, red 800, orange 1000 (basic), yellow 1400, white, blue 2000, 2500, 3000, 3333: own graphic and physics each; heat in fire sweet spots
 - [ ] All skill graphics better, with settings under the champion graphics [U-523]
+- [ ] Ice dash / water arms: attach to walls or champions, pull self or grab them; metal cables too; pin into a wall (near walls only: fast move, then CC; displacement + airborne) [U-524]
+- [ ] CC time rules per skill: stack / refresh / refresh if longer; LoL sleep; every kind of fear in lol.cpp [U-524]
+- [ ] Update maker, graphics, effects, locale; bug checks; Windows and macOS work like Linux; push [U-524]
+- [ ] Missing effects, sfx, sounds; better sounds; missing models for own champions; basic + alternative texture pack; packs change anything [U-525]
+- [ ] Server versions saved as "server v1 DATE", new only when the content changed [U-525]

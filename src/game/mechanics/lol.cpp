@@ -37,19 +37,47 @@ void World::lol_on_hit(Unit& u, Unit& target, bool physical) {
     if (extra > 0) deal_damage(&u, target, std::int32_t(extra), physical ? SubElement::Physical : champions()[std::size_t(u.champ)].sub, physical, true);  // (lifesteal counts, like LoL)
 }
 
-// Fear: the unit cannot act and runs straight away from the one who scared it (if it can move at all).
-// Returns true when the unit is feared (its normal step is skipped).
+// Fear and its kinds: the unit cannot act, its feet are not its own. Returns true when one holds it (its normal step is skipped).
+//   Fear:    runs straight away from the one who scared it
+//   Terrify: runs in panic, the direction changes every half second
+//   Charm:   walks to the one who charmed it
+//   Taunt:   walks to the one who taunted it and attacks it
 bool World::lol_fear_step(Unit& u) {
-    if (!u.st.has(StatusKind::Fear) || u.is_structure()) return false;
-    u.windup_end_ms = std::min<std::int64_t>(u.windup_end_ms, 0);
+    if (!u.st.driven() || u.is_structure()) return false;
     u.casting = false;
-    const Unit* src = find(u.st.source_of(StatusKind::Fear));
-    const bool held = u.st.has(StatusKind::Stun) || u.st.has(StatusKind::Airborne) || u.st.has(StatusKind::Root) || u.st.has(StatusKind::Frozen) || u.st.has(StatusKind::Bloodbound);
-    if (src && !held) {
-        const Dir away = dir_of(std::int64_t(u.ux()) - src->ux(), std::int64_t(u.uy()) - src->uy());
-        move_towards(u, u.x + away.x * 200 / kOne * kSub, u.y + away.y * 200 / kOne * kSub, move_speed_sub(u));
+    const bool held = u.st.has(StatusKind::Stun) || u.st.has(StatusKind::Airborne) || u.st.has(StatusKind::Root) || u.st.has(StatusKind::Frozen) ||
+                      u.st.has(StatusKind::Bloodbound) || u.st.has(StatusKind::Sleep);
+    if (u.st.has(StatusKind::Taunt) && !u.st.has(StatusKind::Fear) && !u.st.has(StatusKind::Terrify) && !u.st.has(StatusKind::Charm)) {
+        Unit* src = find(u.st.source_of(StatusKind::Taunt));
+        if (src && src->alive && !held) {
+            u.order = {OrderKind::Attack, src->id};
+            update_attack(u);
+        }
+        return true;
+    }
+    u.windup_end_ms = std::min<std::int64_t>(u.windup_end_ms, 0);
+    if (held) return true;
+    const std::int32_t sp = move_speed_sub(u);
+    if (u.st.has(StatusKind::Terrify)) {
+        const Dir d = kDirs[std::size_t(mix_hash(u.id + 77, std::uint32_t(now_ms / 500))) & 63];
+        move_towards(u, u.x + d.x * 200 / kOne * kSub, u.y + d.y * 200 / kOne * kSub, sp);
+    } else if (u.st.has(StatusKind::Fear)) {
+        if (const Unit* src = find(u.st.source_of(StatusKind::Fear))) {
+            const Dir away = dir_of(std::int64_t(u.ux()) - src->ux(), std::int64_t(u.uy()) - src->uy());
+            move_towards(u, u.x + away.x * 200 / kOne * kSub, u.y + away.y * 200 / kOne * kSub, sp);
+        }
+    } else if (u.st.has(StatusKind::Charm)) {
+        if (const Unit* src = find(u.st.source_of(StatusKind::Charm)); src && src->alive) move_towards(u, src->x, src->y, sp);
     }
     return true;
+}
+
+// Sleep (like Lillia, Zoe): first drowsy, then asleep; a hit wakes it. World::apply_hit does the waking.
+void World::lol_step_sleep(Unit& u) {
+    if (!u.sleep_at || u.sleep_at > now_ms) return;
+    u.sleep_at = 0;
+    u.st.remove(StatusKind::Drowsy);
+    if (const Unit* s = find(u.sleep_src)) apply_cc(s->stats, u.sleep_src, u, StatusKind::Sleep, u.sleep_ms, u.sleep_val);
 }
 
 }  // namespace em

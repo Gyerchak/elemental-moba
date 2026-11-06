@@ -308,7 +308,9 @@ void World::step_units() {
                         }
                     }
         }
-        if (!u.st.has(StatusKind::Fear))  // [U-472] a feared unit only runs (below)
+        lol_step_sleep(u);  // [U-524]
+        if (step_pull(u)) continue;  // [U-524] thrown or pulled: only that happens
+        if (!u.st.driven())  // [U-472][U-524] a feared, charmed … unit only does that (below)
         switch (u.kind) {
             case UnitKind::Minion: step_minion(u); break;
             case UnitKind::Turret:
@@ -438,6 +440,97 @@ void World::step_units() {
     }
 }
 
+// [U-524] thrown or pulled: straight there, fast; a wall or the end of the way stops it; then what was waiting (a pin's CC)
+void World::start_pull(Unit& u, std::int32_t to_x, std::int32_t to_y, std::int32_t speed) {
+    if (u.is_structure() || u.kind == UnitKind::Boss || !u.alive) return;
+    interrupt(u, kIntKnock);
+    for (Effect& f : fx)
+        if (f.owner == u.id && f.def && f.def->kind == SkillKind::Dash) f.dead = true;
+    u.casting = false, u.order = {}, u.path.clear(), u.windup_end_ms = 0;
+    u.pulled = true;
+    u.pull_x = to_x, u.pull_y = to_y;
+    u.pull_step = std::max(1, speed) * kSub / std::int32_t(cfg.tick_hz);
+}
+
+bool World::step_pull(Unit& u) {
+    if (!u.pulled) return false;
+    const std::int64_t dx = u.pull_x - u.x, dy = u.pull_y - u.y, d = isqrt(dx * dx + dy * dy);
+    bool done = d <= u.pull_step;
+    if (!done) {
+        const std::int32_t nx = u.x + std::int32_t(dx * u.pull_step / d), ny = u.y + std::int32_t(dy * u.pull_step / d);
+        if (walkable_at(u, nx, ny)) u.x = nx, u.y = ny, u.moving = true;
+        else done = true;  // the wall itself: it stops right there
+    }
+    if (done) {
+        u.pulled = false;
+        if (u.pend_cc != StatusKind::Count) {
+            const StatusKind k = u.pend_cc;
+            u.pend_cc = StatusKind::Count;
+            if (const Unit* s = find(u.pend_src)) apply_cc(s->stats, u.pend_src, u, k, u.pend_ms, u.pend_val, SubElement(u.pend_sub));
+            Effect flash;  // the hit on the wall
+            flash.kind = FxKind::Burst, flash.team = u.team == Team::FireNation ? Team::EarthNation : Team::FireNation;
+            flash.sub = SubElement(u.pend_sub), flash.flow = flow_of(flash.sub);
+            flash.x = u.x, flash.y = u.y, flash.radius = 70, flash.arm_ms = now_ms, flash.end_ms = now_ms + 250;
+            fx_pending_.push_back(flash);
+        }
+    }
+    return true;
+}
+
+// [U-524] a pin: into the nearest wall within reach (the direction of the skill first): displaced + airborne on the way, then the CC
+bool World::pin_to_wall(const Effect& e, Unit& o) {
+    const std::int32_t reach = e.def->pin_range;
+    std::int64_t best = -1;
+    std::int32_t bx = 0, by = 0;
+    for (int a = 0; a < 64; a += 2) {
+        const Dir d = kDirs[std::size_t(a)];
+        const std::int64_t along = (std::int64_t(d.x) * e.dir.x + std::int64_t(d.y) * e.dir.y) / kOne;  // behind the target as seen from the skill
+        for (std::int32_t r = 16; r <= reach; r += 16) {
+            const std::int32_t x = o.ux() + std::int32_t(std::int64_t(d.x) * r / kOne), y = o.uy() + std::int32_t(std::int64_t(d.y) * r / kOne);
+            const int cx = x / kCellUnits, cy = y / kCellUnits;
+            if (!Grid::in_bounds(cx, cy)) break;
+            if (grid.at(cx, cy).wall() == Wall::None) continue;
+            const std::int64_t score = std::int64_t(r) * kOne * 2 - along * reach;  // near first, the way it was hit first
+            if (best < 0 || score < best) best = score, bx = x, by = y;
+            break;
+        }
+    }
+    if (best < 0) return false;
+    const std::int32_t speed = 2'000;
+    const std::int64_t ms = isqrt(dist2(o.ux(), o.uy(), bx, by)) * 1'000 / speed + 60;
+    start_pull(o, bx * kSub, by * kSub, speed);
+    o.st.add(StatusKind::Airborne, now_ms + ms, 0, e.owner);
+    o.pend_cc = e.cc != StatusKind::Count ? e.cc : StatusKind::Stun, o.pend_ms = e.def->pin_ms, o.pend_val = e.cc_val, o.pend_src = e.owner, o.pend_sub = std::uint8_t(e.sub);
+    return true;
+}
+
+// [U-524] a grapple caught something: 1 pulls me there, 2 pulls the unit to me, 3 both meet in the middle
+void World::grapple_hit(Effect& e, Unit* unit, std::int32_t x, std::int32_t y) {
+    Unit* owner = find(e.owner);
+    if (!owner || !owner->alive || !e.def) return;
+    const int mode = e.def->grapple;
+    const std::int32_t speed = e.def->grapple_speed;
+    const std::int64_t ms = isqrt(dist2(owner->ux(), owner->uy(), x, y)) * 1'000 / std::max<std::int32_t>(1, speed) + 80;
+    if (mode == 1 || (mode == 3 && !unit)) {
+        owner->ghost_until = now_ms + ms;
+        start_pull(*owner, x * kSub, y * kSub, speed);
+    } else if (mode == 2 && unit) {
+        unit->st.add(StatusKind::Airborne, now_ms + ms, 0, e.owner);
+        start_pull(*unit, owner->x, owner->y, speed);
+    } else if (mode == 3 && unit) {
+        const std::int32_t mx = (owner->x + unit->x) / 2, my = (owner->y + unit->y) / 2;
+        owner->ghost_until = now_ms + ms / 2;
+        start_pull(*owner, mx, my, speed);
+        start_pull(*unit, mx, my, speed);
+    } else {
+        return;
+    }
+    Tether line;  // the arm of water, the cable: only seen
+    line.src = owner->id, line.dst = unit ? unit->id : owner->id;
+    line.ax = x, line.ay = y, line.until_ms = now_ms + ms, line.def = e.def, line.sub = e.sub, line.to_anchor = true;
+    tethers.push_back(line);
+}
+
 void World::respawn(Unit& u) {
     const auto [fx_, fy_] = fountain(u.team);
     u.alive = true;
@@ -450,6 +543,7 @@ void World::respawn(Unit& u) {
     // [U-383] nothing of the last life carries over
     u.riding = false, u.steer_until = 0, u.draw_pts.clear(), u.channel_end_ms = 0, u.windup_end_ms = 0;
     u.untargetable_until = 0, u.flask_revive = 0, u.emote = 255;
+    u.pulled = false, u.sleep_at = 0, u.pend_cc = StatusKind::Count;  // [U-524]
     // [U-508] … also the forms and windows that kept running while dead
     u.burn_acc = 0, u.transform_until = 0, u.tmp_size_until = 0, u.lotus_until = 0, u.flask_until = 0, u.magic_until = 0, u.chirush_until = 0;
     recompute_stats(u);

@@ -154,6 +154,10 @@ void App::options(bool in_game) {
             fx(tr("Vignette (darker screen edges)"), set_.fx_vignette);
             fx(tr("Sharpening"), set_.fx_sharpen);
             constexpr const char* kD[] = {"off", "low", "medium", "high"};
+            if (button(ren_, ui_, x, y, 640, 24, std::format("{}: {}", tr("Look of skills"), tr(kD[std::clamp(set_.fx_skills, 0, 3)])))) set_.fx_skills = (set_.fx_skills + 1) % 4, set_.fx_preset = 4, changed = true;  // [U-523]
+            y += 27;
+            fx(tr("Animations of models"), set_.fx_animations);  // [U-521]
+            fx(tr("Own pictures and sounds of skills"), set_.fx_own_pictures);
             if (button(ren_, ui_, x, y, 640, 24, std::format("{}: {}", tr("Skill particles"), tr(kD[std::clamp(set_.fx_particles, 0, 3)])), set_.fx_particles > 0))
                 set_.fx_particles = (set_.fx_particles + 1) % 4, set_.fx_preset = 4, changed = true;
             y += 27;

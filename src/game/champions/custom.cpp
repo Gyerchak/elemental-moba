@@ -37,7 +37,7 @@ constexpr std::string_view kZones[] = {"Auto", "Centre", "Edge", "Tip", "Band"};
 constexpr std::string_view kSubs[] = {"Water", "Ice", "Wood", "Blood", "Mud", "Steam", "Air", "Earth", "Lava", "Metal", "EarthArmor",
                                       "MetalArmor", "Fire", "BlueFire", "Lightning", "Combustion", "Physical"};
 constexpr std::string_view kStatuses[] = {"Stun", "Root", "Slow", "Silence", "Mute", "Airborne", "Frozen", "Blind", "Burn", "Shield",
-                                          "Haste", "Flying", "Bloodbound", "Channel", "Swimming", "WaterRide", "Redirect", "Wet", "Grievous", "Fear", "Disarm", "Subdue", "Hex", "Break", "DebuffImmune", "Polymorph", "Invisible", "None"};
+                                          "Haste", "Flying", "Bloodbound", "Channel", "Swimming", "WaterRide", "Redirect", "Wet", "Grievous", "Fear", "Disarm", "Subdue", "Hex", "Break", "DebuffImmune", "Polymorph", "Invisible", "Sleep", "Drowsy", "Charm", "Taunt", "Terrify", "None"};
 // [U-474] "ChiBlock" = the chi block status (its wire / enum name is Mute)
 int status_index(std::string_view v);
 constexpr std::string_view kPassives[] = {"None", "InnerFlame", "Static", "Rooted", "MetalSkin", "Molten", "Tide", "Frostbite", "LightFeet", "MistForm",
@@ -134,6 +134,25 @@ const std::vector<SkillDef>& skill_templates() {
             s.keys[0] = {.at = 0, .rot = -60};
             s.keys[1] = {.at = 100, .rot = 60};
         });
+        // [U-524] grapples, pins, LoL crowd control
+        add("@ice_grapple", "A line of ice: it catches a wall or a unit and pulls you there", [](SkillDef& s) {
+            s.kind = SkillKind::Bolt, s.sub = SubElement::Ice, s.dmg = 0, s.dmg_rank = 0, s.ad = 0, s.range = 800, s.width = 50, s.speed = 2'200, s.cast_ms = 100, s.grapple = 1;
+        });
+        add("@water_grab", "Arms of water: they catch a unit and pull it to you", [](SkillDef& s) {
+            s.kind = SkillKind::Bolt, s.sub = SubElement::Water, s.range = 750, s.width = 90, s.speed = 1'800, s.grapple = 2;
+        });
+        add("@metal_cable", "A metal cable: it catches a wall or a unit and pulls you there", [](SkillDef& s) {
+            s.kind = SkillKind::Bolt, s.sub = SubElement::Metal, s.dmg = 0, s.dmg_rank = 0, s.ad = 0, s.range = 900, s.width = 40, s.speed = 2'400, s.cast_ms = 100, s.grapple = 1;
+        });
+        add("@wall_pin", "Throws the target into a wall close by and holds it there (no wall, no pin)", [](SkillDef& s) {
+            s.kind = SkillKind::Bolt, s.sub = SubElement::Earth, s.range = 800, s.width = 110, s.speed = 1'500, s.pin_range = 300, s.pin_ms = 1'400, s.cc = StatusKind::Stun;
+        });
+        add("@sleep_bolt", "Drowsy first, then asleep; a hit wakes it, stronger", [](SkillDef& s) {
+            s.kind = SkillKind::Bolt, s.range = 900, s.width = 90, s.speed = 1'300, s.cc = StatusKind::Sleep, s.cc_ms = 1'800, s.cc_val = 25, s.sleep_delay_ms = 1'200, s.arcane = true;
+        });
+        add("@charm", "The target walks to you", [](SkillDef& s) { s.kind = SkillKind::Bolt, s.range = 850, s.width = 80, s.speed = 1'500, s.cc = StatusKind::Charm, s.cc_ms = 1'400, s.arcane = true; });
+        add("@taunt", "The enemies around you walk to you and attack you", [](SkillDef& s) { s.kind = SkillKind::Burst, s.range = 0, s.radius = 280, s.cc = StatusKind::Taunt, s.cc_ms = 1'500; });
+        add("@terrify", "The target runs around in panic", [](SkillDef& s) { s.kind = SkillKind::Bolt, s.range = 800, s.width = 90, s.speed = 1'400, s.cc = StatusKind::Terrify, s.cc_ms = 1'300, s.arcane = true; });
         add("@mud_shot", "Throws mud that slows: needs mud or shallow water close by", [](SkillDef& s) {
             s.kind = SkillKind::Bolt, s.sub = SubElement::Mud, s.range = 800, s.width = 90, s.speed = 1'200, s.cc = StatusKind::Slow, s.cc_ms = 1'500,
             s.cc_val = 30, s.needs = kNeedMud;
@@ -537,6 +556,15 @@ std::string parse_text(const std::string& text, ChampionDef& out) {
             }
             else if (f == "needs_range") ok = num(sk.needs_range, 32, 3'000);
             else if (f == "light_ms") ok = num(sk.light_ms, 0, 60'000);
+            else if (f == "cc_rule") ok = num(sk.cc_rule, 0, 2);          // [U-524]
+            else if (f == "sleep_delay_ms") ok = num(sk.sleep_delay_ms, 0, 8'000);
+            else if (f == "drowsy_slow") ok = num(sk.drowsy_slow, 0, 95);
+            else if (f == "grapple") ok = num(sk.grapple, 0, 3);
+            else if (f == "grapple_speed") ok = num(sk.grapple_speed, 100, 6'000);
+            else if (f == "pin_range") ok = num(sk.pin_range, 0, 2'000);
+            else if (f == "pin_ms") ok = num(sk.pin_ms, 0, 8'000);
+            else if (f == "heat") ok = num(sk.heat, 0, 9);                // [U-523]
+            else if (f == "sweet_heat") ok = num(sk.sweet_heat, 0, 9);
             else if (f == "burrow") { std::int32_t b = 0; ok = num(b, 0, 1); sk.burrow = b != 0; }  // [U-50]
             else if (f == "lock_ms") ok = num(sk.lock_ms, 0, 60'000);    // [U-347]
             else if (f == "lock_slots") ok = num(sk.lock_slots, 0, 511);

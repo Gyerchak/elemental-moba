@@ -562,6 +562,7 @@ void World::hit_wall(Effect& e, const Unit* owner, int cx, int cy) {
         const std::int32_t kind_bonus = w == Wall::Stone ? s.wall_damage_stone : w == Wall::Ice ? s.wall_damage_ice : s.wall_damage_metal;
         pct = pct * (10'000 + s.wall_damage + kind_bonus) / 10'000;
     }
+    if (const HeatLevel* hl = heat_of(e.heat); hl && w == Wall::Ice) pct = pct * hl->melt_pct / 100;  // [U-523] hotter fire melts ice faster
     damage_wall(cx, cy, std::int32_t(std::max<std::int64_t>(1, e.damage) * pct / 100), e.dir);
 }
 

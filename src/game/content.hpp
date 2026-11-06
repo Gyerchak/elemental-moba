@@ -24,6 +24,21 @@ enum class Geo : std::uint8_t { Auto, Circle, Ring, Line, Rect, Cone, Arc, Squar
 // projectiles: Tip 20). Centre = the middle sweet_size % of the shape; Edge = its outer sweet_size %; Tip = the last
 // sweet_size % of a projectile's flight. [U-510] Band = custom: from sweet_from % of the shape, sweet_size % wide.
 enum class SweetZone : std::uint8_t { Auto, Centre, Edge, Tip, Band };
+// [U-523] fire heat levels: the hotter, the stronger and faster, the brighter and the more it melts.
+struct HeatLevel {
+    const char* name;
+    std::int16_t celsius, dmg_pct, speed_pct, burn_pct, light_pct, melt_pct;
+    std::uint32_t colour, core;
+};
+inline constexpr HeatLevel kHeat[] = {
+    {"Red 600", 600, 70, 85, 60, 60, 40, 0x7a1408, 0xc8341a},      {"Red 800", 800, 85, 92, 80, 80, 70, 0xb0200c, 0xe8502a},
+    {"Orange 1000", 1000, 100, 100, 100, 100, 100, 0xff6a14, 0xffb050}, {"Yellow 1400", 1400, 115, 106, 125, 120, 140, 0xffc828, 0xfff0a0},
+    {"White 1600", 1600, 130, 112, 150, 140, 180, 0xfff0d8, 0xffffff}, {"Blue 2000", 2000, 150, 118, 180, 160, 240, 0x8ccaff, 0xeaf6ff},
+    {"Blue 2500", 2500, 170, 124, 210, 180, 300, 0x4c98ff, 0xcfe6ff}, {"Blue 3000", 3000, 190, 130, 240, 200, 380, 0x2c62f0, 0xb4d0ff},
+    {"Blue 3333", 3333, 210, 136, 270, 220, 460, 0x2438d8, 0xa0b8ff},
+};
+[[nodiscard]] constexpr const HeatLevel* heat_of(int level) { return level >= 1 && level <= int(std::size(kHeat)) ? &kHeat[level - 1] : nullptr; }
+
 // [U-510] what a skill relies on near the caster (SkillDef::needs, all marked ones must be there within needs_range):
 inline constexpr std::uint16_t kNeedEarth = 1, kNeedWater = 2, kNeedMud = 4, kNeedRock = 8, kNeedIce = 16, kNeedLava = 32, kNeedTree = 64,
                                kNeedNight = 128, kNeedDay = 256, kNeedMetal = 512, kNeedFire = 1024;
@@ -264,6 +279,15 @@ struct SkillDef {
     std::array<std::int8_t, 24> poly{};  // Geo::Custom: forward, side pairs in % of radius (at most 12 corners)
     std::uint8_t npoly = 0;
     std::uint16_t needs = 0;       // kNeed… bits
+    // ---- [U-524]
+    std::uint8_t cc_rule = 0;      // the same CC again: 0 keeps the longer time, 1 adds the times, 2 starts the time again
+    std::int16_t sleep_delay_ms = 0, drowsy_slow = 40;  // Sleep: first drowsy this long (slowed by this %), then asleep
+    std::uint8_t grapple = 0;      // a Bolt that catches the first wall or unit: 1 pulls me to it, 2 pulls it to me (units), 3 both meet
+    std::int16_t grapple_speed = 1'600;
+    std::int16_t pin_range = 0;    // on a hit: a wall within this range: the target is thrown into it fast (displaced, airborne) …
+    std::int16_t pin_ms = 0;       // … then gets the skill's CC for this long. No wall close: no pin
+    // ---- [U-523] heat of a fire skill: 0 = its usual look (orange fire); 1 … 9 = HeatLevel (mechanics + look)
+    std::uint8_t heat = 0, sweet_heat = 0;
     bool burrow = false;           // [U-50] Dash: under the ground: cannot be seen or hit on the way, passes walls and units
     std::int32_t lock_ms = 0;      // [U-347] casting it puts my other skills on cooldown this long …
     std::uint16_t lock_slots = 0;  // … only these (bit per key: 1 P, 2 Q, 4 W, 8 E, 16 R, 32 T, 64 Y, 128 F, 256 G; 0 = all others)

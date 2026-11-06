@@ -1622,7 +1622,7 @@ void GameView::play_sounds(NetClient& net) {
         // [U-510] a champion's own sound for this skill: sounds/champions/<id>/cast_<p|w|e|r|t|y>.wav
         const Sound* own = nullptr;
         std::string own_name;
-        if (f.vchamp >= 0) {
+        if (set_.fx_own_pictures && f.vchamp >= 0) {
             own_name = "champions/" + Resources::champion_id(f.vchamp) + "/cast_" + std::string(1, "pwertyqfg"[std::min<int>(f.vslot, 8)]);
             own = res_.sound(own_name);
         }

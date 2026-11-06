@@ -128,6 +128,17 @@ constexpr SpecialRow kSpecialRows[] = {
                       .desc = "Travel under the ground: cannot be seen or hit on the way, passes walls", .needs = kNeedEarth, .burrow = true}},
     {Element::Water, {.name = "Ice Pillar", .kind = K::Pillar, .sub = S::Ice, .range = 600, .radius = 110, .cast_ms = 250, .cd_ms = 20'000, .cost = 40, .dur_ms = 4'000,
                       .desc = "Only on glacier or ice: raises the ground under the target", .needs = kNeedIce}},
+    // [U-524] arms of water, cables, pins
+    {Element::Water, {.name = "Ice Grapple", .kind = K::Bolt, .sub = S::Ice, .range = 800, .width = 50, .speed = 2'200, .cast_ms = 100, .cd_ms = 16'000, .cost = 30,
+                      .desc = "A line of ice: it catches a wall or a unit and pulls you there", .grapple = 1}},
+    {Element::Water, {.name = "Water Arms", .kind = K::Bolt, .sub = S::Water, .dmg = 60, .dmg_rank = 30, .ep = 35, .range = 750, .width = 90, .speed = 1'800, .cd_ms = 18'000, .cost = 40,
+                      .desc = "Arms of water catch a unit and pull it to you", .grapple = 2}},
+    {Element::Water, {.name = "Ice Pin", .kind = K::Bolt, .sub = S::Ice, .dmg = 70, .dmg_rank = 30, .ep = 40, .range = 750, .width = 100, .speed = 1'500, .cd_ms = 20'000, .cost = 40, .cc = C::Frozen,
+                      .desc = "Throws the target into a wall close by and freezes it there (no wall, no pin)", .pin_range = 300, .pin_ms = 1'300}},
+    {Element::Earth, {.name = "Metal Cable", .kind = K::Bolt, .sub = S::Metal, .range = 900, .width = 40, .speed = 2'400, .cast_ms = 100, .cd_ms = 16'000, .cost = 30,
+                      .desc = "A metal cable: it catches a wall or a unit and pulls you there", .grapple = 1}},
+    {Element::Earth, {.name = "Stone Pin", .kind = K::Bolt, .sub = S::Earth, .dmg = 80, .dmg_rank = 30, .ep = 40, .range = 800, .width = 110, .speed = 1'500, .cd_ms = 20'000, .cost = 40, .cc = C::Stun,
+                      .desc = "Throws the target into a wall close by and holds it there (no wall, no pin)", .pin_range = 300, .pin_ms = 1'400}},
 };
 
 }  // namespace em::data

@@ -17,7 +17,8 @@
 namespace em::net {
 
 inline constexpr std::size_t kLongStrMax = 16'000'000;  // [U-518] own champion files up to 64 KB, own maps up to 16 MB
-inline constexpr std::uint16_t kProtocol = 27;  // 27: version id, version download [U-374][U-375]
+inline constexpr std::uint16_t kProtocol = 28;  // 28: heat levels, new statuses [U-523][U-524]
+//inline constexpr std::uint16_t kProtocol = 27;  // 27: version id, version download [U-374][U-375]
 //inline constexpr std::uint16_t kProtocol = 26;  // 26: spectators, replays [X-19][X-20]
 //inline constexpr std::uint16_t kProtocol = 25;  // 25: server password, match timeline [U-371][U-374]
 //inline constexpr std::uint16_t kProtocol = 24;  // 24: own maps are sent to players [U-518]
@@ -286,9 +287,9 @@ struct NetFx {
     std::uint16_t vmark_ms;
     std::uint8_t geo, szone, ssize, spct;  // [U-461][U-462] shape rule, sweet zone / size, sweet % (0 = none)
     std::int16_t inner, sfrom;                  // [U-510] sfrom: where a custom sweet band starts, %
-    std::uint8_t life, pad4;                    // life 0 … 255 of the skill
+    std::uint8_t life, pad4;                    // life 0 … 255 of the skill; pad4 = heat level [U-523]
     std::int16_t vchamp;                        // [U-510] whose skill (−1 none): its picture and sound come from that champion's slot
-    std::uint8_t vslot, pad3;
+    std::uint8_t vslot, pad3;                   // pad3 = heat of the sweet spot [U-523]
 };
 
 // [U-510] the corners of a Geo::Custom skill (few skills: sent apart, so every other effect stays small)

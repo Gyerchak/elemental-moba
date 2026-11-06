@@ -525,7 +525,9 @@ void GameView::draw_units(NetClient& net, double now_s) {
                 if (anim == AnimSlot::Frozen) tint = mixc(tint, {150, 215, 255, 255}, 70);
                 // [U-508] statuses that had no look at all: fear = dark purple, hex / polymorph = small + coloured, invisible = see-through (only allies get it)
                 const bool critter = has_status(u, StatusKind::Hex) || has_status(u, StatusKind::Polymorph);
-                if (has_status(u, StatusKind::Fear)) tint = mixc(tint, {120, 60, 170, 255}, 55);
+                if (has_status(u, StatusKind::Fear) || has_status(u, StatusKind::Terrify)) tint = mixc(tint, {120, 60, 170, 255}, 55);
+                if (has_status(u, StatusKind::Charm)) tint = mixc(tint, {255, 170, 210, 255}, 45);  // [U-524]
+                if (has_status(u, StatusKind::Sleep)) tint = mixc(tint, {130, 130, 200, 255}, 45);
                 if (has_status(u, StatusKind::Hex)) tint = mixc(tint, {110, 230, 110, 255}, 60);
                 if (has_status(u, StatusKind::Polymorph)) tint = mixc(tint, {255, 160, 220, 255}, 60);
                 if (has_status(u, StatusKind::Invisible)) tint.a = 110;
@@ -533,6 +535,7 @@ void GameView::draw_units(NetClient& net, double now_s) {
                 float gy = view_.sy_h(du.y, lift);
                 if (anim == AnimSlot::Swim) gy += 14 * z;  // half in the water
                 Sprites::tilt = air_tilt;
+                if (!set_.fx_animations && u.alive) t = 0, hold = false;  // [U-521] still pictures
                 Sprites::draw(r_, *sheet, an, t, sprite_dir(float(u.fx), float(u.fy), view_.flip), view_.sx(du.x), gy,
                               z * float(u.size_pct) / 100.f * (critter ? 0.6f : 1.f), tint, hold);
                 Sprites::tilt = 0;
@@ -592,6 +595,25 @@ void GameView::draw_units(NetClient& net, double now_s) {
                         const float f = float(std::fmod(now_s * 1.2 + k * 0.33, 1.0));
                         fill_circle(r_, sx0 + float(k * 9 - 9) * z, view_.sy_h(du.y, lift + H * (1 - f)), 2 * z + 1, {120, 180, 255, std::uint8_t(220 * (1 - f))}, 6);
                     }
+                if (has_status(u, StatusKind::Sleep) || has_status(u, StatusKind::Drowsy)) {  // [U-524] Z z z rising from the head (drowsy: fewer, fainter)
+                    const bool deep = has_status(u, StatusKind::Sleep);
+                    for (int k = 0; k < (deep ? 3 : 1); ++k) {
+                        const float f = float(std::fmod(now_s * 0.7 + k * 0.33, 1.0));
+                        text(r_, sx0 + (6 + 12 * f) * z, view_.sy_h(du.y, lift + H + 10 + 40 * f), "Z", {200, 210, 255, std::uint8_t((deep ? 240 : 140) * (1 - f))}, 1.f + f * 0.8f);
+                    }
+                }
+                if (has_status(u, StatusKind::Charm))  // [U-524] hearts rising
+                    for (int k = 0; k < 3; ++k) {
+                        const float f = float(std::fmod(now_s * 0.9 + k * 0.33, 1.0)), hx = sx0 + float(k - 1) * 12 * z, hy = view_.sy_h(du.y, lift + H + 8 + 34 * f);
+                        const Rgba c{255, 120, 190, std::uint8_t(230 * (1 - f))};
+                        fill_circle(r_, hx - 2.2f * z, hy, 2.6f * z + 0.5f, c, 8), fill_circle(r_, hx + 2.2f * z, hy, 2.6f * z + 0.5f, c, 8);
+                        line(r_, hx - 4.6f * z, hy + 1, hx, hy + 6 * z, c), line(r_, hx + 4.6f * z, hy + 1, hx, hy + 6 * z, c);
+                    }
+                if (has_status(u, StatusKind::Taunt))  // [U-524] a red mark and a rage ring
+                    ground_ring(r_, view_, du.x, du.y, rb + 10 + 6 * ph, {255, 90, 50, std::uint8_t(220 * (1 - ph))}, 24);
+                if (has_status(u, StatusKind::Terrify))  // [U-524] shaking dark rings
+                    for (int k = 0; k < 2; ++k)
+                        ground_ring(r_, view_, du.x + std::sin(float(now_s) * 31 + float(k)) * 5, du.y + std::cos(float(now_s) * 27 + float(k)) * 5, rb + 8 + float(k) * 7, {120, 40, 110, 200}, 20);
                 if (has_status(u, StatusKind::Fear))  // [U-508] dark wisps circling above the head
                     for (int k = 0; k < 4; ++k) {
                         const float a = float(now_s * 4) + float(k) * 1.57f;
@@ -1004,6 +1026,10 @@ void GameView::draw_hits(NetClient& net, double now_s) {
     }
 }
 
+namespace {
+float rad_for_core(const net::NetFx& f) { return float(std::max<int>({int(f.radius), f.width / 2, 8})); }
+}  // namespace
+
 // ---------------------------------------------------------------- [U-459] the programmable skill look
 // Every skill effect is drawn on its EXACT hitbox (fx_shape = the server's shape); SkillDef::vis adds steps on top of
 // it: glow (soft edge rings), trail (where it was), particles (sparks inside the hitbox), flash (a ring at the start
@@ -1060,8 +1086,16 @@ void GameView::draw_fx_marks(double now_s) {
 // [U-456] a chain: a line from the caster to the target, the circle it must leave, and how long it has left
 void GameView::draw_tethers(NetClient& net, double /*now_s*/) {
     for (const net::NetTether& t : net.cur.tethers) {
-        const Rgba c = t.team == net.my_team ? Rgba{120, 190, 255, 255} : Rgba{255, 90, 70, 255};
+        Rgba c = t.team == net.my_team ? Rgba{120, 190, 255, 255} : Rgba{255, 90, 70, 255};
         const float q = t.total_ms > 0 ? std::clamp(float(t.left_ms) / float(t.total_ms), 0.f, 1.f) : 0.f;
+        if (t.radius == 0) {  // [U-524] a grapple: an arm of water, a line of ice, a cable
+            const SubElement gs = SubElement(t.sub);
+            c = gs == SubElement::Ice ? Rgba{190, 240, 255, 255} : gs == SubElement::Metal ? Rgba{180, 186, 200, 255} : hex(element_colour(base_element(gs)));
+            const float gx0 = view_.sx(float(t.sx)), gy0 = view_.sy_h(float(t.sy), 40), gx1 = view_.sx(float(t.dx)), gy1 = view_.sy_h(float(t.dy), 30);
+            for (int w = -2; w <= 2; ++w) line(r_, gx0 + float(w), gy0, gx1 + float(w), gy1, with_alpha(c, std::uint8_t(w == 0 ? 255 : 150)));
+            fill_circle(r_, gx1, gy1, 5 + view_.zoom * 3, c, 10);
+            continue;
+        }
         ground_ring(r_, view_, float(t.ax), float(t.ay), float(t.radius), with_alpha(c, 200), 64);
         ground_fill(r_, view_, float(t.ax), float(t.ay), float(t.radius) * (1 - q), with_alpha(c, 45), 48);  // fills up until it pulls
         const float x0 = view_.sx(float(t.sx)), y0 = view_.sy_h(float(t.sy), 40), x1 = view_.sx(float(t.dx)), y1 = view_.sy_h(float(t.dy), 40);
@@ -1141,6 +1175,11 @@ void GameView::draw_world(NetClient& net, double now_s) {
         if (Geo(f.geo) == Geo::Custom)
             for (const net::NetFxPoly& fp : cur.fx_polys)
                 if (fp.id == f.id) corners_pts = fp.pts, corners_n = fp.n;
+        const HeatLevel* heat = heat_of(f.pad4);  // [U-523] the fire's temperature decides its colour
+        if (heat) col = hex(heat->colour);
+        else if (fire_family(sub) && sub != SubElement::Lightning && sub != SubElement::BlueFire) col = hex(kHeat[2].colour);  // the basic fire: orange 1000
+        if (sub == SubElement::BlueFire && !heat) heat = &kHeat[5];
+        else if (fire_family(sub) && sub != SubElement::Lightning && !heat) heat = &kHeat[2];
         if (f.vcol) col = hex(f.vcol);  // [U-459] the skill's own colour
         if (k == FxKind::Burst && !f.armed) {  // telegraph: exact edge only (+ where the sweet spot will be [U-461])
             if (geo_is_poly(Geo(f.geo))) outline_poly(r_, view_, fx_poly(k, f.x, f.y, f.radius, f.width, f.length, {f.dx, f.dy}, Geo(f.geo), corners_pts, corners_n), with_alpha(col, 230), 2);  // [U-510]
@@ -1154,7 +1193,7 @@ void GameView::draw_world(NetClient& net, double now_s) {
         draw_fx_look(f, s, std::uint32_t(col.r) << 16 | std::uint32_t(col.g) << 8 | col.b, now_s);  // [U-459] glow / trail / sparks: under the body
         // [U-510] the skill's own picture: always the size of the hitbox, looping, once over its life, or growing with it
         bool pictured = false;
-        if (f.vchamp >= 0 && std::size_t(f.vchamp) < champions().size()) {
+        if (set_.fx_own_pictures && f.vchamp >= 0 && std::size_t(f.vchamp) < champions().size()) {
             const ChampionDef& cd = champions()[std::size_t(f.vchamp)];
             const SkillDef* const list[] = {&cd.p, &cd.w, &cd.e, &cd.r, &cd.t, &cd.y, &cd.q_own, &cd.f_own, &cd.g_own};
             const SkillDef::Visual& pv = list[std::min<int>(f.vslot, 8)]->vis;
@@ -1180,6 +1219,15 @@ void GameView::draw_world(NetClient& net, double now_s) {
         } else {
             if (!pictured) fill_shape(r_, view_, s, with_alpha(col, a));
             outline_shape(r_, view_, s, mixc(col, {255, 255, 255, 255}, 40), 1.5f);
+        }
+        // [U-523] the look of a skill by the setting: a hotter, brighter core inside the same hitbox, a living edge; 0 = flat
+        if (set_.fx_skills >= 1 && !pictured && k != FxKind::Auto && k != FxKind::TowerShot) {
+            const Rgba core = heat ? hex(heat->core) : mixc(col, {255, 255, 255, 255}, 45);
+            const float pulse = 0.5f + 0.5f * float(std::sin(now_s * 7.0 + double(f.seed % 100)));
+            Shape inner = s;
+            for (int ci = 0; ci < inner.n; ++ci) inner.c[std::size_t(ci)].r = std::max(1, inner.c[std::size_t(ci)].r * (55 + int(pulse * 8)) / 100);
+            if (!geo_is_poly(Geo(f.geo)) && Geo(f.geo) != Geo::Ring && Geo(f.geo) != Geo::Arc) fill_shape(r_, view_, inner, with_alpha(core, std::uint8_t(set_.fx_skills >= 3 ? a * 3 / 4 : a / 2)));
+            if (set_.fx_skills >= 2) soft_disc(r_, view_.sx(float(f.x)), view_.sy(float(f.y)), view_.rx(rad_for_core(f)), view_.ry(rad_for_core(f)), with_alpha(core, std::uint8_t(heat ? 110 : 60)), true);
         }
         if (f.inner > 0) ground_ring(r_, view_, float(f.x), float(f.y), float(f.inner), {0, 0, 0, 120}, 40);  // [U-462] the hole
         if (f.spct > 0) {  // [U-461] the sweet spot of this skill, on its real hitbox
