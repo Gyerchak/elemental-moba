@@ -5,6 +5,8 @@
 #include "game/match/maps.hpp"
 
 #include <enet/enet.h>
+#undef near  // (Windows headers define these words)
+#undef far
 
 #include <algorithm>
 #include <random>
@@ -163,7 +165,11 @@ void Server::send_all_cells(Player& p) {  // reconnect / late start: every cell 
 void Server::send_snapshot(Player& p) {
     const World& W = *world_;
     const Unit* me = W.find(p.unit);
-    static const Unit kNobody{};  // [X-20] a spectator: nobody's numbers, the chosen team's vision
+    static const Unit kNobody = [] {  // [X-20] a spectator: nobody's numbers, the chosen team's vision
+        Unit u;
+        u.champ = 0;
+        return u;
+    }();
     if (!me && !p.spectator) return;
     const Team team = me ? me->team : Team(p.spec_team);
     if (!me) me = &kNobody;

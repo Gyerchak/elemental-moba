@@ -7,6 +7,8 @@
 #include "game/match/maps.hpp"
 #include <SDL3/SDL.h>
 #include <enet/enet.h>
+#undef near  // (Windows headers define these words)
+#undef far
 
 #include <csignal>
 #include <filesystem>

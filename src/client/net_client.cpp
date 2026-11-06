@@ -8,6 +8,8 @@
 #include "game/match/maps.hpp"
 
 #include <enet/enet.h>
+#undef near  // (Windows headers define these words)
+#undef far
 
 #include <algorithm>
 #include <chrono>

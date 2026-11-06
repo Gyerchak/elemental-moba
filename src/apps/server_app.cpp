@@ -4,6 +4,8 @@
 //                             --port N  --map NAME  --version NAME  --tick N  --unranked  --language CODE
 // The champion maker's output (custom_champions/*.champ) is sent to every player who joins.
 #include <enet/enet.h>
+#undef near  // (Windows headers define these words)
+#undef far
 
 #include <algorithm>
 #include <atomic>

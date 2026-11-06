@@ -2,6 +2,8 @@
 // chat channels, skins, and the answer to a server-list ping.
 #include <random>
 #include <enet/enet.h>
+#undef near  // (Windows headers define these words)
+#undef far
 
 #include <algorithm>
 #include <format>

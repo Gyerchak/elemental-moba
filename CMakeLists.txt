@@ -9,6 +9,9 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)  # [U-02]
 endif()
 add_compile_options(-Wall -Wextra -Wpedantic)
+if(WIN32)  # [U-213] Windows headers must keep their hands off our names
+  add_compile_definitions(NOMINMAX WIN32_LEAN_AND_MEAN)
+endif()
 
 add_library(em_core STATIC src/map/default_map.cpp src/map/twisted_grove.cpp)
 target_include_directories(em_core PUBLIC src)
@@ -28,6 +31,9 @@ pkg_check_modules(SDL3TTF REQUIRED IMPORTED_TARGET sdl3-ttf)  # [U-250] real fon
 file(GLOB EM_NET_SRC CONFIGURE_DEPENDS src/net/*.cpp)
 add_library(em_net STATIC ${EM_NET_SRC} src/client/net_client.cpp)
 target_link_libraries(em_net PUBLIC em_game PkgConfig::ENET)
+if(WIN32)
+  target_link_libraries(em_net PUBLIC ws2_32 winmm)
+endif()
 file(GLOB_RECURSE EM_CLIENT_SRC CONFIGURE_DEPENDS src/client/*.cpp)
 list(FILTER EM_CLIENT_SRC EXCLUDE REGEX "net_client\\.cpp$")
 # [U-510][U-511] what the game, the champion maker and the server app share

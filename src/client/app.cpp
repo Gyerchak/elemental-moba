@@ -184,6 +184,7 @@ int App::run() {
         c.start_ms = opt_.start_ms;
         c.first_wave_ms = opt_.first_wave_ms;
         c.players_are_bots = opt_.autoplay;
+        if (!opt_.practice_map.empty() && map_index(opt_.practice_map) >= 0) c.map = map_index(opt_.practice_map);  // [U-518] (tests)
         std::string err;
         if (!start_server(c, &err)) {
             SDL_Log("server: %s", err.c_str());
