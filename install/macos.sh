@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Elemental MOBA — install on macOS (Homebrew). bash install/macos.sh
 set -euo pipefail
-echo "NOTE: the game is Vulkan only [U-496]; macOS has no native Vulkan, so it will probably refuse to start there."
+echo "NOTE: macOS runs on Metal: everything works, without the post effects (bloom, water shader) there."
 command -v brew >/dev/null || { echo "Install Homebrew first: https://brew.sh"; exit 1; }
 brew install git cmake ninja llvm sdl3 sdl3_ttf enet
 GAME="$HOME/elemental-moba"

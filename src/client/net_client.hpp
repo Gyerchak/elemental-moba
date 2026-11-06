@@ -140,6 +140,9 @@ public:
     std::string password;                    // [U-374] of the next server I join
     bool fetch_version = false;              // [U-374] the next connection only downloads the server's game version
     std::string downloaded_version;          //         … done: its name
+    std::string server_version_id, server_name_seen;  // [U-525]
+    int version_expected = 0;
+    std::vector<std::pair<std::string, std::string>> version_got;
     bool spectator = false;                  // [X-20] the next join only watches
     int spec_team = 0, replay_speed = 100;   // whose vision, replay speed % (0 = pause)
     void send_spectate();

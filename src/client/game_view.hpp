@@ -112,7 +112,9 @@ private:
     int fog_fade_t_ = -1;
     std::vector<std::uint32_t> map_px_, fog_px_;
     // [U-257] textured ground
-    static constexpr int kGroundPx = 4, kGroundTextures = 17;
+    static constexpr int kGroundTextures = 17;
+    int ground_px_ = 8;  // [U-521] pixels per cell of the painted ground: follows the graphics quality (Low 2 … Highest 8)
+    void set_ground_quality();
     [[nodiscard]] bool stats_open() const { return expand_stats_ || (SDL_GetModState() & SDL_KMOD_ALT); }  // [U-520] Alt expands it too
     int replay_before_pause_ = 100;                   // [X-19]
     std::vector<std::pair<int, int>> changed_cells_;  // [U-520]

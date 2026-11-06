@@ -32,6 +32,7 @@ inline constexpr const char* kOfficialVersion = "official-0.1";
 std::string apply_version(const std::string& name, int* changes = nullptr);
 [[nodiscard]] const std::string& current_version();
 [[nodiscard]] std::string version_description(const std::string& name);
+[[nodiscard]] std::string next_server_version_name(const std::string& server_name, const std::string& date);  // [U-525]
 [[nodiscard]] std::string version_id(const std::string& name);  // [U-375] computed from its files
 [[nodiscard]] std::vector<std::pair<std::string, std::string>> version_files(const std::string& name);  // [U-374] relative path, text
 bool store_version_files(const std::string& name, const std::vector<std::pair<std::string, std::string>>& files);

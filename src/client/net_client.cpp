@@ -6,6 +6,7 @@
 #include "client/net_client.hpp"
 #include "game/match/map_file.hpp"
 #include "game/versions.hpp"
+#include <ctime>
 #include "game/match/maps.hpp"
 
 #include <enet/enet.h>
@@ -290,6 +291,7 @@ void NetClient::handle(const std::uint8_t* data, std::size_t n, double now_s) {
         case Msg::Reject:
             reject_reason = r.str();
             server_version = r.str();
+            server_version_id = r.str(), server_name_seen = r.str();  // [U-525]
             state = State::Rejected;
             break;
         case Msg::Lobby: {
@@ -531,12 +533,31 @@ void NetClient::handle(const std::uint8_t* data, std::size_t n, double now_s) {
             custom_from_server = int(defs.size());
             break;
         }
-        case Msg::VersionFiles: {  // [U-374] what I asked for: the server's game version
-            const std::string name = r.str();
-            std::vector<std::pair<std::string, std::string>> files(r.get<std::uint16_t>());
-            for (auto& f : files) f.first = r.str(), f.second = r.long_str();
-            if (!r.bad() && store_version_files(name, files)) downloaded_version = name;
-            else reject_reason = "the version could not be downloaded", state = State::Rejected;
+        case Msg::VersionFiles: {  // [U-374][U-525] what I asked for: the server's game version, file by file
+            server_name_seen = r.str(), server_version_id = r.str();
+            version_expected = r.get<std::uint16_t>();
+            version_got.clear();
+            if (version_expected == 0) reject_reason = "the version could not be downloaded", state = State::Rejected;
+            break;
+        }
+        case Msg::VersionFile: {
+            std::string rel = r.str(), bytes = r.long_str();
+            if (r.bad() || version_expected == 0) break;
+            version_got.push_back({std::move(rel), std::move(bytes)});
+            if (int(version_got.size()) < version_expected) break;
+            version_expected = 0;
+            char day[16] = {};
+            const std::time_t now_t = std::time(nullptr);
+            std::strftime(day, sizeof day, "%Y-%m-%d", std::localtime(&now_t));
+            const std::string name = next_server_version_name(server_name_seen, day);  // a snapshot: "Server v2 2026-11-06"
+            if (store_version_files(name, version_got)) {
+                std::ofstream(std::filesystem::path("versions") / name / "source.info") << "server=" << server_name_seen << "\nid=" << server_version_id << "\ndate=" << day << "\n";
+                std::ofstream(std::filesystem::path("versions") / name / "version.txt", std::ios::app);
+                downloaded_version = name;
+            } else {
+                reject_reason = "the version could not be downloaded", state = State::Rejected;
+            }
+            version_got.clear();
             break;
         }
         case Msg::Timeline: {  // [U-371]

@@ -7,7 +7,12 @@
 #include <fstream>
 #include <vector>
 
-#if !defined(_WIN32)
+#if defined(_WIN32)
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#undef near
+#undef far
+#else
 #include <arpa/inet.h>
 #include <ifaddrs.h>
 #include <net/if.h>
@@ -48,6 +53,24 @@ std::string lan_address() {
                 if (std::string_view(i->ifa_name) != "docker0" && !std::string_view(i->ifa_name).starts_with("br-")) break;
             }
         freeifaddrs(all);
+    }
+#else
+    WSADATA wsa{};
+    if (WSAStartup(MAKEWORD(2, 2), &wsa) == 0) {
+        char host[256] = {};
+        addrinfo hints{}, *res = nullptr;
+        hints.ai_family = AF_INET;
+        if (gethostname(host, sizeof host) == 0 && getaddrinfo(host, nullptr, &hints, &res) == 0) {
+            for (addrinfo* a = res; a; a = a->ai_next) {
+                char buf[INET_ADDRSTRLEN] = {};
+                inet_ntop(AF_INET, &reinterpret_cast<sockaddr_in*>(a->ai_addr)->sin_addr, buf, sizeof buf);
+                if (std::string_view(buf).starts_with("127.")) continue;
+                best = buf;
+                break;
+            }
+            freeaddrinfo(res);
+        }
+        WSACleanup();
     }
 #endif
     return best;

@@ -1128,7 +1128,7 @@ void GameView::draw_world(NetClient& net, double now_s) {
         if (view_.flip) SDL_RenderTextureRotated(r_, t, &s, &d, 180.0, nullptr, SDL_FLIP_NONE);  // [U-174]
         else SDL_RenderTexture(r_, t, &s, &d);
     };
-    draw_layer(map_tex_, float(kGroundPx));
+    draw_layer(map_tex_, float(ground_px_));
     if (set_.fx_water && post_.ready() && src.w > 0 && src.h > 0 && mask_tex_) {  // [U-502] animated water + lava
         if (mask_dirty_) SDL_UpdateTexture(mask_tex_, nullptr, mask_px_.data(), kGridSize * 4), mask_dirty_ = false;
         post_.draw_water(mask_tex_, src, d, view_.flip, float(std::fmod(now_s, 3'600.0)), float(kGridSize));

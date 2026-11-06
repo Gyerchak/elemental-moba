@@ -20,13 +20,20 @@ void Server::receive(int pid, Reader& r) {
     const Msg m = r.get<Msg>();
     if (m == Msg::StatusQuery) return on_status_query(p);
     if (m == Msg::GetVersion) {  // [U-374] (no Hello needed: a player who does not have the version cannot join yet)
-        Writer w;
-        w.put(Msg::VersionFiles);
-        w.str(cfg_.version);
         const auto files = version_files(cfg_.version);
-        w.put<std::uint16_t>(std::uint16_t(std::min<std::size_t>(files.size(), 500)));
-        for (std::size_t i = 0; i < files.size() && i < 500; ++i) w.str(files[i].first), w.long_str(files[i].second);
-        send(p.peer, w, true);
+        {
+            Writer w;
+            w.put(Msg::VersionFiles);
+            w.str(cfg_.name), w.str(version_id(cfg_.version));
+            w.put<std::uint16_t>(std::uint16_t(std::min<std::size_t>(files.size(), 2'000)));
+            send(p.peer, w, true);
+        }
+        for (std::size_t i = 0; i < files.size() && i < 2'000; ++i) {  // one packet per file: pictures are big
+            Writer w;
+            w.put(Msg::VersionFile);
+            w.str(files[i].first), w.long_str(files[i].second);
+            send(p.peer, w, true);
+        }
         return;
     }
     if (m == Msg::Hello) return on_hello(pid, r);
@@ -157,14 +164,15 @@ void Server::on_hello(int pid, Reader& r) {
         w.put(Msg::Reject);
         w.str(why);
         w.str(cfg_.version);
+        w.str(version_id(cfg_.version)), w.str(cfg_.name);  // [U-525]
         send(p.peer, w, true);
         enet_peer_disconnect_later(p.peer, 0);
     };
     if (proto != kProtocol) return reject("protocol mismatch — update the game");
     if (!cfg_.password.empty() && password != cfg_.password && !(cfg_.host_secret != 0 && secret == cfg_.host_secret)) return reject("wrong password");  // [U-374]
     // [U-95] the client falls back to the server's version itself; we only refuse unknown ones
-    if (version != cfg_.version) return reject(std::format("server runs version {}", cfg_.version));
-    if (their_id != version_id(cfg_.version))  // [U-375] the same name, other files
+    (void)version;
+    if (their_id != version_id(cfg_.version))  // [U-375][U-525] the content counts, not what a copy is called
         return reject(std::format("server runs version {}", cfg_.version));
     if (!(cfg_.allowed_platforms & platform))  // [U-213]
         return reject(std::format("this server does not allow {} players", platform_name(platform)));

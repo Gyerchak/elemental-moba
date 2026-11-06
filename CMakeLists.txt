@@ -43,6 +43,9 @@ set(EM_UI_SRC src/client/draw.cpp src/client/locale.cpp src/client/tool_shell.cp
 list(FILTER EM_CLIENT_SRC EXCLUDE REGEX "/(draw|locale|tool_shell|sprites|resources|audio|settings|custom_champions)\\.cpp$")
 add_library(em_ui STATIC ${EM_UI_SRC})
 target_link_libraries(em_ui PUBLIC em_game PkgConfig::SDL3 PkgConfig::SDL3TTF)
+if(WIN32)
+  target_link_libraries(em_ui PUBLIC ws2_32)
+endif()
 add_executable(elemental_moba src/main.cpp ${EM_CLIENT_SRC})
 target_link_libraries(elemental_moba PRIVATE em_ui em_net)
 # [U-510] the champion maker

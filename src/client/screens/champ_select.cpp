@@ -14,6 +14,7 @@
 #endif
 #include "client/own_emotes.hpp"
 #include "client/locale.hpp"
+#include "client/tool_shell.hpp"
 
 namespace em {
 
@@ -172,7 +173,7 @@ std::string invite_address(const std::string& joined) {
     }
     return best;
 #else
-    return joined;
+    return tool::lan_address();
 #endif
 }
 }  // namespace
@@ -540,6 +541,6 @@ void App::champ_select() {
     }
 }
 
-std::string lan_address() { return invite_address(""); }  // [U-506]
+std::string lan_address() { return tool::lan_address(); }  // [U-506]
 
 }  // namespace em

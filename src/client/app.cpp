@@ -36,16 +36,22 @@ App::App(AppOptions o) : opt_(std::move(o)) {
     load_custom_champions(set_.custom_champions);  // [U-210] before any match — AFTER the version (they copy its numbers)
     // [U-214][U-496][U-501] VULKAN ONLY: SDL's GPU renderer locked to the Vulkan driver (it also runs our SPIR-V shaders)
     const SDL_WindowFlags base = SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY;
+#if !defined(__APPLE__)
     SDL_SetHint(SDL_HINT_GPU_DRIVER, "vulkan");
+#endif  // ([U-524] macOS has no Vulkan of its own: SDL's GPU renderer runs on Metal there, without our SPIR-V post effects)
     win_ = SDL_CreateWindow("elemental-moba", opt_.width, opt_.height, base);
     if (win_) ren_ = SDL_CreateRenderer(win_, "gpu");
     if (ren_) {  // (never anything else than Vulkan under it)
         auto* dev = static_cast<SDL_GPUDevice*>(SDL_GetPointerProperty(SDL_GetRendererProperties(ren_), SDL_PROP_RENDERER_GPU_DEVICE_POINTER, nullptr));
+#if defined(__APPLE__)
+        (void)dev;
+#else
         if (!dev || std::string_view(SDL_GetGPUDeviceDriver(dev)) != "vulkan") {
             SDL_DestroyRenderer(ren_);
             ren_ = nullptr;
             SDL_SetError("the GPU driver is not Vulkan");
         }
+#endif
     }
     if (!ren_) {  // [U-496] Vulkan ONLY (no fallback renderer): say why and stop
         const std::string why = std::format("Elemental MOBA needs Vulkan (a Vulkan driver for your GPU).\n\nSDL: {}", SDL_GetError());
@@ -350,12 +356,14 @@ void App::frame(double now_s) {
     }
     if (net_.state == NetClient::State::Rejected && screen_ != Screen::Menu && screen_ != Screen::Multiplayer) {
         // [U-95] auto-fallback: the server runs another version we also have → switch and retry
-        const auto have = list_versions();
-        if (net_.server_version != set_.version && std::ranges::find(have, net_.server_version) != have.end() &&
-            apply_version(net_.server_version).empty()) {
-            set_.version = net_.server_version;
+        // [U-525] the same CONTENT counts (the id), whatever my copy is called
+        std::string same;
+        for (const std::string& v : list_versions())
+            if (!net_.server_version_id.empty() && version_id(v) == net_.server_version_id) same = v;
+        if (!same.empty() && same != set_.version && apply_version(same).empty()) {
+            set_.version = same;
             set_.save();
-            status_ = std::format("{} {} — {}", tr("switched to the server's version"), net_.server_version, tr("join again"));
+            status_ = std::format("{} {} — {}", tr("switched to the server's version"), same, tr("join again"));
             stop_server();
             go(Screen::Menu);
         } else {

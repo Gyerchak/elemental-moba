@@ -37,3 +37,23 @@ jobs:
         with:
           name: elemental-moba-windows-programs
           path: dist/
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tools
+        run: brew install cmake ninja llvm sdl3 sdl3_ttf enet pkgconf
+      - name: Build
+        run: |
+          export CXX="$(brew --prefix llvm)/bin/clang++"
+          export LDFLAGS="-L$(brew --prefix llvm)/lib/c++ -Wl,-rpath,$(brew --prefix llvm)/lib/c++"
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --target elemental_moba em_server em_champion_maker em_map_maker
+      - uses: actions/upload-artifact@v4
+        with:
+          name: elemental-moba-macos-programs
+          path: |
+            build/elemental_moba
+            build/em_server
+            build/em_champion_maker
+            build/em_map_maker

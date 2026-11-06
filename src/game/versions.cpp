@@ -283,15 +283,28 @@ std::string version_id(const std::string& name) {
         std::vector<fs::path> files;
         std::error_code ec;
         for (const auto& e : fs::recursive_directory_iterator(fs::path("versions") / name, ec))
-            if (e.is_regular_file() && e.path().extension() == ".txt") files.push_back(e.path());
+            if (e.is_regular_file() && e.path().extension() != ".info") files.push_back(e.path());  // (source.info: where a copy came from)
         std::ranges::sort(files);
         for (const fs::path& f : files) {
             std::ifstream in(f, std::ios::binary);
             const std::string text((std::istreambuf_iterator<char>(in)), {});
-            mix(f.filename().string()), mix(text);
+            mix(fs::relative(f, fs::path("versions") / name, ec).generic_string()), mix(text);
         }
     }
     return std::format("{:08x}", std::uint32_t(h ^ (h >> 32)));
+}
+
+// [U-525] the next free name for what came from this server: "Name v1 2026-11-06", "Name v2 2026-11-09" …
+std::string next_server_version_name(const std::string& server_name, const std::string& date) {
+    std::string clean;
+    for (const char c : server_name) clean += std::isalnum(static_cast<unsigned char>(c)) || c == '-' || c == '_' ? c : ' ';
+    while (!clean.empty() && clean.back() == ' ') clean.pop_back();
+    if (clean.empty()) clean = "server";
+    int top = 0;
+    const std::string pre = clean + " v";
+    for (const std::string& v : list_versions())
+        if (v.starts_with(pre)) top = std::max(top, std::atoi(v.c_str() + pre.size()));
+    return std::format("{}{} {}", pre, top + 1, date);
 }
 
 // [U-374] a version's text files, to give to a player who does not have them
@@ -300,7 +313,7 @@ std::vector<std::pair<std::string, std::string>> version_files(const std::string
     std::error_code ec;
     const fs::path root = fs::path("versions") / name;
     for (const auto& e : fs::recursive_directory_iterator(root, ec))
-        if (e.is_regular_file() && e.path().extension() == ".txt" && e.file_size(ec) < 1'000'000) {
+        if (e.is_regular_file() && e.path().extension() != ".info" && e.file_size(ec) < 8'000'000) {
             std::ifstream in(e.path(), std::ios::binary);
             out.push_back({fs::relative(e.path(), root, ec).generic_string(), std::string((std::istreambuf_iterator<char>(in)), {})});
         }
@@ -310,7 +323,7 @@ std::vector<std::pair<std::string, std::string>> version_files(const std::string
 bool store_version_files(const std::string& name, const std::vector<std::pair<std::string, std::string>>& files) {
     const auto safe = [](std::string_view p) {  // only plain relative paths inside the version's own folder
         if (p.empty() || p.front() == '/' || p.find("..") != std::string_view::npos || p.find('\\') != std::string_view::npos || p.find(':') != std::string_view::npos) return false;
-        return p.ends_with(".txt");
+        return p.ends_with(".txt") || p.ends_with(".png") || p.ends_with(".bmp") || p.ends_with(".wav");
     };
     if (name.empty() || name == kOfficialVersion || name.find('/') != std::string::npos || name.find('\\') != std::string::npos || name.find("..") != std::string::npos) return false;
     std::error_code ec;

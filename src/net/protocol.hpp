@@ -17,7 +17,8 @@
 namespace em::net {
 
 inline constexpr std::size_t kLongStrMax = 16'000'000;  // [U-518] own champion files up to 64 KB, own maps up to 16 MB
-inline constexpr std::uint16_t kProtocol = 28;  // 28: heat levels, new statuses [U-523][U-524]
+inline constexpr std::uint16_t kProtocol = 29;  // 29: versions by content, snapshots [U-525]
+//inline constexpr std::uint16_t kProtocol = 28;  // 28: heat levels, new statuses [U-523][U-524]
 //inline constexpr std::uint16_t kProtocol = 27;  // 27: version id, version download [U-374][U-375]
 //inline constexpr std::uint16_t kProtocol = 26;  // 26: spectators, replays [X-19][X-20]
 //inline constexpr std::uint16_t kProtocol = 25;  // 25: server password, match timeline [U-371][U-374]
@@ -52,7 +53,8 @@ enum class Msg : std::uint8_t {
     CustomMaps,       // [U-518] the server's own maps (sent on joining)
     EmoteData,     // [U-414] another player's own emote (only when the server allows own emotes)
     Timeline,      // [U-371] numbers of every champion over the match, for the graphs
-    VersionFiles,  // [U-374] the server's game version: name, then its text files
+    VersionFiles,  // [U-374] the server's game version: its name, id, how many files …
+    VersionFile,   // [U-525] … then each file: relative path, bytes
 };
 
 // [U-414] own emotes: up to 4 per player, a PNG ≤ 96 KB (≤ 256 × 256) + an optional WAV ≤ 256 KB; emote slots 6…9

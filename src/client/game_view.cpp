@@ -71,14 +71,13 @@ std::string mmss(std::int64_t ms) {
 
 GameView::GameView(SDL_Renderer* r, Settings& s, Resources& res, Audio& audio) : r_(r), set_(s), res_(res), audio_(audio) {
     sprites_.init(&res_);  // [U-258]
-    // [U-257] the ground: kGroundPx pixels per cell, painted from the pack's surface textures
-    map_tex_ = SDL_CreateTexture(r_, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, kGridSize * kGroundPx, kGridSize * kGroundPx);
+    // [U-257] the ground: ground_px_ pixels per cell, painted from the pack's surface textures
     fog_tex_ = SDL_CreateTexture(r_, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, kGridSize, kGridSize);
 
-    SDL_SetTextureScaleMode(map_tex_, SDL_SCALEMODE_LINEAR);
     SDL_SetTextureScaleMode(fog_tex_, SDL_SCALEMODE_LINEAR);
     SDL_SetTextureBlendMode(fog_tex_, SDL_BLENDMODE_BLEND);
-    map_px_.resize(std::size_t(kGridSize) * kGridSize * kGroundPx * kGroundPx);
+    ground_px_ = 0;
+    set_ground_quality();
     mask_px_.assign(std::size_t(kGridSize) * kGridSize, 0);  // [U-502]
     mask_tex_ = SDL_CreateTexture(r_, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, kGridSize, kGridSize);
     if (mask_tex_) SDL_SetTextureBlendMode(mask_tex_, SDL_BLENDMODE_BLEND), SDL_SetTextureScaleMode(mask_tex_, SDL_SCALEMODE_LINEAR);
@@ -142,7 +141,7 @@ void GameView::paint_cell(int x, int y, Cell c) {
     };
     auto pixel = [&](const Look& l, int wx, int wy) {  // 256 px of texture span 32 cells; the texture keeps 70 % of its own look
         if (!l.t) return l.base;
-        const int tx = (wx * 2) % l.t->w, ty = (wy * 2) % l.t->h;
+        const int tx = (wx * l.t->w / (32 * ground_px_)) % l.t->w, ty = (wy * l.t->h / (32 * ground_px_)) % l.t->h;  // one tile = 32 cells at every quality
         const std::uint8_t* p = static_cast<const std::uint8_t*>(l.t->pixels) + std::size_t(ty) * std::size_t(l.t->pitch) + std::size_t(tx) * std::size_t(SDL_BYTESPERPIXEL(l.t->format));
         return mixc(l.base, Rgba{p[0], p[1], p[2], 255}, 70);
     };
@@ -156,10 +155,10 @@ void GameView::paint_cell(int x, int y, Cell c) {
             if (me.wall || n.wall) n = me;  // walls stay sharp
             plain = plain && n.which == me.which && n.base.r == me.base.r && n.base.g == me.base.g && n.base.b == me.base.b;
         }
-    auto put = [&](int i, int j, Rgba px) { map_px_[std::size_t(y * kGroundPx + j) * std::size_t(kGridSize * kGroundPx) + std::size_t(x * kGroundPx + i)] = pack(px); };
-    for (int j = 0; j < kGroundPx; ++j)
-        for (int i = 0; i < kGroundPx; ++i) {
-            const int wx = x * kGroundPx + i, wy = y * kGroundPx + j;
+    auto put = [&](int i, int j, Rgba px) { map_px_[std::size_t(y * ground_px_ + j) * std::size_t(kGridSize * ground_px_) + std::size_t(x * ground_px_ + i)] = pack(px); };
+    for (int j = 0; j < ground_px_; ++j)
+        for (int i = 0; i < ground_px_; ++i) {
+            const int wx = x * ground_px_ + i, wy = y * ground_px_ + j;
             if (plain) {
                 put(i, j, pixel(me, wx, wy));
                 continue;
@@ -167,7 +166,7 @@ void GameView::paint_cell(int x, int y, Cell c) {
             // how far this pixel lies towards the next cell (0 … 0.5), moved a little by noise
             const std::uint32_t h = (std::uint32_t(wx) * 73856093u) ^ (std::uint32_t(wy) * 19349663u);
             const float jitter = float((h ^ (h >> 11)) % 100) / 100.f * 0.28f - 0.14f;
-            const float fx = (float(i) + 0.5f) / float(kGroundPx) - 0.5f, fy = (float(j) + 0.5f) / float(kGroundPx) - 0.5f;
+            const float fx = (float(i) + 0.5f) / float(ground_px_) - 0.5f, fy = (float(j) + 0.5f) / float(ground_px_) - 0.5f;
             const float ax = std::clamp(std::abs(fx) + jitter, 0.f, 0.5f), ay = std::clamp(std::abs(fy) + jitter, 0.f, 0.5f);
             const int sx = fx > 0 ? 2 : 0, sy = fy > 0 ? 2 : 0;
             const Rgba c00 = pixel(me, wx, wy), c10 = pixel(around[1][sx], wx, wy), c01 = pixel(around[sy][1], wx, wy), c11 = pixel(around[sy][sx], wx, wy);
@@ -179,8 +178,22 @@ void GameView::paint_cell(int x, int y, Cell c) {
         }
 }
 
+// [U-521] the map follows the graphics quality like the champions do: the ground is painted at this many pixels per cell
+void GameView::set_ground_quality() {
+    static constexpr int kPx[] = {2, 4, 6, 8};
+    const int want = kPx[std::clamp(set_.render_quality, 0, 3)];
+    if (want == ground_px_ && map_tex_) return;
+    ground_px_ = want;
+    if (map_tex_) SDL_DestroyTexture(map_tex_);
+    map_tex_ = SDL_CreateTexture(r_, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, kGridSize * ground_px_, kGridSize * ground_px_);
+    if (map_tex_) SDL_SetTextureScaleMode(map_tex_, SDL_SCALEMODE_LINEAR);
+    map_px_.assign(std::size_t(kGridSize) * kGridSize * ground_px_ * ground_px_, 0);
+    map_raw_.assign(std::size_t(kGridSize) * kGridSize, 0xffffffffu);  // everything is painted again
+}
+
 void GameView::reset() {
     leave = false;
+    set_ground_quality();
     pending_ = -1;
     show_shop_ = show_score_ = chat_open_ = false;
     last_fog_ = -1;
@@ -345,9 +358,9 @@ void GameView::rebuild_textures(NetClient& net, std::int64_t now_ms, bool force)
         }
         changed_cells_.clear();
         if (x1 >= 0) {
-            const SDL_Rect rr{x0 * kGroundPx, y0 * kGroundPx, (x1 - x0 + 1) * kGroundPx, (y1 - y0 + 1) * kGroundPx};
-            const int pitch = kGridSize * kGroundPx * 4;
-            SDL_UpdateTexture(map_tex_, &rr, map_px_.data() + std::size_t(rr.y) * std::size_t(kGridSize * kGroundPx) + std::size_t(rr.x), pitch);
+            const SDL_Rect rr{x0 * ground_px_, y0 * ground_px_, (x1 - x0 + 1) * ground_px_, (y1 - y0 + 1) * ground_px_};
+            const int pitch = kGridSize * ground_px_ * 4;
+            SDL_UpdateTexture(map_tex_, &rr, map_px_.data() + std::size_t(rr.y) * std::size_t(kGridSize * ground_px_) + std::size_t(rr.x), pitch);
         }
     }
     // [U-204] smooth fog edges: a 3 × 3 blur of the alpha (off in the developer view)
