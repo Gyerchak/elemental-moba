@@ -472,7 +472,8 @@ void App::champ_select() {
         text(ren_, bx, H - 300, fit_text(tr(kGameModeDescs[std::min<int>(net_.queue_mode ? queue_rules_ : net_.mode, 2)]), 250), {150, 160, 180});
         // [U-422] invite: a join link to the clipboard (paste it into Multiplayer → Direct connect)
         if (button(ren_, ui_, bx, H - 186, 120, 30, tr("Invite"))) {
-            const std::string link = std::format("em-join://{}:{}", invite_address(net_.address), net_.port);
+            const bool mine = server_ != nullptr;  // [U-537] my own game: the public address, when there is one
+            const std::string link = std::format("em-join://{}:{}", mine && !set_.host_public.empty() ? set_.host_public : invite_address(net_.address), net_.port);
             SDL_SetClipboardText(link.c_str());
             status_ = std::format("{} {}", tr("copied:"), link);
         }

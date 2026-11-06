@@ -26,7 +26,7 @@ struct MapDoc {
         bool mirrored = true;
     };
     std::vector<Spot> spots;
-    bool epic_islands = false, exact_terrain = true;
+    bool epic_islands = false, exact_terrain = true, turn_for_team = true;
     MinionWaves minions;
     std::uint16_t features = 0;
     std::vector<std::uint32_t> cells;  // kGridSize², row by row

@@ -202,6 +202,7 @@ void Server::send_snapshot(Player& p) {
         n.fy = std::int16_t(std::clamp(u.face.y, -32'767, 32'767));
         n.walk = std::uint16_t(u.walk_phase & 0xffff);
         n.size_pct = std::uint16_t(W.size_pct(u));
+        n.model_pct = std::uint16_t(W.model_pct(u));
         n.sight = std::uint16_t(u.st.has(StatusKind::Blind) ? u.sight * (100 - u.st.value(StatusKind::Blind)) / 100 : u.sight);
         n.hp = u.hp;
         n.hp_max = u.kind == UnitKind::Champion ? u.stats.health.total() : u.stats.health.total();

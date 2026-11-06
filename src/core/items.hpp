@@ -1,4 +1,5 @@
 #pragma once
+#include <vector>
 // [U-80][U-81][U-113][U-114][U-136] Items. In-game gold shop [?-01]. Data here = placeholder roster.
 // [X-46] size / speed / cast items, [X-74] element-defensive items, [X-84] basic stat items.
 // Stat units follow stats.hpp: hundredths (100 = 1.00 or 1 %).
@@ -56,7 +57,7 @@ struct ItemDef {
     std::int32_t spellvamp = 0, on_hit_dmg = 0, on_hit_max_hp = 0;     // [U-473]
     // [U-476] ANY stat by name (StatKey) — new stats need no new item fields
     struct More { StatKey key = StatKey::Count; std::int32_t value = 0; bool pct = false; };  // [U-482] pct: value 100 = +1 % of the stat
-    std::array<More, 4> more{};
+    std::array<More, 8> more{};  // ([U-535] 8: own items may have many)
     // [U-478] only when switched on: `feature` = Feature bits the match must have; `mod` = a game-version mod
     // (versions/<name>/version.txt: mods = lol) — e.g. the LoL items exist only in that modified version
     std::uint16_t feature = 0;
@@ -65,7 +66,7 @@ struct ItemDef {
     std::int32_t true_sight = 0;    // [U-478] Invisibility: sees invisible enemies within this radius
 };
 
-inline constexpr std::array kItems = {
+inline constexpr std::array kBuiltinItems = {
     // [X-84] basics
     ItemDef{.name = "Long Spear", .cost = 350, .attack = 1'000},
     ItemDef{.name = "Spirit Pearl", .cost = 435, .elemental_power = 2'000},
@@ -192,30 +193,44 @@ inline constexpr std::array kItems = {
     ItemDef{.name = "Shade Blade", .cost = 3'000, .attack = 2'500, .attack_speed = 1'500, .active = ItemActive::Shadow, .active_cd_ms = 25'000,
             .limit = BuyLimit::One, .feature = kFeatInvisBit},
 };
+
+// [U-535] The items IN USE: the built-in ones, then what the game version adds or changes (versions.cpp: item.<name>.<key> = …).
+[[nodiscard]] inline std::vector<ItemDef>& item_store() {
+    static std::vector<ItemDef> v(kBuiltinItems.begin(), kBuiltinItems.end());
+    return v;
+}
+inline void restore_items() { item_store().assign(kBuiltinItems.begin(), kBuiltinItems.end()); }
+struct ItemTable {
+    const ItemDef& operator[](std::size_t i) const { return item_store()[i]; }
+    [[nodiscard]] std::size_t size() const { return item_store().size(); }
+    [[nodiscard]] auto begin() const { return item_store().cbegin(); }
+    [[nodiscard]] auto end() const { return item_store().cend(); }
+};
+inline constexpr ItemTable kItems{};
 inline constexpr std::int32_t kMaxElementResist = 6'000;  // [X-74] 60 %
 inline constexpr std::int32_t kMaxSlowResist = 8'000;     // [U-218] 80 %
 
 // ---------------------------------------------------------------- [U-261] build paths
-[[nodiscard]] constexpr int item_index(std::string_view name) {
+[[nodiscard]] inline int item_index(std::string_view name) {
     for (std::size_t i = 0; i < kItems.size(); ++i)
         if (kItems[i].name == name) return int(i);
     return -1;
 }
 enum class ItemTier : std::uint8_t { Basic, Epic, Legendary };
 [[nodiscard]] constexpr bool has_parts(const ItemDef& d) { return !d.from[0].empty(); }
-[[nodiscard]] constexpr ItemTier item_tier(const ItemDef& d) {
+[[nodiscard]] inline ItemTier item_tier(const ItemDef& d) {
     if (!has_parts(d)) return ItemTier::Basic;
     for (std::string_view p : d.from)
         if (!p.empty() && item_index(p) >= 0 && has_parts(kItems[std::size_t(item_index(p))])) return ItemTier::Legendary;
     return ItemTier::Epic;
 }
-[[nodiscard]] constexpr std::int32_t parts_cost(const ItemDef& d) {
+[[nodiscard]] inline std::int32_t parts_cost(const ItemDef& d) {
     std::int32_t c = 0;
     for (std::string_view p : d.from)
         if (!p.empty() && item_index(p) >= 0) c += kItems[std::size_t(item_index(p))].cost;
     return c;
 }
-[[nodiscard]] constexpr std::int32_t recipe_cost(const ItemDef& d) { return d.cost - parts_cost(d); }
+[[nodiscard]] inline std::int32_t recipe_cost(const ItemDef& d) { return d.cost - parts_cost(d); }
 
 // What buying `item` costs with these items in the bag: owned parts are used up (also parts of parts),
 // you pay the rest. `used` = bag slots that disappear (true = used up).
@@ -224,7 +239,7 @@ struct BuyPlan {
     std::array<bool, kItemSlots> used{};
 };
 namespace detail {
-constexpr std::int32_t take(const Bag& bag, std::array<bool, kItemSlots>& used, int item, bool top) {
+inline std::int32_t take(const Bag& bag, std::array<bool, kItemSlots>& used, int item, bool top) {
     // returns the gold this part saves (its full cost if carried, else what its own parts save)
     if (!top)
         for (std::size_t s = 0; s < bag.size(); ++s)
@@ -238,29 +253,29 @@ constexpr std::int32_t take(const Bag& bag, std::array<bool, kItemSlots>& used, 
     return saved;
 }
 }  // namespace detail
-[[nodiscard]] constexpr BuyPlan plan_buy(const Bag& bag, int item) {
+[[nodiscard]] inline BuyPlan plan_buy(const Bag& bag, int item) {
     BuyPlan b;
     b.price = kItems[std::size_t(item)].cost - detail::take(bag, b.used, item, true);
     return b;
 }
 
-// every part exists and no recipe is negative
+// every part of a built-in item exists and no recipe is negative
 static_assert([] {
-    for (const ItemDef& d : kItems) {
+    auto price = [](std::string_view n) -> std::int32_t {
+        for (const ItemDef& d : kBuiltinItems)
+            if (d.name == n) return d.cost;
+        return -1;
+    };
+    for (const ItemDef& d : kBuiltinItems) {
+        std::int32_t parts = 0;
         for (std::string_view p : d.from)
-            if (!p.empty() && item_index(p) < 0) return false;
-        if (recipe_cost(d) < 0) return false;
+            if (!p.empty()) {
+                if (price(p) < 0) return false;
+                parts += price(p);
+            }
+        if (d.cost - parts < 0) return false;
     }
     return true;
-}());
-// Dragon Bone Halberd (3100) with a Long Spear (350) and a Swift Dagger (300) in the bag → 2450
-static_assert([] {
-    Bag bag{};
-    bag.fill(-1);
-    bag[0] = std::int16_t(item_index("Long Spear"));
-    bag[1] = std::int16_t(item_index("Swift Dagger"));
-    const BuyPlan p = plan_buy(bag, item_index("Dragon Bone Halberd"));
-    return p.price == 3'100 - 650 && p.used[0] && p.used[1];
 }());
 
 // [U-478] feature Neutral items: jungle monsters drop these (one neutral slot per champion; a better tier replaces it).
@@ -338,11 +353,11 @@ inline constexpr std::int32_t kLotusCastSpeed = 4'000, kLotusMs = 5'000;
 
 static_assert([] {
     Stats s;
-    for (int i = 0; i < 4; ++i) add_item(s, kItems[13]);  // 4 × Wet Wraps → capped 60 %
+    for (int i = 0; i < 4; ++i) add_item(s, kBuiltinItems[13]);  // 4 × Wet Wraps → capped 60 %
     return s.resist_fire == kMaxElementResist && after_element_resist(1'000, Element::Fire, s) == 400 &&
            after_element_resist(1'000, Element::Water, s) == 1'000;
 }());
-static_assert(kItems[13].resist_fire == 2'500 && kItems[22].unique);
+static_assert(kBuiltinItems[13].resist_fire == 2'500 && kBuiltinItems[22].unique);
 
 // [U-482] the % bonuses of an item (after all flat bonuses are in)
 constexpr void item_pct_bonuses(Stats& s, const ItemDef& i) {

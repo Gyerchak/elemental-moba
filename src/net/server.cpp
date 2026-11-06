@@ -148,11 +148,16 @@ bool Server::start(std::string* error) {
     ENetAddress addr{};
     addr.host = cfg_.loopback_only ? ENET_HOST_ANY : ENET_HOST_ANY;
     if (cfg_.loopback_only) enet_address_set_host(&addr, "127.0.0.1");
+    else if (!cfg_.bind_ip.empty() && enet_address_set_host(&addr, cfg_.bind_ip.c_str()) != 0) {  // [U-537]
+        if (error) *error = std::format("{}: unknown address", cfg_.bind_ip);
+        return false;
+    }
     addr.port = cfg_.port;
     host_ = enet_host_create(&addr, kMaxPlayers + 4, 2, 0, 0);
     if (host_) enet_host_compress_with_range_coder(host_);  // [U-280] smaller packets → less lag (clients do the same)
     if (!host_) {
-        if (error) *error = std::format("cannot bind UDP port {}", cfg_.port);
+        if (error) *error = cfg_.bind_ip.empty() ? std::format("cannot bind UDP port {}", cfg_.port)
+                                                 : std::format("cannot listen on {}:{}: it is not an address of this PC. A public IP belongs to the router: leave this field empty and write it in Public address.", cfg_.bind_ip, cfg_.port);
         return false;
     }
     return true;

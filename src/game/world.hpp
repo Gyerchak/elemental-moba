@@ -227,6 +227,7 @@ struct Unit {
     std::int32_t slide_x = 0, slide_y = 0, prev_x = 0, prev_y = 0;  // [U-52] sliding on ice (sub per tick)
     std::array<std::int16_t, 12> practice_size{};  // [U-517] practice tool: +% of each skill's size
     std::int32_t practice_model = 0;               // [U-517] practice tool: +model size (100 = 1 %)
+    std::int32_t practice_hitbox = 0;              // [U-536] practice tool: the hitbox alone (1 = 1 %)
     std::int64_t flask_until = 0;  // [U-81] immortal heal window
     std::int32_t flask_revive = 0; // revive heals left
     std::int64_t flask_next_ms = 0;
@@ -565,7 +566,8 @@ public:
     [[nodiscard]] bool visible_to(Team t, const Unit& u) const;
     [[nodiscard]] bool visible_to(Team t, const Effect& e) const;
     [[nodiscard]] Shape hitbox(const Unit& u) const;
-    [[nodiscard]] std::int32_t size_pct(const Unit& u) const;
+    [[nodiscard]] std::int32_t size_pct(const Unit& u) const;   // the hitbox
+    [[nodiscard]] std::int32_t model_pct(const Unit& u) const;  // [U-536] the picture
     [[nodiscard]] Shape shape_of(const Effect& e) const;
     [[nodiscard]] bool targetable(const Unit& u) const;
     [[nodiscard]] bool vulnerable(const Unit& u) const;  // structure order rules

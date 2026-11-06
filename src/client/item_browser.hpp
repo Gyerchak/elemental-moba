@@ -21,7 +21,9 @@ enum class ItemCategory : std::uint8_t {
 
 struct ItemBrowser {
     int category = 0;            // ItemCategory
-    int sort = 0;                // 0 name, 1 price up, 2 price down
+    int sort = 0;                // 0 name, 1 price up, 2 price down, 3 amount of the chosen stats, 4 gold efficiency [U-547]
+    std::vector<std::string> sort_stats;  // [U-547] the stats that count (empty = all of them)
+    bool choosing_stats = false;
     int selected = -1;           // clicked item
     int tier = -1;               // [U-261] −1 all, 0 basic, 1 epic, 2 legendary
     std::string search;

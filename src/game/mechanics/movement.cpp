@@ -22,6 +22,9 @@ std::int32_t World::move_speed_sub(const Unit& u) const {
     if (u.st.has(StatusKind::Polymorph)) ms100 = std::max<std::int64_t>(10'000, ms100 - 6'000);  // [U-484] LoL polymorph: −60 base speed
     ms100 = ms100 * (10'000 + u.stats.move_speed_pct) / 10'000;
     ms100 = ms100 * u.st.move_speed_pct() / 100;
+    if (const int cx = u.ux() / kCellUnits, cy = u.uy() / kCellUnits;  // [U-527] the mud of a swamp
+        Grid::in_bounds(cx, cy) && grid.at(cx, cy).surface() == Surface::Mud && !u.flying() && !u.st.has(StatusKind::WaterRide))
+        ms100 = ms100 * (100 - elements::kMudGroundSlowPct) / 100;
     if (u.st.has(StatusKind::Hex)) ms100 = std::min<std::int64_t>(ms100, 14'000);  // [U-476] a critter crawls
     if (u.casting && u.cast.slot < std::uint8_t(Slot::Count)) {
         const SkillDef* d = u.skill[u.cast.slot];
@@ -382,7 +385,7 @@ void World::step_units() {
                 std::int64_t bd = 600LL * 600;
                 const bool champs_only = (u.order.slot & 1) != 0, to_cursor = (u.order.slot & 2) != 0;
                 for (const Unit& o : units)
-                    if (o.alive && o.team != u.team && o.team != Team::Neutral && targetable(o) && vulnerable(o) &&
+                    if (o.alive && o.team != u.team && (o.team != Team::Neutral || !champs_only) && targetable(o) && vulnerable(o) &&  // [U-542] "anything": neutral monsters too
                         (!champs_only || o.kind == UnitKind::Champion) && visible_to(u.team, o)) {
                         const std::int64_t d = to_cursor ? dist2(o.ux(), o.uy(), u.order.x, u.order.y) : dist2(o.ux(), o.uy(), u.ux(), u.uy());
                         if (d < bd) {

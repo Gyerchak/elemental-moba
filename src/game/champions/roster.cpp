@@ -156,6 +156,7 @@ void restore_official_numbers() {  // built-in champions, Q options and specials
     std::ranges::copy(kSpecials, specials_store().begin());
     std::ranges::copy(kQ, q_store().begin());
     restore_setup();  // [U-483] runes / masteries / keystones / trees back to the defaults
+    restore_items();  // [U-535] own items of a version are gone
 }
 Element q_option_element(int q) {
     if (q >= int(kQ.size()) && q < int(q_store().size())) return base_element(q_store()[std::size_t(q)].sub);  // [U-520]

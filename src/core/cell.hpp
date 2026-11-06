@@ -11,6 +11,7 @@ namespace em {
 enum class Surface : std::uint8_t {
     Land, Dryland, Glacier, Water, Sand, Stone, Wood, DeepWater, Magma, Metal, Platinum,
     StoneRoad, ForestPath,  // [U-269] earth-based: roads along the lanes, paths through the jungle
+    Mud,                    // [U-527] swamps: slows walkers, earth can be bent, half a source of water; it stays
     Count
 };
 static_assert(std::to_underlying(Surface::Count) <= 16);

@@ -733,6 +733,28 @@ Additions outside the plan live in `ENGINE-EXTRAS.md`, never here.
 - [U-524] **After the previous tasks:** waterbending with ice: an ice dash that attaches to a wall of any kind or to a champion and pulls the caster towards it, like arms of water; the other way too: grabbing a champion with water CC (in the series: Korra's father pulling her up, the armless Red Lotus waterbender moving freely). Metalbenders with metal tools do the same (the Beifong police). Water, earth and metal benders can PIN someone into a wall with their element: a CC usable only near walls; it first moves the champion fast towards the wall, then gives the CC; during it: displacement + airborne. CC stacking kinds per skill: stacks the time of the same CC / refreshes the time / refreshes only if the new one is longer. League of Legends sleep (like Lillia and Zoe) and fears of every kind under the LoL part of the system code. Update everything connected: the champion maker and skills, graphics and effect animations for what is new; bug checks in engine and graphic display; locale; GitHub. Make everything work well on Windows and macOS as it does on Linux, then update GitHub again.
 - [U-525] **For later:** anything missing an effect, sfx or sound gets one; sounds improved with the existing tools to the best quality, each one can be made; missing models for champions and custom champions; a basic texture pack replacing the auto-generated files, and an alternative texture pack for the map; a texture pack can change anything: map visuals, sounds, animations, animation scripts. Versions downloaded from a server stay well synced with clients and are saved as a new own snapshot named with the server's name and the time: "servername v1 DATE", when the server's content is new "servername v2 DATE"; nothing changed in the packet: no new version.
 - [U-526] Public IP 188.191.207.97 goes in the address file on GitHub (it was already there); when all is done push everything and copy the whole game with an install script to the pendrive called Ventoy.
+- [U-527] **Maps:** mud as a terrain of the map (swamps).
+- [U-528] **Map maker:** more symmetry axes than the team mirrors: more configurations.
+- [U-529] **Champion maker** started from the game opens inside the game window, like the map maker.
+- [U-530] **Start menu:** buttons are placed unevenly: logical, even spacing.
+- [U-531] **Champion maker:** change the angle of looking at the model.
+- [U-532] **Map maker:** change the angle of viewing the map and set it as the map's default; "my side is always at the bottom" should be configurable too.
+- [U-533] **Skill creator** even better.
+- [U-534] **Autoattacks:** only blue fire is listed: list all fire colours, named Fire - Blue, Fire - Orange and so on; the element stays fire.
+- [U-535] **Two more creators:** loadouts and items. The champion maker can also change the own Q and design F and G.
+- [U-536] **Model size:** changing it breaks skins and animations and the model can be out of sync with the hitbox. Only the hitbox size changes; the model size only with a special setting. Shape comes first: a way to DRAW any hitbox of units or skills.
+- [U-537] **Host server:** only the port can be changed: also the address it uses, with an option for the public IP.
+- [U-538] **Hitbox area of skills:** adjustable visually too, like a skin for it; only dev mode shows the original sizes.
+- [U-539] **Aatrox W** knocks up only on the sweet spots, not on every hit. (Its animation is really good.)
+- [U-540] No improvement seen on the Aatrox model; improvement seen on the characters made here.
+- [U-541] **Jungle monsters and minions:** still the old graphics; update graphics, vfx, sfx, animations to the quality of the rest; they should be tweakable like other things.
+- [U-542] **D key** does not autoattack neutral jungle monsters.
+- [U-543] **Companion:** a small weird behaviour when it fast travels.
+- [U-544] **Base map:** a much nicer, more logical plan.
+- [U-545] **Autoattack lines:** ranged minions and others do not show them; those stay in developer mode.
+- [U-546] **Structures, minions, monsters, epic monsters:** an option to use skills and to be set like champions: they are just bots using the game's mechanics.
+- [U-547] **Items and builds, any browsing of items:** sort by the amount of stats and by gold efficiency, of the whole item or of selected stats.
+- [U-548] **Champion choosing menu:** in the lobby show my own champion's model in the middle, allies' champions at the sides and behind.
 
 ---
 *Hubert continues editing the plan later — new ideas get the next free `[U-xx]` number.*

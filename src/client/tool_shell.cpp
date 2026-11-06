@@ -16,8 +16,11 @@
 #include <arpa/inet.h>
 #include <ifaddrs.h>
 #include <net/if.h>
+#include <netdb.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
+#include <sys/time.h>
+#include <unistd.h>
 #endif
 
 #include "client/locale.hpp"
@@ -91,6 +94,58 @@ std::string next_language(const std::string& code) {
     return it == all.end() || it + 1 == all.end() ? all.front() : *(it + 1);
 }
 
+std::string public_address(std::string* error) {
+    auto fail = [&](const char* why) { if (error) *error = why; return std::string(); };
+#if defined(_WIN32)
+    WSADATA wsa{};
+    if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) return fail("no network");
+    using Sock = SOCKET;
+    const Sock bad = INVALID_SOCKET;
+#else
+    using Sock = int;
+    const Sock bad = -1;
+#endif
+    addrinfo hints{};
+    hints.ai_family = AF_INET, hints.ai_socktype = SOCK_DGRAM;
+    addrinfo* res = nullptr;
+    if (getaddrinfo("stun.l.google.com", "19302", &hints, &res) != 0 || !res) return fail("no answer: no internet or no name lookup");
+    const Sock s = socket(AF_INET, SOCK_DGRAM, 0);
+    std::string found;
+    if (s != bad) {
+#if defined(_WIN32)
+        const DWORD ms = 2000;
+        setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&ms), sizeof ms);
+#else
+        timeval tv{2, 0};
+        setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof tv);
+#endif
+        unsigned char req[20] = {0x00, 0x01, 0x00, 0x00, 0x21, 0x12, 0xA4, 0x42};  // a binding request, magic cookie
+        for (int i = 8; i < 20; ++i) req[i] = static_cast<unsigned char>(SDL_rand(256));
+        if (sendto(s, reinterpret_cast<const char*>(req), 20, 0, res->ai_addr, static_cast<socklen_t>(res->ai_addrlen)) == 20) {
+            unsigned char in[512];
+            const int n = int(recvfrom(s, reinterpret_cast<char*>(in), sizeof in, 0, nullptr, nullptr));
+            for (int i = 20; n >= 20 && i + 4 <= n;) {
+                const int type = in[i] << 8 | in[i + 1], len = in[i + 2] << 8 | in[i + 3];
+                if ((type == 0x0020 || type == 0x0001) && len >= 8 && i + 12 <= n && in[i + 5] == 1) {
+                    const unsigned char x = type == 0x0020 ? 0xFF : 0;  // XOR-MAPPED: with the magic cookie
+                    const unsigned char k[4] = {0x21, 0x12, 0xA4, 0x42};
+                    found = std::format("{}.{}.{}.{}", in[i + 8] ^ (k[0] & x), in[i + 9] ^ (k[1] & x), in[i + 10] ^ (k[2] & x), in[i + 11] ^ (k[3] & x));
+                    break;
+                }
+                i += 4 + ((len + 3) & ~3);
+            }
+        }
+#if defined(_WIN32)
+        closesocket(s);
+#else
+        close(s);
+#endif
+    }
+    freeaddrinfo(res);
+    if (found.empty()) return fail("no answer: no internet, or the firewall stops it");
+    return found;
+}
+
 bool open_program(const char* name, std::string* error) {
     const char* base = SDL_GetBasePath();
     fs::path p = fs::path(base ? base : "") / name;
@@ -130,7 +185,17 @@ bool Window::open(const char* title, int width, int height) {
     return true;
 }
 
+void Window::attach(SDL_Window* w, SDL_Renderer* r) {
+    win_ = w, ren_ = r, embedded_ = true;
+    t0_ = SDL_GetTicks();
+    SDL_StopTextInput(win_);
+}
+
 Window::~Window() {
+    if (embedded_) {
+        SDL_StopTextInput(win_);
+        return;
+    }
     if (ren_) SDL_DestroyRenderer(ren_);
     if (win_) SDL_DestroyWindow(win_);
 }
@@ -146,7 +211,7 @@ bool Window::begin(const std::function<void(const SDL_Event&)>& extra) {
         if (extra) extra(e);
         switch (e.type) {
             case SDL_EVENT_QUIT:
-            case SDL_EVENT_WINDOW_CLOSE_REQUESTED: open_ = false; break;
+            case SDL_EVENT_WINDOW_CLOSE_REQUESTED: open_ = false, exit.quit = true; break;
             case SDL_EVENT_MOUSE_WHEEL: ui.wheel += e.wheel.y; break;
             case SDL_EVENT_MOUSE_MOTION: ui.mx = e.motion.x, ui.my = e.motion.y; break;
             case SDL_EVENT_MOUSE_BUTTON_DOWN:
@@ -195,6 +260,14 @@ void Window::end() {
             SDL_DestroySurface(s);
         }
         closing_ = true;
+    }
+    if (embedded_) {  // [U-529] the way back to the menu of the game
+        SDL_SetRenderClipRect(ren_, nullptr);
+        if (back_armed_ > 0) --back_armed_;
+        if (gfx::button(ren_, ui, w - 280, 8, 150, 28, back_armed_ > 0 ? loc::tr("Click again: not saved") : loc::tr("Back to the game"), back_armed_ > 0)) {
+            if (!dirty || back_armed_ > 0) closing_ = true;
+            else back_armed_ = 240;
+        }
     }
     gfx::end_frame_text();
     SDL_RenderPresent(ren_);

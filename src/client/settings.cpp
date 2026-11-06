@@ -157,6 +157,9 @@ bool Settings::load(const std::string& path) {
         else if (k == "fx_skills") fx_skills = std::clamp(to_int(v, 3), 0, 3);
         else if (k == "fx_own_pictures") fx_own_pictures = v == "1";
         else if (k == "fx_animations") fx_animations = v == "1";
+        else if (k == "map_side") map_side = std::clamp(std::atoi(v.c_str()), 0, 2);
+        else if (k == "host_bind") host_bind = v;
+        else if (k == "host_public") host_public = v;
         else if (k == "resource_pack") resource_pack = v;
         else if (k == "show_other_skins") show_other_skins = b;
         else if (k == "force_own_skins") force_own_skins = b;
@@ -297,6 +300,7 @@ void Settings::save(const std::string& path) const {
     for (int s = 0; s < kSkillSlots; ++s) out << "quick_cast_" << s << '=' << quick_cast[std::size_t(s)] << '\n';
     out << "auto_attack=" << auto_attack << "\nchamps_only_toggle=" << champs_only_toggle
         << "\nboth_buttons_center=" << both_buttons_center << "\nshow_attack_range=" << show_attack_range << "\nattack_move_cursor=" << attack_move_cursor << "\ncompanion=" << companion << "\nruleset=" << ruleset << "\nmap=" << map << "\nshow_other_emotes=" << show_other_emotes
+        << "\nmap_side=" << map_side << "\nhost_bind=" << host_bind << "\nhost_public=" << host_public
         << "\nauto_buy=" << auto_buy << "\nauto_level=" << auto_level << '\n';
     for (const auto& e : own_emotes) out << "own_emote=" << e << '\n';
     for (int i = 0; i < kActions; ++i) out << "key_" << kInfo[i].id << '=' << SDL_GetScancodeName(keys[std::size_t(i)]) << '\n';

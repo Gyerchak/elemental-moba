@@ -76,6 +76,7 @@ Cell make_cell(int cx, int cy) {
         const bool roots = pit_d >= 24 && pit_d <= 30 && std::abs(p.y - 256) > 5 && std::abs(p.x - 256) > 5;
         if (roots) c.set_tree(Tree::Alive);
         else if (pit_d < 22 || path) c.set_surface(pit_d < 14 ? Surface::Stone : Surface::ForestPath);
+        else if (n >= 0.30 && n < 0.36) c.set_surface(Surface::Mud);                    // [U-527] the wet edge of the swamp
         else if (n < 0.30) c.set_surface(Surface::Water);                               // swamp water (shallow: wade through)
         else if (n > 0.52) c.set_tree(Tree::Alive);                                   // groves
         else if (n > 0.46 && hash(cx / 2, cy / 2, 3) % 100 < 45) c.set_bush(Bush::Alive);  // brush around them

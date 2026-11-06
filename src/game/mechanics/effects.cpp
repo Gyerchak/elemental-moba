@@ -157,7 +157,7 @@ void World::effect_hits(Effect& e) {
         if (e.cc == StatusKind::Sleep && e.def && e.def->sleep_delay_ms > 0 && o.team != e.team && !o.st.has(StatusKind::DebuffImmune) && o.kind != UnitKind::Boss && !o.is_structure()) {
             apply_cc(e.src, e.owner, o, StatusKind::Drowsy, e.def->sleep_delay_ms, e.def->drowsy_slow, e.sub);
             o.sleep_at = now_ms + e.def->sleep_delay_ms, o.sleep_ms = e.cc_ms, o.sleep_val = e.cc_val, o.sleep_src = e.owner;
-        } else if (!wants_pin) {
+        } else if (!wants_pin && !(e.def && e.def->cc_sweet_only && !sweet)) {  // [U-539]
             apply_cc(e.src, e.owner, o, e.cc, e.cc_ms, e.cc_val, e.sub, e.def ? e.def->cc_rule : 0);
         }
         (void)pinned;
@@ -172,7 +172,7 @@ void World::effect_hits(Effect& e) {
         if (e.combo == Combo::IceShards) apply_cc(e.src, e.owner, o, StatusKind::Slow, 1'500, 40);
         if (e.combo == Combo::Firestorm || (owner && has_passive(*owner, PassiveId::InnerFlame) && e.damage > 0))
             apply_cc(e.src, e.owner, o, StatusKind::Burn, 2'000, 1'500);
-        if (e.knock) knock(o, e.ux() - e.dir.x * 60 / kOne, e.uy() - e.dir.y * 60 / kOne, e.knock, e.owner);
+        if (e.knock && !(e.def && e.def->cc_sweet_only && !sweet)) knock(o, e.ux() - e.dir.x * 60 / kOne, e.uy() - e.dir.y * 60 / kOne, e.knock, e.owner);
         // [X-58] lightning chains through the connected shallow water the target stands in
         if (e.sub == SubElement::Lightning) {
             const int cx = o.ux() / kCellUnits, cy = o.uy() / kCellUnits;

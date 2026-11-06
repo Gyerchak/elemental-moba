@@ -25,6 +25,7 @@
 #include "client/locale.hpp"
 #include "client/resources.hpp"
 #include "client/sprites.hpp"
+#include "apps/makers.hpp"
 #include "client/tool_shell.hpp"
 #include "game/champions/custom.hpp"
 #include "game/content.hpp"
@@ -132,7 +133,29 @@ const std::vector<std::string_view> kZoneNames = {"Auto", "Centre", "Edge", "Tip
 const std::vector<std::string_view> kCcNames = {"Stun", "Root", "Slow", "Silence", "ChiBlock", "Airborne", "Frozen", "Blind", "Burn", "Shield", "Haste", "Flying", "Bloodbound", "Channel", "Swimming", "WaterRide",
                                                 "Redirect", "Wet", "Grievous", "Fear", "Disarm", "Subdue", "Hex", "Break", "DebuffImmune", "Polymorph", "Invisible", "Sleep", "Drowsy", "Charm", "Taunt", "Terrify", "None"};
 const std::vector<std::string_view> kPassiveNames = {"None", "InnerFlame", "Static", "Rooted", "MetalSkin", "Molten", "Tide", "Frostbite", "LightFeet", "MistForm", "ChiFlow", "SeismicSense", "HeatSense", "FireInHand", "Lantern", "WindSense", "ElementalCycle"};
+const std::vector<std::string_view> kHeatNames = {"Usual", "Red 600", "Red 800", "Orange 1000", "Yellow 1400", "White 1600", "Blue 2000", "Blue 2500", "Blue 3000", "Blue 3333"};
 const std::vector<std::string_view> kCatNames = {"Champion", "Minion", "SiegeMinion", "SuperMinion", "Monster", "EpicMonster", "Turret", "Inhibitor", "Shrine"};
+// [U-534] what the element lists show: every colour of fire by name; the element stays fire
+struct ElementChoice { const char* name; const char* sub; int heat; };
+constexpr ElementChoice kFireChoices[] = {
+    {"Fire - Red 600", "Fire", 1}, {"Fire - Red 800", "Fire", 2}, {"Fire - Orange 1000", "Fire", 0}, {"Fire - Yellow 1400", "Fire", 4}, {"Fire - White 1600", "Fire", 5},
+    {"Fire - Blue 2000", "BlueFire", 6}, {"Fire - Blue 2500", "BlueFire", 7}, {"Fire - Blue 3000", "BlueFire", 8}, {"Fire - Blue 3333", "BlueFire", 9}};
+[[nodiscard]] std::string element_shown(SubElement sub, int heat) {
+    if (sub == SubElement::Fire || sub == SubElement::BlueFire) {
+        if (heat == 0) return sub == SubElement::Fire ? "Fire - Orange 1000" : "Fire - Blue 2000";
+        for (const ElementChoice& c : kFireChoices)
+            if (c.heat == heat) return c.name;
+        if (heat == 3) return "Fire - Orange 1000";
+    }
+    return std::string(kSubNames[std::size_t(sub)]);
+}
+[[nodiscard]] std::vector<ElementChoice> element_choices() {
+    std::vector<ElementChoice> out;
+    for (std::string_view n : kSubNames)
+        if (n == "Fire") out.insert(out.end(), std::begin(kFireChoices), std::end(kFireChoices));
+        else if (n != "BlueFire") out.push_back({n.data(), n.data(), 0});
+    return out;
+}
 const std::vector<std::string_view> kNeeds(std::begin(kNeedNames), std::end(kNeedNames));
 
 struct Page {
@@ -207,6 +230,7 @@ const std::vector<Page>& skill_pages() {
             SI("cc_ms_rank", "Lasts per rank (ms)", cc_ms_rank, -2000, 2000, 50, ""),
             SI("cc_val", "Strength", cc_val, 0, 2000, 5, "Slow %, burn hundredths of HP per second, blind %, chi block mask (1 water 2 earth 4 fire 8 air, 0 all)"),
             SI("cc_val_rank", "Strength per rank", cc_val_rank, -200, 200, 5, ""),
+            SB("cc_sweet_only", "Only on the sweet spot", cc_sweet_only, "The effect and the knock happen only when the sweet spot hits"),
             Field{"cc_rule", "The same effect again", FT::Enum, 0, 0, 0, "Keeps the longer time, adds the times together, or starts the time again", [](const SkillDef& s) { return int(s.cc_rule); }, {"Keeps the longer", "Adds up", "Starts again"}},
             SI("sleep_delay_ms", "Sleep: drowsy first (ms)", sleep_delay_ms, 0, 5000, 50, "Effect Sleep: slowed this long, then asleep; a hit wakes it"),
             SI("drowsy_slow", "Sleep: drowsy slow %", drowsy_slow, 0, 95, 5, ""),
@@ -334,6 +358,20 @@ class Maker {
 public:
     bool init(const std::string& open_file);
     void frame();
+    void run() {
+        std::string drop;
+        while (win.begin([&](const SDL_Event& e) {
+            if (e.type == SDL_EVENT_DROP_FILE && e.drop.data) drop = e.drop.data;
+        })) {
+            if (!drop.empty()) {
+                take_drop(drop);
+                drop.clear();
+            }
+            frame();
+            win.dirty = dirty_;
+            win.end();
+        }
+    }
     tool::Window win;
     void start_at(int tab, int page) { tab_ = std::clamp(tab, 0, 2), page_ = std::clamp(page, 0, int(skill_pages().size()) - 1); }
     // a file dropped on the window: by its kind
@@ -365,6 +403,15 @@ private:
     int speed_ = 100;
     float aim_x_ = 4400, aim_y_ = 3900;
     bool top_down_ = false, edit_corners_ = false;
+    int tilt_ = 72;                 // [U-531] how the camera looks at it: 100 = from above
+    int turn_from_ = 0;             // [U-531] dragging on the preview turns the model
+    float turn_mx_ = -1;
+    bool model_special_ = false, sheet_special_ = false;  // [U-536] changing the model's size or how its sheet is read: only when asked for
+    int draw_mode_ = 0;             // [U-536] 1: draw the body's hitbox with the mouse, 2: draw the skill's shape
+    std::vector<std::pair<float, float>> stroke_;
+    bool stroking_ = false;
+    void finish_body_drawing(Dir facing, float cx, float cy, int scale_pct);
+    void finish_skill_drawing(Dir facing, float cx, float cy);
     float zooms_[3] = {2.6f, 0.6f, 2.6f};  // each tab keeps its own (a model close, a skill from afar)
     int anim_i_ = 0, dir_ = 2;
     double last_t_ = 0;
@@ -536,7 +583,7 @@ void Maker::open_file(const std::string& file) {
 }
 
 bool Maker::init(const std::string& open) {
-    if (!win.open("Elemental MOBA - Champion maker", 1600, 900)) return false;
+    if (!win.embedded() && !win.open("Elemental MOBA - Champion maker", 1600, 900)) return false;
     std::error_code ec;
     fs::create_directories("resourcepacks/_maker", ec);
     res_ = std::make_unique<Resources>();
@@ -801,6 +848,21 @@ void Maker::field_row(const Field& f, float x, float& y, float w) {
             break;
         }
         case FT::Enum: {
+            if (std::string_view(f.key) == "sub") {  // [U-534] every colour of fire by name; the element stays fire
+                if (button(r, ui, x, y, w, 24, std::format("{}: {}", tr(f.label), tr(element_shown(sk().sub, sk().heat))))) {
+                    std::vector<Pick> items;
+                    for (const ElementChoice& c : element_choices()) items.push_back({tr(c.name), c.name, ""});
+                    open_picker(tr(f.label), std::move(items), [this](const std::string& val) {
+                        for (const ElementChoice& c : element_choices())
+                            if (val == c.name) {
+                                const bool fire = std::string_view(c.sub) == "Fire" || std::string_view(c.sub) == "BlueFire";
+                                set_skill("sub", c.sub);
+                                if (fire || sk().heat) set_skill("heat", std::string(kHeatNames[std::size_t(c.heat)]));
+                            }
+                    });
+                }
+                break;
+            }
             const int v = std::clamp(f.get(sk()), 0, int(f.names.size()) - 1);
             if (button(r, ui, x, y, w, 24, std::format("{}: {}", tr(f.label), tr(f.names[std::size_t(v)])))) {
                 std::vector<Pick> items;
@@ -895,6 +957,9 @@ void Maker::page_shape(float x, float& y, float w) {
     num("width", "Width", sk().width, 0, 1500, "Width of the projectile, line, cone's far side");
     num("radius", "Radius / size", sk().radius, 0, 1200, "Size of blasts, fields and the polygon shapes");
     if (g == Geo::Ring || g == Geo::Arc) num("inner", "Hole in the middle", sk().inner, 0, 1000, "What is inside the hole is not hit");
+    if (hover(ui, x, y, w, 26)) tip_ = tr("Hold the button in the preview and draw any shape: it becomes the exact hitbox of this skill");
+    if (button(r, ui, x, y, w, 26, draw_mode_ == 2 ? tr("Now draw in the preview (click again to cancel)") : tr("Draw the shape with the mouse"), draw_mode_ == 2)) draw_mode_ = draw_mode_ == 2 ? 0 : 2;
+    y += 32;
     if (g == Geo::Custom) {
         text(r, x, y + 6, trf("{} corners", sk().npoly / 2), {210, 210, 220});
         if (button(r, ui, x + 120, y, 240, 24, edit_corners_ ? tr("Click in the preview to add corners") : tr("Draw the corners in the preview"), edit_corners_)) edit_corners_ = !edit_corners_;
@@ -1028,6 +1093,7 @@ void Maker::page_look(float x, float& y, float w) {
     };
     text(r, x, y, fit_text(tr("The colour and effects are drawn on the exact hitbox, so they always match its size."), w), {255, 220, 150});
     y += 20;
+    num("vis.size", "How big it looks %", v.size_pct, 10, 400, "Like a skin for the hitbox: only the look changes, it hits with the real size. The developer view shows the real size");
     {   // colour: R G B
         int cr = int(v.colour >> 16 & 255), cg = int(v.colour >> 8 & 255), cb = int(v.colour & 255);
         bool ch = false;
@@ -1222,7 +1288,20 @@ void Maker::tab_champion(float x, float& y, float w) {
     const std::vector<std::string_view> elems{"Water", "Earth", "Fire", "Air", "None"}, roles{"Mage", "Marksman", "Fighter", "Tank", "Assassin", "Support"},
         res{"Water", "Fuel", "None", "Ammo", "Energy", "Rage", "Mana"}, attrs{"None", "Strength", "Agility", "Intelligence", "Universal"}, ranges{"Melee", "Ranged"};
     choose("element", "Element", elems[std::size_t(cur_.element)], elems);
-    choose("sub", "Autoattack element", kSubNames[std::size_t(cur_.sub)], kSubNames);
+    if (button(r, ui, x, py, w, 24, std::format("{}: {}", tr("Autoattack element"), tr(element_shown(cur_.sub, cur_.auto_heat))))) {  // [U-534]
+        std::vector<Pick> items;
+        for (const ElementChoice& c : element_choices()) items.push_back({tr(c.name), c.name, ""});
+        open_picker(tr("Autoattack element"), std::move(items), [this](const std::string& val) {
+            for (const ElementChoice& c : element_choices())
+                if (val == c.name) {
+                    const Draft before = d_;
+                    set_kv(d_.champ, "sub", c.sub);
+                    set_kv(d_.champ, "auto_heat", std::to_string(c.heat));
+                    changed(before);
+                }
+        });
+    }
+    py += 28;
     choose("role", "Role", roles[std::size_t(cur_.role)], roles);
     choose("range", "Range", ranges[cur_.range == Range::Ranged ? 1 : 0], ranges);
     choose("resource", "Resource", res[std::size_t(cur_.resource)], res);
@@ -1271,6 +1350,22 @@ void Maker::tab_champion(float x, float& y, float w) {
         as("autos.wall_pct", "Damage to walls %", a.wall_pct, 0, 1000);
     }
     py += 8;
+    {   // [U-535] its very own skills for these keys
+        text(r, x, py, fit_text(tr("Its own Q, F and G: only this champion can pick them"), w, 2), {255, 220, 150}, 2);
+        py += 26;
+        const float kw = w / 3;
+        for (int i = 0; i < 3; ++i) {
+            const char sl = "qfg"[i];
+            const SkillDef& own = slot_skill(cur_, sl);
+            if (button(r, ui, x + kw * float(i), py, kw - 4, 26, fit_text(std::format("{}: {}", char(std::toupper(static_cast<unsigned char>(sl))), own.name.empty() ? tr("design it") : std::string(own.name)), kw - 12))) {
+                tab_ = 1, slot_ = sl, page_ = 0, scroll_ = 0;
+                SDL_SetRenderClipRect(r, nullptr);
+                y = clip_bottom_;
+                return;
+            }
+        }
+        py += 34;
+    }
     text(r, x, py, fit_text(tr("Q options (shared skills of the element, at most 6)"), w, 2), {255, 220, 150}, 2);
     py += 26;
     for (std::size_t i = 0; i < cur_.q_pool.size(); ++i) {
@@ -1318,6 +1413,56 @@ void Maker::tab_model(float x, float& y, float w) {
     SDL_SetRenderClipRect(r, &clip);
     if (hover(ui, x, clip_top_, w, clip_bottom_ - clip_top_)) scroll_ = std::max(0.f, scroll_ - ui.wheel * 44);
     float py = clip_top_ + 6 - scroll_;
+    // ---- the base hitbox
+    text(r, x, py, fit_text(tr("Base hitbox: the circles the game hits. Shown on the model in the preview."), w, 2), {255, 220, 150}, 2);
+    py += 26;
+    {   // [U-536] its size alone: the model and its animations stay as they are
+        int hs = cur_.hitbox_pct;
+        if (hover(ui, x, py, w, 26)) tip_ = tr("Only the hitbox changes: the model and its animations stay as they are");
+        if (slider(r, ui, id_for("hitbox_size"), x, py, w, hs, 20, 300, tr("Hitbox size %"))) set_champ("hitbox_size", std::to_string(hs));
+        py += 28;
+        if (hover(ui, x, py, w, 28)) tip_ = tr("Hold the button in the preview and draw around the body: it becomes the circles of the hitbox");
+        if (button(r, ui, x, py, w, 28, draw_mode_ == 1 ? tr("Now draw in the preview (click again to cancel)") : tr("Draw the hitbox with the mouse"), draw_mode_ == 1)) draw_mode_ = draw_mode_ == 1 ? 0 : 1;
+        py += 34;
+    }
+    const char* const bodies[] = {"Humanoid", "Slim", "Broad", "Beast"};
+    const float bw = (w - 8) / 4;
+    for (int i = 0; i < 4; ++i)
+        if (button(r, ui, x + bw * float(i), py, bw - 4, 24, tr(bodies[i]))) {
+            const Draft before = d_;
+            std::erase_if(d_.champ, [](const auto& kv) { return kv.first.starts_with("body"); });
+            d_.champ.push_back({"body", bodies[i]});
+            changed(before);
+        }
+    py += 30;
+    const BodyDef body = *cur_.body;
+    for (int i = 0; i < std::min<int>(body.n + 1, 6); ++i) {
+        const BodyPart bp = i < body.n ? body.parts[std::size_t(i)] : BodyPart{0, 0, 16, 0};
+        text(r, x, py + 2, trf("Circle {}", i + 1), {255, 200, 120});
+        py += 16;
+        int fw = bp.fwd, sd = bp.side, rd = bp.r, sw = bp.swing;
+        const std::string b = std::format("body{}", i);
+        bool ch = false;
+        ch |= slider(r, ui, id_for(b + "f"), x, py, w, fw, -150, 150, tr("Forward"));
+        py += 22;
+        ch |= slider(r, ui, id_for(b + "s"), x, py, w, sd, -150, 150, tr("Sideways"));
+        py += 22;
+        ch |= slider(r, ui, id_for(b + "r"), x, py, w, rd, 2, 150, tr("Radius"));
+        py += 22;
+        ch |= slider(r, ui, id_for(b + "w"), x, py, w, sw, -30, 30, tr("Swing when walking"));
+        py += 26;
+        if (ch) {
+            const Draft before = d_;
+            std::erase_if(d_.champ, [](const auto& kv) { return kv.first == "body"; });
+            // all circles written out, so the hitbox is exactly what is shown
+            for (int j = 0; j < std::max<int>(body.n, i + 1); ++j) {
+                const BodyPart o = j == i ? BodyPart{std::int16_t(fw), std::int16_t(sd), std::int16_t(rd), std::int16_t(sw)} : j < body.n ? body.parts[std::size_t(j)] : BodyPart{};
+                set_kv(d_.champ, std::format("body.part{}", j + 1), std::format("{} {} {} {}", o.fwd, o.side, o.r, o.swing));
+            }
+            changed(before);
+        }
+    }
+    py += 8;
     text(r, x, py, fit_text(tr("Model: a sprite sheet (PNG). With a sheet.txt beside it, its animations come along."), w), {255, 220, 150});
     py += 20;
     if (button(r, ui, x, py, 240, 28, tr("Load a model file"))) ask_file("model", true);
@@ -1342,14 +1487,28 @@ void Maker::tab_model(float x, float& y, float w) {
             if (slider(r, ui, id_for(std::string("m") + id), x, py, w, iv, lo, hi, tr(label))) v = float(iv) / scale, dirty_ = true;
             py += 24;
         };
-        ival("px", "Frame size (pixels)", s.px, 16, 1024);
-        ival("dirs", "Rows (directions)", s.dirs, 1, 8);
-        ival("wrap", "Frames per row (0 = one long row)", s.wrap, 0, 64);
-        fval("or", "Model size in the world", s.ortho_m, 100.f, 20, 1200);
-        fval("ax", "Feet: left - right %", s.ax, 100.f, 0, 100);
-        fval("ay", "Feet: top - bottom %", s.ay, 100.f, 0, 100);
-        text(r, x, py, fit_text(tr("Line the feet up with the hitbox in the preview: they belong together."), w), {150, 150, 170});
-        py += 22;
+        // [U-536] special settings: they can put a model out of step with its hitbox or break its animations, so they are closed at first
+        if (hover(ui, x, py, w, 26)) tip_ = tr("Only if the model should look bigger or smaller than its hitbox");
+        if (button(r, ui, x, py, w, 24, std::format("{}: {}", tr("Special: change the size of the model"), model_special_ ? tr("ON") : tr("OFF")), model_special_)) model_special_ = !model_special_;
+        py += 28;
+        if (model_special_) {
+            int ms = cur_.model_scale;
+            if (slider(r, ui, id_for("model_scale"), x, py, w, ms, 20, 300, tr("Size of the model %"))) set_champ("model_scale", std::to_string(ms));
+            py += 26;
+            fval("ax", "Feet: left - right %", s.ax, 100.f, 0, 100);
+            fval("ay", "Feet: top - bottom %", s.ay, 100.f, 0, 100);
+            text(r, x, py, fit_text(tr("Line the feet up with the hitbox in the preview: they belong together."), w), {150, 150, 170});
+            py += 22;
+        }
+        if (hover(ui, x, py, w, 26)) tip_ = tr("Only for a sheet you made yourself: wrong numbers here break the animations");
+        if (button(r, ui, x, py, w, 24, std::format("{}: {}", tr("Special: how the picture file is read"), sheet_special_ ? tr("ON") : tr("OFF")), sheet_special_)) sheet_special_ = !sheet_special_;
+        py += 28;
+        if (sheet_special_) {
+            ival("px", "Frame size (pixels)", s.px, 16, 1024);
+            ival("dirs", "Rows (directions)", s.dirs, 1, 8);
+            ival("wrap", "Frames per row (0 = one long row)", s.wrap, 0, 64);
+            fval("or", "Model size in the world", s.ortho_m, 100.f, 20, 1200);
+        }
         text(r, x, py, fit_text(tr("Animations in the file"), w, 2), {255, 220, 150}, 2);
         py += 26;
         std::string remove;
@@ -1418,47 +1577,6 @@ void Maker::tab_model(float x, float& y, float w) {
         if (col) py += 26;
         py += 8;
     }
-    // ---- the base hitbox
-    text(r, x, py, fit_text(tr("Base hitbox: the circles the game hits. Shown on the model in the preview."), w, 2), {255, 220, 150}, 2);
-    py += 26;
-    const char* const bodies[] = {"Humanoid", "Slim", "Broad", "Beast"};
-    const float bw = (w - 8) / 4;
-    for (int i = 0; i < 4; ++i)
-        if (button(r, ui, x + bw * float(i), py, bw - 4, 24, tr(bodies[i]))) {
-            const Draft before = d_;
-            std::erase_if(d_.champ, [](const auto& kv) { return kv.first.starts_with("body"); });
-            d_.champ.push_back({"body", bodies[i]});
-            changed(before);
-        }
-    py += 30;
-    const BodyDef body = *cur_.body;
-    for (int i = 0; i < std::min<int>(body.n + 1, 6); ++i) {
-        const BodyPart bp = i < body.n ? body.parts[std::size_t(i)] : BodyPart{0, 0, 16, 0};
-        text(r, x, py + 2, trf("Circle {}", i + 1), {255, 200, 120});
-        py += 16;
-        int fw = bp.fwd, sd = bp.side, rd = bp.r, sw = bp.swing;
-        const std::string b = std::format("body{}", i);
-        bool ch = false;
-        ch |= slider(r, ui, id_for(b + "f"), x, py, w, fw, -150, 150, tr("Forward"));
-        py += 22;
-        ch |= slider(r, ui, id_for(b + "s"), x, py, w, sd, -150, 150, tr("Sideways"));
-        py += 22;
-        ch |= slider(r, ui, id_for(b + "r"), x, py, w, rd, 2, 150, tr("Radius"));
-        py += 22;
-        ch |= slider(r, ui, id_for(b + "w"), x, py, w, sw, -30, 30, tr("Swing when walking"));
-        py += 26;
-        if (ch) {
-            const Draft before = d_;
-            std::erase_if(d_.champ, [](const auto& kv) { return kv.first == "body"; });
-            // all circles written out, so the hitbox is exactly what is shown
-            for (int j = 0; j < std::max<int>(body.n, i + 1); ++j) {
-                const BodyPart o = j == i ? BodyPart{std::int16_t(fw), std::int16_t(sd), std::int16_t(rd), std::int16_t(sw)} : j < body.n ? body.parts[std::size_t(j)] : BodyPart{};
-                set_kv(d_.champ, std::format("body.part{}", j + 1), std::format("{} {} {} {}", o.fwd, o.side, o.r, o.swing));
-            }
-            changed(before);
-        }
-    }
-    py += 8;
     // ---- pictures and sounds of the champion
     text(r, x, py, fit_text(tr("Pictures and sounds"), w, 2), {255, 220, 150}, 2);
     py += 26;
@@ -1468,6 +1586,110 @@ void Maker::tab_model(float x, float& y, float w) {
     for (char s : kSlots) file_row("sound_" + std::string(1, s), trf("Sound of {} (WAV)", char(std::toupper(static_cast<unsigned char>(s)))), false, x, py, w);
     SDL_SetRenderClipRect(r, nullptr);
     y = clip_bottom_;
+}
+
+// ---------------------------------------------------------------- [U-536] hitboxes drawn with the mouse
+namespace {
+[[nodiscard]] double dist_to_segment(double px, double py, double ax, double ay, double bx, double by) {
+    const double dx = bx - ax, dy = by - ay, l = dx * dx + dy * dy;
+    const double t = l > 0 ? std::clamp(((px - ax) * dx + (py - ay) * dy) / l, 0.0, 1.0) : 0.0;
+    return std::hypot(px - ax - t * dx, py - ay - t * dy);
+}
+[[nodiscard]] bool inside_outline(const std::vector<std::pair<double, double>>& p, double x, double y) {
+    bool in = false;
+    for (std::size_t i = 0, j = p.size() - 1; i < p.size(); j = i++)
+        if ((p[i].second > y) != (p[j].second > y) && x < (p[j].first - p[i].first) * (y - p[i].second) / (p[j].second - p[i].second) + p[i].first) in = !in;
+    return in;
+}
+// keeps the points that matter (Douglas-Peucker)
+void simplify(const std::vector<std::pair<double, double>>& p, std::size_t a, std::size_t b, double eps, std::vector<bool>& keep) {
+    if (b <= a + 1) return;
+    double best = -1;
+    std::size_t at = a;
+    for (std::size_t i = a + 1; i < b; ++i) {
+        const double d = dist_to_segment(p[i].first, p[i].second, p[a].first, p[a].second, p[b].first, p[b].second);
+        if (d > best) best = d, at = i;
+    }
+    if (best > eps) {
+        keep[at] = true;
+        simplify(p, a, at, eps, keep);
+        simplify(p, at, b, eps, keep);
+    }
+}
+}  // namespace
+
+// The outline becomes the circles the game tests: the biggest circle that fits, then the biggest in what is left (at most 6).
+void Maker::finish_body_drawing(Dir f, float cx, float cy, int scale_pct) {
+    draw_mode_ = 0;
+    if (stroke_.size() < 6) return status_ = tr("Too small: hold the button and draw around the body."), void();
+    const double fx = double(f.x) / kOne, fy = double(f.y) / kOne, sc = 100.0 / std::max(1, scale_pct);
+    std::vector<std::pair<double, double>> o;
+    for (const auto& [wx, wy] : stroke_) {
+        const double dx = double(wx) - cx, dy = double(wy) - cy;
+        o.push_back({(dx * fx + dy * fy) * sc, (-dx * fy + dy * fx) * sc});  // forward, sideways
+    }
+    double x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+    for (const auto& [a, b] : o) x0 = std::min(x0, a), x1 = std::max(x1, a), y0 = std::min(y0, b), y1 = std::max(y1, b);
+    const double step = std::max(1.0, std::max(x1 - x0, y1 - y0) / 80);
+    struct P { double x, y, edge; bool covered; };
+    std::vector<P> pts;
+    for (double yy = y0; yy <= y1; yy += step)
+        for (double xx = x0; xx <= x1; xx += step)
+            if (inside_outline(o, xx, yy)) {
+                double e = 1e9;
+                for (std::size_t i = 0, j = o.size() - 1; i < o.size(); j = i++) e = std::min(e, dist_to_segment(xx, yy, o[i].first, o[i].second, o[j].first, o[j].second));
+                pts.push_back({xx, yy, e, false});
+            }
+    std::vector<BodyPart> parts;
+    while (parts.size() < 6) {
+        const P* best = nullptr;
+        for (const P& p : pts)
+            if (!p.covered && p.edge >= 2 && (!best || p.edge > best->edge)) best = &p;
+        if (!best) break;
+        const double r0 = std::min(best->edge, 150.0), bx = best->x, by = best->y;
+        parts.push_back({std::int16_t(std::clamp(std::lround(bx), -300L, 300L)), std::int16_t(std::clamp(std::lround(by), -300L, 300L)), std::int16_t(std::max(2L, std::lround(r0))), 0});
+        for (P& p : pts)
+            if (std::hypot(p.x - bx, p.y - by) <= r0) p.covered = true;
+    }
+    if (parts.empty()) return status_ = tr("Too small: hold the button and draw around the body."), void();
+    const Draft before = d_;
+    std::erase_if(d_.champ, [](const auto& kv) { return kv.first.starts_with("body"); });
+    for (std::size_t i = 0; i < parts.size(); ++i) set_kv(d_.champ, std::format("body.part{}", i + 1), std::format("{} {} {} 0", parts[i].fwd, parts[i].side, parts[i].r));
+    changed(before);
+    status_ = trf("The hitbox is now {} circles", parts.size());
+    stroke_.clear();
+}
+
+// The outline becomes the corners of the skill's own shape, and its size.
+void Maker::finish_skill_drawing(Dir f, float cx, float cy) {
+    draw_mode_ = 0;
+    if (stroke_.size() < 6) return status_ = tr("Too small: hold the button and draw the shape."), void();
+    const double fx = double(f.x) / kOne, fy = double(f.y) / kOne;
+    std::vector<std::pair<double, double>> o;
+    double ext = 1;
+    for (const auto& [wx, wy] : stroke_) {
+        const double dx = double(wx) - cx, dy = double(wy) - cy;
+        o.push_back({dx * fx + dy * fy, -dx * fy + dy * fx});
+        ext = std::max(ext, std::max(std::abs(o.back().first), std::abs(o.back().second)));
+    }
+    std::vector<bool> keep;
+    for (double eps = ext / 200;; eps *= 1.4) {
+        keep.assign(o.size(), false);
+        keep.front() = keep.back() = true;
+        simplify(o, 0, o.size() - 1, eps, keep);
+        if (std::ranges::count(keep, true) <= 24) break;
+    }
+    std::string list;
+    const int radius = int(std::ceil(ext));
+    for (std::size_t i = 0; i < o.size(); ++i)
+        if (keep[i]) list += std::format("{},{} ", std::clamp(int(std::lround(o[i].first * 100 / radius)), -127, 127), std::clamp(int(std::lround(o[i].second * 100 / radius)), -127, 127));
+    const Draft before = d_;
+    set_kv(kv(), "geo", "Custom");
+    set_kv(kv(), "poly", list);
+    set_kv(kv(), "radius", std::to_string(radius));
+    set_kv(kv(), "width", std::to_string(radius * 2));
+    changed(before);
+    stroke_.clear();
 }
 
 // ---------------------------------------------------------------- the preview
@@ -1482,7 +1704,7 @@ void Maker::preview(float x, float y, float w, float h) {
     float& zoom_ = zooms_[std::clamp(tab_, 0, 2)];
     v.cx = cwx, v.cy = cwy, v.zoom = zoom_;
     v.sw = (x + w / 2) * 2, v.sh = (y + h * 0.55f) * 2;
-    v.gy = top_down_ ? 1.f : 0.72f, v.hz = top_down_ ? 0.f : 0.7f;
+    v.gy = float(tilt_) / 100.f, v.hz = tilt_ >= 100 ? 0.f : 0.7f;  // [U-531]
     for (int i = -40; i <= 40; ++i) {  // the ground: a cell grid
         const float a = cwx + float(i) * 96;
         line(r, v.sx(a), v.sy(cwy - 3840), v.sx(a), v.sy(cwy + 3840), {60, 68, 60, 255});
@@ -1495,18 +1717,38 @@ void Maker::preview(float x, float y, float w, float h) {
     const SkillDef& d = sk();
     const bool show_skill = tab_ == 1;
     // ---- the aim
-    if (over && show_skill && (ui.down || ui.clicked) && !edit_corners_) aim_x_ = v.wx(ui.mx), aim_y_ = v.wy(ui.my);
+    if (over && show_skill && (ui.down || ui.clicked) && !edit_corners_ && !draw_mode_) aim_x_ = v.wx(ui.mx), aim_y_ = v.wy(ui.my);
     const std::int32_t ux = std::int32_t(cwx), uy = std::int32_t(cwy);
-    const Dir aim = dir_of(std::int64_t(aim_x_) - ux, std::int64_t(aim_y_) - uy);
-    // ---- the model and its hitbox
-    const Shape body = place_body(*cur_.body, ux, uy, aim, 0, 100 + cur_.model_size / 100);
+    // [U-531] away from the skills the model faces where you turned it, and the hitbox turns with it
+    const double dir_a = double(dir_) * 3.14159265358979 / 4;
+    const Dir aim = show_skill ? dir_of(std::int64_t(aim_x_) - ux, std::int64_t(aim_y_) - uy)
+                               : dir_of(std::int64_t(std::lround(std::cos(dir_a) * 1000)), std::int64_t(std::lround(std::sin(dir_a) * 1000)));
+    // ---- the model and its hitbox [U-536] two numbers: the hitbox size does not touch the model
+    const int both_pct = std::max(10, 100 + cur_.model_size / 100), hit_pct = std::max(10, both_pct * cur_.hitbox_pct / 100);
+    const Shape body = place_body(*cur_.body, ux, uy, aim, 0, hit_pct);
+    if (!show_skill && !draw_mode_ && over && pick_done_ == nullptr) {  // [U-531] drag sideways: the model turns
+        if (ui.clicked && ui.my > y + 64) turn_mx_ = ui.mx, turn_from_ = dir_, ui.clicked = false;
+        if (turn_mx_ >= 0 && ui.down) dir_ = ((turn_from_ + int((ui.mx - turn_mx_) / 36)) % 8 + 8) % 8;
+    }
+    if (!ui.down) turn_mx_ = -1;
+    if (draw_mode_ == 1) {  // [U-536] draw the outline of the body
+        if (over && ui.clicked && ui.my > y + 64) stroking_ = true, stroke_.clear(), ui.clicked = false;
+        if (stroking_) {
+            const std::pair<float, float> p{v.wx(ui.mx), v.wy(ui.my)};
+            if (stroke_.empty() || std::hypot(p.first - stroke_.back().first, p.second - stroke_.back().second) > 2.f) stroke_.push_back(p);
+            if (!ui.down) {
+                stroking_ = false;
+                finish_body_drawing(aim, cwx, cwy, hit_pct);
+            }
+        }
+    }
     {
         fill_shape(r, v, body, {255, 255, 255, 40});  // [U-522] one clean shape
         outline_shape(r, v, body, {255, 230, 80, 255}, 1.5f);
     }
     if (model_.loaded) {
         const int dir = tab_ == 2 ? dir_ : sprite_dir(float(aim.x), float(aim.y), false);
-        Sprites::draw(r, model_.view, anim_key_, win.now_s, dir, v.sx(cwx), v.sy(cwy), v.zoom * float(100 + cur_.model_size / 100) / 100.f);
+        Sprites::draw(r, model_.view, anim_key_, win.now_s, dir, v.sx(cwx), v.sy(cwy), v.zoom * float(both_pct * cur_.model_scale / 100) / 100.f);
     }
     // ---- the chosen skill over its life
     if (show_skill) {
@@ -1601,6 +1843,21 @@ void Maker::preview(float x, float y, float w, float h) {
             ground_fill(r, v, float(tx), float(ty), 30, hit ? Rgba{255, 70, 60, 200} : Rgba{120, 120, 135, 170}, 16);
             ground_ring(r, v, float(tx), float(ty), 30, {220, 220, 230, 200}, 16);
         }
+        if (const int look = d.vis.size_pct; look != 100) {  // [U-538] how big it looks, around the real hitbox
+            const Shape ls = fx_shape(fk, std::int32_t(sx), std::int32_t(sy), radius * look / 100, width * look / 100, length * look / 100, sd, flow_of(d.sub), 7, std::uint32_t(tick_q), std::uint8_t(d.geo), d.inner * look / 100);
+            if (!poly) outline_shape(r, v, ls, {255, 255, 255, 120}, 1.f);
+        }
+        if (draw_mode_ == 2) {  // [U-536] draw the shape of the skill
+            if (over && ui.clicked && ui.my > y + 64) stroking_ = true, stroke_.clear(), ui.clicked = false;
+            if (stroking_) {
+                const std::pair<float, float> p{v.wx(ui.mx), v.wy(ui.my)};
+                if (stroke_.empty() || std::hypot(p.first - stroke_.back().first, p.second - stroke_.back().second) > 2.f) stroke_.push_back(p);
+                if (!ui.down) {
+                    stroking_ = false;
+                    finish_skill_drawing(sd, sx, sy);
+                }
+            }
+        }
         // corners being drawn
         if (edit_corners_ && d.geo == Geo::Custom) {
             for (int i = 0; i + 1 < d.npoly; i += 2) {
@@ -1613,7 +1870,7 @@ void Maker::preview(float x, float y, float w, float h) {
                 std::string list;
                 const int have = ui.rclicked ? std::max(0, d.npoly - 2) : d.npoly;
                 for (int i = 0; i + 1 < have; i += 2) list += std::format("{},{} ", d.poly[std::size_t(i)], d.poly[std::size_t(i + 1)]);
-                if (!ui.rclicked && d.npoly < 24) {
+                if (!ui.rclicked && d.npoly < 48) {
                     const float mx = v.wx(ui.mx) - sx, my = v.wy(ui.my) - sy;
                     const int fw = std::clamp(int((mx * afx + my * afy) * 100.f / float(radius)), -127, 127);
                     const int sd2 = std::clamp(int((-mx * afy + my * afx) * 100.f / float(radius)), -127, 127);
@@ -1644,7 +1901,7 @@ void Maker::preview(float x, float y, float w, float h) {
         if (button(r, ui, spx + 88, ty, 36, 28, "+")) sp = std::min(300, sp + 10);
         speed_ = sp;
         SDL_SetRenderClipRect(r, &clip);
-    } else if (tab_ == 2) {
+    } else {
         // ---- the model's direction
         SDL_SetRenderClipRect(r, nullptr);
         const float ty = y + h - 40;
@@ -1657,8 +1914,11 @@ void Maker::preview(float x, float y, float w, float h) {
     }
     SDL_SetRenderClipRect(r, nullptr);
     rect(r, x, y, w, h, {90, 90, 110, 255});
-    if (button(r, ui, x + w - 130, y + 8, 122, 24, top_down_ ? tr("From above") : tr("Game camera"), false)) top_down_ = !top_down_;
-    text(r, x + 10, y + 10, show_skill ? tr("Click to aim. Wheel = zoom. Yellow = the body's hitbox, pink = the sweet spot.") : tr("Wheel = zoom. Yellow = the hitbox of the body."), {200, 200, 210});
+    for (std::size_t i = 1; i < stroke_.size() && (stroking_ || draw_mode_); ++i)
+        line(r, v.sx(stroke_[i - 1].first), v.sy(stroke_[i - 1].second), v.sx(stroke_[i].first), v.sy(stroke_[i].second), {255, 240, 120, 255});
+    if (button(r, ui, x + w - 130, y + 8, 122, 24, tilt_ >= 100 ? tr("From above") : tr("Game camera"), false)) tilt_ = tilt_ >= 100 ? 72 : 100;
+    slider(r, ui, 9101, x + w - 250, y + 36, 240, tilt_, 40, 100, tr("Angle of the camera"));  // [U-531]
+    text(r, x + 10, y + 10, show_skill ? tr("Click to aim. Wheel = zoom. Yellow = the body's hitbox, pink = the sweet spot.") : (draw_mode_ == 1 ? tr("Hold and draw the outline of the body: it becomes the hitbox.") : tr("Wheel = zoom. Drag = turn the model. Yellow = the hitbox of the body.")), {200, 200, 210});
 }
 
 // ---------------------------------------------------------------- the bar on top
@@ -1701,11 +1961,16 @@ void Maker::toolbar() {
         if (file_.empty() && opened_builtin_.empty()) save_as_new(d_.name);
         else if (dirty_ || file_.empty()) overwrite();
         if (error_.empty() && !file_.empty()) {
-            const char* base = SDL_GetBasePath();
-            const std::string exe = (fs::path(base ? base : "") / "elemental_moba").string();
-            const char* args[] = {exe.c_str(), "--practice-with", file_.c_str(), nullptr};
-            if (SDL_Process* p = SDL_CreateProcess(args, false)) SDL_DestroyProcess(p);
-            else status_ = SDL_GetError();
+            if (win.embedded()) {  // [U-529] the same window goes straight into practice
+                win.exit.practice_file = file_;
+                win.leave();
+            } else {
+                const char* base = SDL_GetBasePath();
+                const std::string exe = (fs::path(base ? base : "") / "elemental_moba").string();
+                const char* args[] = {exe.c_str(), "--practice-with", file_.c_str(), nullptr};
+                if (SDL_Process* p = SDL_CreateProcess(args, false)) SDL_DestroyProcess(p);
+                else status_ = SDL_GetError();
+            }
         }
     }
     x += 174;
@@ -1715,7 +1980,7 @@ void Maker::toolbar() {
         reparse();
     }
     if (button(r, ui, win.w - 120, 8, 110, 28, loc::current() == "en" ? "EN" : "PL")) loc::load(tool::next_language(loc::current()));
-    const char* const tabs[] = {"Champion", "Skills", "Model, hitbox, sounds"};
+    const char* const tabs[] = {"Champion", "Skills", "Hitbox, model, sounds"};
     float tx = 14;
     for (int i = 0; i < 3; ++i) {
         const float tw = 200;
@@ -1782,7 +2047,9 @@ void Maker::frame() {
 
 }  // namespace
 
-int main(int argc, char** argv) {
+namespace em::makers {
+
+int champion_main(int argc, char** argv) {
     tool::go_to_game_folder();
     std::string open_file;
     int start_tab = 0, start_page = 0;
@@ -1805,18 +2072,19 @@ int main(int argc, char** argv) {
         }
         Maker* m = maker.get();
         m->start_at(start_tab, start_page);
-        std::string drop;
-        while (m->win.begin([&](const SDL_Event& e) {
-            if (e.type == SDL_EVENT_DROP_FILE && e.drop.data) drop = e.drop.data;
-        })) {
-            if (!drop.empty()) {
-                m->take_drop(drop);
-                drop.clear();
-            }
-            m->frame();
-            m->win.end();
-        }
+        m->run();
     }
     SDL_Quit();
     return 0;
 }
+
+// [U-529] inside the window of the game
+tool::ToolExit champion_embedded(SDL_Window* win, SDL_Renderer* ren) {
+    auto maker = std::make_unique<Maker>();
+    maker->win.attach(win, ren);
+    if (!maker->init("")) return {};
+    maker->run();
+    return maker->win.exit;
+}
+
+}  // namespace em::makers

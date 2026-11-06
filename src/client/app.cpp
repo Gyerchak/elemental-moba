@@ -2,6 +2,8 @@
 // The screens themselves are in client/screens/*.cpp.
 #include "game/versions.hpp"
 #include "client/app.hpp"
+#include "apps/makers.hpp"
+#include "client/tool_shell.hpp"
 #include <fstream>
 #include <cstdlib>
 #include <filesystem>
@@ -214,6 +216,7 @@ int App::run() {
         else status_ = err;
     }
     while (!quit_) {
+        if (open_maker_) run_maker();  // [U-529]
         ui_.clicked = ui_.rclicked = ui_.backspace = ui_.enter = false;
         ui_.wheel = 0;
         ui_.typed.clear();
@@ -312,6 +315,52 @@ int App::run() {
         }
     }
     return 0;
+}
+
+// [U-529] a maker inside this window; when it is left, what it saved counts at once
+void App::run_maker() {
+    const int which = open_maker_;
+    open_maker_ = 0;
+    if (server_) {  // [U-529] a server runs in this program and uses the same tables: the maker gets its own window
+        constexpr const char* kProgram[] = {"em_champion_maker", "em_map_maker", "em_item_maker", "em_loadout_maker"};
+        std::string err;
+        if (!tool::open_program(kProgram[std::clamp(which - 1, 0, 3)], &err)) status_ = err;
+        return;
+    }
+    tool::ToolExit ex;
+    switch (which) {
+        case 1: ex = makers::champion_embedded(win_, ren_); break;
+        case 2: ex = makers::map_embedded(win_, ren_); break;
+        case 3: ex = makers::item_embedded(win_, ren_); break;
+        default: ex = makers::loadout_embedded(win_, ren_); break;
+    }
+    ui_.down = false, ui_.clicked = false, ui_.drag = -1, ui_.focus = -1;
+    SDL_StopTextInput(win_);
+    if (ex.quit) quit_ = true;
+    if (!ex.use_version.empty()) set_.version = ex.use_version, set_.save();
+    if (server_) return;  // (a running server keeps what it started with)
+    if (!apply_version(set_.version).empty()) set_.version = kOfficialVersion;
+    load_custom_maps();
+    if (!ex.practice_file.empty() && std::ranges::find(set_.custom_champions, ex.practice_file) == set_.custom_champions.end()) {
+        set_.custom_champions.push_back(ex.practice_file);
+        set_.save();
+    }
+    reset_custom_champions();
+    load_custom_champions(set_.custom_champions);
+    if (!ex.practice_file.empty() || !ex.practice_map.empty()) {  // "Test in practice": straight into it
+        net::ServerConfig c;
+        c.version = set_.version;
+        c.port = std::uint16_t(7790 + std::random_device{}() % 200);
+        c.practice = true;
+        c.ruleset = std::uint8_t(set_.ruleset);
+        c.map = !ex.practice_map.empty() && map_index(ex.practice_map) >= 0 ? map_index(ex.practice_map) : std::clamp(set_.map, 0, int(maps().size()) - 1);
+        c.features = maps()[std::size_t(c.map)].features;
+        c.loopback_only = true;
+        c.host_secret = secret_;
+        std::string err;
+        if (start_server(c, &err)) connect_local(c.port);
+        else status_ = err;
+    }
 }
 
 void App::frame(double now_s) {

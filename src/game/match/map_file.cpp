@@ -46,7 +46,7 @@ MapDef def_of(const MapDoc& d) {
     m.nexus_turrets = d.nexus_turrets, m.camps = d.camps, m.aggro_camps = d.aggro_camps, m.buff_camps = d.buff_camps, m.dark_spirits = d.dark_spirits;
     for (const auto& [c, name] : d.epics) m.epics.push_back({c, keep(name)});
     for (const MapDoc::Spot& s : d.spots) m.spots.push_back({s.cell, keep(s.monster), s.mirrored});
-    m.epic_islands = d.epic_islands, m.exact_terrain = d.exact_terrain;
+    m.epic_islands = d.epic_islands, m.exact_terrain = d.exact_terrain, m.turn_for_team = d.turn_for_team;
     m.minions = d.minions;
     m.features = d.features;
     m.cells = std::make_shared<const std::vector<std::uint32_t>>(d.cells);
@@ -74,7 +74,7 @@ MapDoc doc_of(const MapDef& m) {
     d.nexus_turrets = m.nexus_turrets, d.camps = m.camps, d.aggro_camps = m.aggro_camps, d.buff_camps = m.buff_camps, d.dark_spirits = m.dark_spirits;
     for (const EpicSpot& e : m.epics) d.epics.push_back({e.cell, std::string(e.monster)});
     for (const MonsterSpot& s : m.spots) d.spots.push_back({s.cell, std::string(s.monster), s.mirrored});
-    d.epic_islands = m.epic_islands, d.exact_terrain = m.exact_terrain;
+    d.epic_islands = m.epic_islands, d.exact_terrain = m.exact_terrain, d.turn_for_team = m.turn_for_team;
     d.minions = m.minions;
     d.features = m.features;
     const Grid g = map_grid(m);
@@ -107,7 +107,7 @@ std::string doc_to_blob(const MapDoc& d) {
     for (const CellPt& p : d.dark_spirits) line_pt(t, "dark_spirit", p);
     for (const auto& [c, n] : d.epics) t += std::format("epic {} {} {}\n", c.first, c.second, n);
     for (const MapDoc::Spot& s : d.spots) t += std::format("spot {} {} {} {}\n", s.cell.first, s.cell.second, s.mirrored ? 1 : 0, s.monster);
-    t += std::format("epic_islands {}\nexact_terrain {}\n", d.epic_islands ? 1 : 0, d.exact_terrain ? 1 : 0);
+    t += std::format("epic_islands {}\nexact_terrain {}\nturn_for_team {}\n", d.epic_islands ? 1 : 0, d.exact_terrain ? 1 : 0, d.turn_for_team ? 1 : 0);
     t += std::format("melee {}\nranged {}\nsiege_every {}\nfirst_ms {}\nperiod_ms {}\nfeatures {}\n", d.minions.melee, d.minions.ranged, d.minions.siege_every, d.minions.first_ms,
                      d.minions.period_ms, d.features);
     // the cells: pairs of (how many, value), little endian
@@ -192,6 +192,7 @@ std::string doc_from_blob(std::string_view blob, MapDoc& out) {
         }
         else if (key == "epic_islands") d.epic_islands = rest == "1";
         else if (key == "exact_terrain") d.exact_terrain = rest == "1";
+        else if (key == "turn_for_team") d.turn_for_team = rest == "1";
         else if (key == "melee") { in >> d.minions.melee; d.minions.melee = std::clamp(d.minions.melee, 0, 12); }
         else if (key == "ranged") { in >> d.minions.ranged; d.minions.ranged = std::clamp(d.minions.ranged, 0, 12); }
         else if (key == "siege_every") { in >> d.minions.siege_every; d.minions.siege_every = std::clamp(d.minions.siege_every, 0, 20); }

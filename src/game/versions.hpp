@@ -17,6 +17,7 @@
 // A skill change applies to every skill with that name (champion skills, Q options, specials).
 // The server tells joining players its version; a player who has the same folder switches to it.
 // Any mistake (unknown champion / skill / key, bad number) = the version is refused with the reason.
+#include <cstdint>
 #include <string>
 #include <utility>
 #include <vector>
@@ -27,6 +28,12 @@ namespace em {
 
 inline constexpr const char* kOfficialVersion = "official-0.1";
 
+// [U-535] the lines of a version file, one by one (what the item maker and the loadout maker preview)
+struct ItemDef;
+std::string apply_item_line(const std::string& name, const std::string& key, const std::string& value);
+std::string apply_setup_text(const std::string& kind, const std::string& name, const std::string& key, const std::string& value);
+[[nodiscard]] std::vector<std::string> item_number_keys();
+[[nodiscard]] std::int32_t item_number(const ItemDef& d, const std::string& key);
 [[nodiscard]] std::vector<std::string> list_versions();  // official first, then versions/<name>/ folders
 // Switch the game's numbers to this version. Returns "" when fine, else why it failed (the official numbers stay).
 std::string apply_version(const std::string& name, int* changes = nullptr);

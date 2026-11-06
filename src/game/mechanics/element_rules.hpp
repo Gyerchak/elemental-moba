@@ -37,6 +37,7 @@ inline constexpr std::int64_t kPuddleMs = 8'000;           // [U-292] steam cool
 // the ground gives (bonus, range bonus, half the water cost is still paid); earth and mud come from it in full.
 inline constexpr std::int64_t kMudMs = 15'000;
 inline constexpr std::int32_t kMudWaterPct = 50;
+inline constexpr std::int32_t kMudGroundSlowPct = 20;  // [U-527] walking on the mud of a swamp
 inline constexpr std::int64_t kWetWhileOnWaterMs = 150;    // [U-292] on shallow water / a puddle: wet only while standing there
 inline constexpr std::int32_t kIceSlideKeep = 62;          // [U-52] on ice a unit slides on when it stops: 62 / 64 of its speed stays per tick (at 128 Hz ≈ 0.3 s to half)
 inline constexpr std::int32_t kIcePatchSlowPct = 20;       // [U-293] an ice patch is slippery: −20 % move speed while on it

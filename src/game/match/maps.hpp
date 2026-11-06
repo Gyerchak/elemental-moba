@@ -49,6 +49,7 @@ struct MapDef {
     MinionWaves minions;
     std::uint16_t features = 0;  // [U-478] Feature bits this map switches on by default (all off unless set)
     std::vector<MonsterSpot> spots;  // [U-518]
+    bool turn_for_team = true;       // [U-532] the Earth side sees the map turned 180 degrees: each team has its base at the bottom
     bool exact_terrain = false;      // [U-518] the terrain is exactly as painted: no automatic clearings, ponds, fords
 };
 

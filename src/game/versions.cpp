@@ -200,6 +200,99 @@ std::string apply_setup_line(const std::string& kind, const std::string& name, c
     return {};
 }
 
+// ---------------------------------------------------------------- [U-535] own items
+//   item.<name>.<key> = value    a name not there yet makes a new item (at the end of the table).
+//   keys: cost; every number of ItemDef below (points as in the shop: 25 = +25); group = None / Boots / ElementWard / Special;
+//   limit = Many / One / OnePerGroup; from = part, part, part; unique, ghost, classic_only, removed = 0 / 1;
+//   any other stat by its name (kStatKeyNames), pct_<stat> for "+x % of it".
+namespace {
+struct ItemNumber { const char* key; std::int32_t ItemDef::*field; int scale; };
+constexpr ItemNumber kItemNumbers[] = {
+    {"cost", &ItemDef::cost, 1}, {"health", &ItemDef::health, 100}, {"attack", &ItemDef::attack, 100}, {"elemental_power", &ItemDef::elemental_power, 100},
+    {"defence", &ItemDef::defence, 100}, {"elemental_defence", &ItemDef::elemental_defence, 100}, {"attack_speed", &ItemDef::attack_speed, 100},
+    {"move_speed", &ItemDef::move_speed, 100}, {"elemental_haste", &ItemDef::elemental_haste, 100}, {"non_elemental_haste", &ItemDef::non_elemental_haste, 100},
+    {"cast_speed", &ItemDef::cast_speed, 100}, {"skill_speed", &ItemDef::skill_speed, 100}, {"skill_width", &ItemDef::skill_width, 100},
+    {"skill_length", &ItemDef::skill_length, 100}, {"skill_range", &ItemDef::skill_range, 100}, {"skill_radius", &ItemDef::skill_radius, 100},
+    {"elemental_lethality", &ItemDef::elemental_lethality, 100}, {"elemental_penetration", &ItemDef::elemental_penetration, 100}, {"tenacity", &ItemDef::tenacity, 100},
+    {"cc_amplify", &ItemDef::cc_amplify, 100}, {"model_size", &ItemDef::model_size, 100}, {"resist_water", &ItemDef::resist_water, 100},
+    {"resist_earth", &ItemDef::resist_earth, 100}, {"resist_fire", &ItemDef::resist_fire, 100}, {"resist_air", &ItemDef::resist_air, 100},
+    {"slow_resist", &ItemDef::slow_resist, 100}, {"slow_resist_ice", &ItemDef::slow_resist_ice, 100}, {"move_speed_pct", &ItemDef::move_speed_pct, 100},
+    {"wall_damage", &ItemDef::wall_damage, 100}, {"lifesteal", &ItemDef::lifesteal, 100}, {"omnivamp", &ItemDef::omnivamp, 100},
+    {"crit_chance", &ItemDef::crit_chance, 100}, {"crit_damage", &ItemDef::crit_damage, 100}, {"spellvamp", &ItemDef::spellvamp, 100},
+    {"on_hit_dmg", &ItemDef::on_hit_dmg, 100}, {"on_hit_max_hp", &ItemDef::on_hit_max_hp, 100}, {"active_cd_ms", &ItemDef::active_cd_ms, 1}, {"true_sight", &ItemDef::true_sight, 1},
+};
+}  // namespace
+
+std::string item_line(const std::string& name, const std::string& key, const std::string& v) {
+    if (name.empty()) return "an item needs a name";
+    std::vector<ItemDef>& all = item_store();
+    auto it = std::ranges::find_if(all, [&](const ItemDef& d) { return d.name == name; });
+    if (it == all.end()) {
+        if (all.size() >= 2'000) return "too many items";
+        all.push_back(ItemDef{.name = keep_setup_name(name), .cost = 100});
+        it = all.end() - 1;
+    }
+    ItemDef& d = *it;
+    auto flag = [&](bool& b) { b = v != "0"; };
+    if (key == "unique") return flag(d.unique), std::string();
+    if (key == "ghost") return flag(d.ghost), std::string();
+    if (key == "classic_only") return flag(d.classic_only), std::string();
+    if (key == "removed") return d.mod = v != "0" ? std::string_view("removed") : std::string_view(), std::string();
+    if (key == "name") return d.name = keep_setup_name(v), std::string();
+    if (key == "group") {
+        constexpr const char* n[] = {"None", "Boots", "ElementWard", "Special"};
+        for (int i = 0; i < 4; ++i)
+            if (v == n[i]) return d.group = ItemGroup(i), std::string();
+        return std::format("group '{}': None / Boots / ElementWard / Special", v);
+    }
+    if (key == "limit") {
+        constexpr const char* n[] = {"Many", "One", "OnePerGroup"};
+        for (int i = 0; i < 3; ++i)
+            if (v == n[i]) return d.limit = BuyLimit(i), std::string();
+        return std::format("limit '{}': Many / One / OnePerGroup", v);
+    }
+    if (key == "active") {
+        constexpr const char* n[] = {"None", "LotusTile", "SpiritFlask", "Falcon", "Shadow"};
+        for (int i = 0; i < 5; ++i)
+            if (v == n[i]) return d.active = ItemActive(i), std::string();
+        return std::format("active '{}': None / LotusTile / SpiritFlask / Falcon / Shadow", v);
+    }
+    if (key == "from") {
+        d.from = {};
+        std::size_t n = 0, start = 0;
+        while (start <= v.size() && n < d.from.size()) {
+            const std::size_t c = v.find(',', start);
+            const std::string part = trim(v.substr(start, c == std::string::npos ? std::string::npos : c - start));
+            if (!part.empty()) d.from[n++] = keep_setup_name(part);
+            if (c == std::string::npos) break;
+            start = c + 1;
+        }
+        return {};
+    }
+    const std::optional<NumExpr> e = parse_num_expr(v);
+    if (!e) return std::format("'{}' is not a number", v);
+    for (const ItemNumber& f : kItemNumbers)
+        if (key == f.key) {
+            d.*f.field = std::int32_t(std::clamp<std::int64_t>(apply_num_expr(*e, d.*f.field, f.scale), -100'000'000, 100'000'000));
+            return {};
+        }
+    const bool pct = key.starts_with("pct_");
+    const std::string stat = pct ? key.substr(4) : key;
+    for (int i = 0; i < int(StatKey::Count); ++i)
+        if (stat == kStatKeyNames[i]) {
+            ItemDef::More* free = nullptr;
+            for (ItemDef::More& m : d.more) {
+                if (m.key == StatKey(i) && m.pct == pct) free = &m;
+                else if (!free && m.key == StatKey::Count) free = &m;
+            }
+            if (!free) return "at most 8 other stats on an item";
+            *free = {StatKey(i), std::int32_t(apply_num_expr(*e, free->key == StatKey(i) ? free->value : 0, 100)), pct};
+            if (free->value == 0) *free = {};
+            return {};
+        }
+    return std::format("unknown key '{}' for an item", key);
+}
+
 // [U-482] any number may be relative to the official one: +30%, -20%, *1.5, +40 (core/numbers.hpp)
 bool set_champion(ChampionDef& c, const std::string& key, const NumExpr& e) {
     auto put = [&](std::int32_t& f, double scale) { f = std::int32_t(std::clamp<std::int64_t>(apply_num_expr(e, f, scale), -1'000'000'000, 1'000'000'000)); };
@@ -349,6 +442,19 @@ std::string version_description(const std::string& name) {
     return {};
 }
 
+std::string apply_item_line(const std::string& name, const std::string& key, const std::string& v) { return item_line(name, key, v); }
+std::vector<std::string> item_number_keys() {
+    std::vector<std::string> out;
+    for (const ItemNumber& f : kItemNumbers) out.push_back(f.key);
+    return out;
+}
+std::int32_t item_number(const ItemDef& d, const std::string& key) {
+    for (const ItemNumber& f : kItemNumbers)
+        if (key == f.key) return d.*f.field / f.scale;
+    return 0;
+}
+std::string apply_setup_text(const std::string& kind, const std::string& name, const std::string& key, const std::string& v) { return apply_setup_line(kind, name, key, v); }
+
 std::string apply_version(const std::string& name, int* changes) {
     restore_official_numbers();
     g_current = kOfficialVersion;
@@ -390,7 +496,7 @@ std::string apply_version(const std::string& name, int* changes) {
         // "champion.<name>.<key>" / "skill.<name>.<key>" (names may contain spaces, not dots)
         const auto d1 = k.find('.'), d2 = k.rfind('.');
         if (d1 == std::string::npos || d1 == d2) {
-            error = std::format("line {}: write champion.<name>.<key> or skill.<name>.<key>", line_no);
+            error = std::format("line {}: write champion.<name>.<key>, skill.<name>.<key> or item.<name>.<key>", line_no);
             break;
         }
         const std::string kind = k.substr(0, d1), what = k.substr(d1 + 1, d2 - d1 - 1), key = k.substr(d2 + 1);
@@ -401,6 +507,14 @@ std::string apply_version(const std::string& name, int* changes) {
                 break;
             }
             if (const std::string e = apply_setup_line(what.substr(0, d3), what.substr(d3 + 1), key, v); !e.empty()) {
+                error = std::format("line {}: {}", line_no, e);
+                break;
+            }
+            ++n;
+            continue;
+        }
+        if (kind == "item") {  // [U-535] item.<name>.<key>
+            if (const std::string e = item_line(what, key, v); !e.empty()) {
                 error = std::format("line {}: {}", line_no, e);
                 break;
             }
@@ -425,7 +539,7 @@ std::string apply_version(const std::string& name, int* changes) {
             for (SkillDef& s : specials_mut())
                 if (s.name == what) found = true, key_ok = key_ok && set_skill(s, key, *value);
         } else {
-            error = std::format("line {}: unknown '{}' (champion / skill)", line_no, kind);
+            error = std::format("line {}: unknown '{}' (champion / skill / item / setup)", line_no, kind);
             break;
         }
         if (!found) error = std::format("line {}: no {} named '{}'", line_no, kind, what);

@@ -178,6 +178,18 @@ void App::host(bool dedicated) {
     text_field(ren_, ui_, 42, x + 440, y, 120, port_, tr("UDP port"));
     text_field(ren_, ui_, 43, x + 580, y, 90, tick_, tr("Tick rate (Hz)"));
     y += 54;
+    {  // [U-537] the address it listens on, and the address others use from outside
+        const std::string b0 = set_.host_bind, p0 = set_.host_public;
+        text_field(ren_, ui_, 46, x, y, 240, set_.host_bind, tr("Listen on (empty = all)"));
+        text_field(ren_, ui_, 47, x + 260, y, 200, set_.host_public, tr("Public address"));
+        if (button(ren_, ui_, x + 470, y, 200, 28, tr("Find my public IP"))) {
+            std::string why;
+            if (const std::string ip = tool::public_address(&why); !ip.empty()) set_.host_public = ip, status_ = std::format("{} {}", tr("Public address"), ip);
+            else status_ = tr(why);
+        }
+        if (set_.host_bind != b0 || set_.host_public != p0) set_.save();
+    }
+    y += 54;
     text_field(ren_, ui_, 44, x, y, 440, host_motd_, tr("Message of the day"));
     text_field(ren_, ui_, 45, x + 460, y, 210, host_pass_, tr("Password (empty = none)"));  // [U-374]
     y += 44;
@@ -218,6 +230,8 @@ void App::host(bool dedicated) {
         c.name = host_name_;
         c.motd = host_motd_;
         c.password = host_pass_;
+        c.bind_ip = set_.host_bind;      // [U-537]
+        c.public_ip = set_.host_public;
         c.port = std::uint16_t(std::clamp(std::atoi(port_.c_str()), 1024, 65'535));
         c.tick_hz = std::uint32_t(std::clamp(std::atoi(tick_.c_str()), 16, 256));
         c.force_server_textures = force_tex_;
@@ -251,6 +265,14 @@ void App::host(bool dedicated) {
         if (button(ren_, ui_, x + 420, y + 118, 70, 26, tr("Copy"))) {
             SDL_SetClipboardText(mine.c_str());
             status_ = std::format("{} {}", tr("copied:"), mine);
+        }
+    }
+    if (!set_.host_public.empty()) {  // [U-537] the address for players outside
+        const std::string pub = std::format("{}:{}", set_.host_public, port_);
+        text(ren_, x, y + 150, std::format("{}: {}", tr("Your public address"), pub), {230, 225, 170}, 1.5f);
+        if (button(ren_, ui_, x + 420, y + 144, 70, 26, tr("Copy") + " ")) {
+            SDL_SetClipboardText(pub.c_str());
+            status_ = std::format("{} {}", tr("copied:"), pub);
         }
     }
     text(ren_, x, y + 80, tr("Others join with your IP address and this port (open the UDP port in your router for the internet)."), {150, 150, 170});

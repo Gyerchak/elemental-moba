@@ -122,6 +122,8 @@ struct Settings {
     int fx_particles = 3;                  // 0 off, 1 low, 2 medium, 3 high
     int fx_skills = 3;                     // [U-523] skill look: 0 flat, 1 core, 2 + glow, 3 full
     bool fx_own_pictures = true;           // [U-521] pictures and sounds of own champions' skills
+    int map_side = 0;                      // [U-532] my base at the bottom: 0 as the map says, 1 always, 2 never
+    std::string host_bind, host_public;    // [U-537] Host a match / server: the address to listen on, the address shown to others
     bool fx_animations = true;             // [U-521] unit animations play (off: first frame of each, less work)
     void apply_fx_preset(int preset) {
         fx_preset = preset;

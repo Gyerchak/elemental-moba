@@ -217,10 +217,7 @@ void App::custom_champions() {
     }
     if (y == 80) text(ren_, 20, y, tr("No files yet. Copy custom_champions/example.champ and change it."), {200, 200, 210});
     if (!can_change) text(ren_, 20, H - 90, tr("Stop the running server to change own champions."), {255, 180, 120});
-    if (button(ren_, ui_, 230, H - 52, 240, 36, tr("Champion maker"))) {  // [U-510]
-        std::string err;
-        if (!tool::open_program("em_champion_maker", &err)) status_ = err;
-    }
+    if (button(ren_, ui_, 230, H - 52, 240, 36, tr("Champion maker"))) open_maker_ = 1;  // [U-510][U-529]
     if (button(ren_, ui_, 20, H - 52, 200, 36, tr("Back"))) go(Screen::Menu);
 }
 

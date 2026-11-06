@@ -123,7 +123,7 @@ void draw_panel(tool::Window& win, Panel& p) {
     y += 40;
     // ---- running or not, always on top
     const bool on = p.server != nullptr;
-    fill_rect(r, x, y, colw, 78, {30, 34, 46, 255});
+    fill_rect(r, x, y, colw, 100, {30, 34, 46, 255});
     rect(r, x, y, colw, 78, on ? Rgba{120, 220, 130, 255} : Rgba{110, 110, 140, 255});
     if (on) {
         text(r, x + 12, y + 10, std::format("{} {}   {} {}   {}", tr("port"), p.server->port(), tr("players"), p.server->players.load(),
@@ -138,6 +138,14 @@ void draw_panel(tool::Window& win, Panel& p) {
     if (button(r, ui, x + 420, y + 50, 70, 22, tr("Copy"))) {
         SDL_SetClipboardText(addr.c_str());
         p.status = std::format("{} {}", tr("copied:"), addr);
+    }
+    if (!p.cfg.public_ip.empty()) {  // [U-537]
+        const std::string pub = std::format("{}:{}", p.cfg.public_ip, p.port_s);
+        text(r, x + 12, y + 76, std::format("{}: {}", tr("Your public address"), pub), {230, 225, 170});
+        if (button(r, ui, x + 420, y + 72, 70, 22, tr("Copy") + " ")) {
+            SDL_SetClipboardText(pub.c_str());
+            p.status = std::format("{} {}", tr("copied:"), pub);
+        }
     }
     if (button(r, ui, x + colw - 200, y + 10, 188, 56, on ? tr("Stop server") : tr("Start server"), on)) {
         if (on) p.stop(), p.status.clear();
@@ -167,6 +175,14 @@ void draw_panel(tool::Window& win, Panel& p) {
     y += 12;
     text_field(r, ui, 1, x, y, 420, p.cfg.name, tr("Name in the server list"));
     text_field(r, ui, 2, x + 440, y, 120, p.port_s, tr("UDP port"));
+    y += 42;
+    text_field(r, ui, 11, x, y, 240, p.cfg.bind_ip, tr("Listen on (empty = all)"));  // [U-537]
+    text_field(r, ui, 12, x + 260, y, 200, p.cfg.public_ip, tr("Public address"));
+    if (button(r, ui, x + 470, y, 200, 28, tr("Find my public IP"))) {
+        std::string why;
+        if (const std::string ip = tool::public_address(&why); !ip.empty()) p.cfg.public_ip = ip;
+        else p.status = tr(why);
+    }
     y += 42;
     text_field(r, ui, 3, x, y, colw, p.cfg.motd, tr("Message of the day"));
     y += 42;
@@ -249,6 +265,8 @@ int main(int argc, char** argv) {
         auto next = [&] { return i + 1 < argc ? std::string(argv[++i]) : std::string(); };
         if (a == "--nogui") console = true;
         else if (a == "--port") cfg.port = std::uint16_t(std::atoi(next().c_str()));
+        else if (a == "--bind") cfg.bind_ip = next();      // [U-537]
+        else if (a == "--public") cfg.public_ip = next();
         else if (a == "--map") cfg.map = std::max(0, map_index(next()));
         else if (a == "--version") cfg.version = next();
         else if (a == "--tick") cfg.tick_hz = std::uint32_t(std::atoi(next().c_str()));

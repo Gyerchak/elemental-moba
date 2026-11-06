@@ -97,7 +97,15 @@ std::uint8_t World::mob_name_id(const Unit& u) {
     return 0;
 }
 
-std::int32_t World::size_pct(const Unit& u) const { return model_size_pct(u.stats); }
+// [U-536] the hitbox and the picture are two numbers: items and growing change both, a champion's hitbox_size only the first, model_scale only the second
+std::int32_t World::size_pct(const Unit& u) const {
+    const std::int32_t own = u.kind == UnitKind::Champion ? champions()[std::size_t(u.champ)].hitbox_pct : 100;
+    return std::max(10, model_size_pct(u.stats) * (own + u.practice_hitbox) / 100);
+}
+std::int32_t World::model_pct(const Unit& u) const {
+    const std::int32_t own = u.kind == UnitKind::Champion ? champions()[std::size_t(u.champ)].model_scale : 100;
+    return std::max(10, model_size_pct(u.stats) * own / 100);
+}
 
 Shape World::hitbox(const Unit& u) const {
     return place_body(*u.body, u.ux(), u.uy(), u.face, u.walk_phase, size_pct(u));
@@ -487,7 +495,8 @@ bool World::can_cast_now(const Unit& u, Slot s, std::string* why, std::int32_t s
 bool World::only_mud_source(const Unit& u, std::int32_t sx, std::int32_t sy) const {
     if (sx >= 0) return water_source_at(sx, sy) == WaterSource::Mud;
     std::size_t i = 0;
-    return big_water_near(u, &i) == 2 && clouds[i].kind == CloudKind::Mud;
+    const int near = big_water_near(u, &i);
+    return near == 3 || (near == 2 && clouds[i].kind == CloudKind::Mud);  // [U-527] 3: the mud of the map
 }
 
 // [U-510] what the skill relies on and is not here (empty = fine)
@@ -510,7 +519,7 @@ std::string_view World::missing_need(const Unit& u, const SkillDef& d) const {
     }
     if ((d.needs & kNeedWater) && big_water_near(u) == 0 && !near_cell([](Cell c) { return c.surface() == Surface::Water || c.surface() == Surface::DeepWater; }))
         return "needs water nearby";
-    if ((d.needs & kNeedMud) && !near_cloud(CloudKind::Mud) && !near_cell([](Cell c) { return c.surface() == Surface::Water; }))
+    if ((d.needs & kNeedMud) && !near_cloud(CloudKind::Mud) && !near_cell([](Cell c) { return c.surface() == Surface::Water || c.surface() == Surface::Mud; }))
         return "needs mud or shallow water nearby";
     if ((d.needs & kNeedRock) && !near_cell([](Cell c) { return c.wall() == Wall::Stone; })) return "needs a rock or stone wall nearby";
     if ((d.needs & kNeedIce) && !near_cloud(CloudKind::IcePatch) && !near_cell([](Cell c) { return c.wall() == Wall::Ice || c.surface() == Surface::Glacier; }))
@@ -752,7 +761,8 @@ void World::command(std::uint32_t id, const Cmd& c) {
             return;
         case CmdKind::PracticeSize:  // [U-517]
             if (cfg.practice) {
-                if (c.slot == 255) u.practice_model = c.y ? 0 : std::clamp(u.practice_model + c.x * 100, -5'000, 20'000);
+                if (c.slot == 255) u.practice_hitbox = c.y ? 0 : std::clamp(u.practice_hitbox + c.x, -80, 400);  // [U-536] the hitbox alone
+                else if (c.slot == 254) u.practice_model = c.y ? 0 : std::clamp(u.practice_model + c.x * 100, -5'000, 20'000);  // the special key: the model too
                 else if (c.slot < u.practice_size.size()) {
                     std::int16_t& g = u.practice_size[c.slot];
                     g = c.y ? std::int16_t(0) : std::int16_t(std::clamp(g + c.x, -80, 400));

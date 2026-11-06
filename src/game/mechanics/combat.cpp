@@ -410,6 +410,7 @@ void World::fire_auto(Unit& u, Unit& target) {
     if (elemental) {
         sub = champions()[std::size_t(u.champ)].sub;
         dmg = dmg * sky_boost(base_element(sub), sky).power_pm() / 1000;  // [U-370]
+        if (const HeatLevel* hl = heat_of(champions()[std::size_t(u.champ)].auto_heat)) dmg = dmg * hl->dmg_pct / 100;  // [U-534]
     } else if (u.magic_until > now_ms) {  // [U-264] a non-bender in a magic stance: the auto becomes magic
         sub = SubElement(u.magic_sub);
         dmg = dmg * sky_boost(base_element(sub), sky).power_pm() / 1000;  // [U-370]
@@ -434,6 +435,7 @@ void World::fire_auto(Unit& u, Unit& target) {
     e.owner = u.id;
     e.target = t->id;
     e.sub = sub;
+    if (elemental && u.kind == UnitKind::Champion) e.heat = champions()[std::size_t(u.champ)].auto_heat;  // [U-534] its colour
     e.flow = sub != SubElement::Physical ? flow_of(sub) : Flow::Plain;
     e.x = u.x;
     e.y = u.y;

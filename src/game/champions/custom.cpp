@@ -237,6 +237,14 @@ std::string parse_text(const std::string& text, ChampionDef& out) {
             const int e = enum_of(kSubs, v);
             if (e < 0) return std::format("line {}: unknown sub-element '{}'", n, v);
             out.sub = SubElement(e);
+        } else if (k == "hitbox_size") {  // [U-536] the hitbox alone: 120 = 120 %, +20 = 20 % more
+            const std::string t(v);
+            const int x = std::atoi(t.c_str());
+            out.hitbox_pct = std::int16_t(std::clamp(t.starts_with('+') || t.starts_with('-') ? out.hitbox_pct + x : x, 20, 500));
+        } else if (k == "model_scale") {  // [U-536] the picture alone
+            out.model_scale = std::int16_t(std::clamp(std::atoi(std::string(v).c_str()), 20, 500));
+        } else if (k == "auto_heat") {  // [U-534]
+            out.auto_heat = std::uint8_t(std::clamp(std::atoi(std::string(v).c_str()), 0, 9));
         } else if (k == "role") {
             const int e = enum_of(kRoles, v);
             if (e < 0) return std::format("line {}: unknown role '{}'", n, v);
@@ -516,6 +524,7 @@ std::string parse_text(const std::string& text, ChampionDef& out) {
             else if (f == "vis.flash") ok = num(sk.vis.flash, 0, 1);
             else if (f == "vis.particles") ok = num(sk.vis.particles, 0, 40);
             else if (f == "vis.mark_ms") ok = num(sk.vis.mark_ms, 0, 30'000);
+            else if (f == "vis.size") ok = num(sk.vis.size_pct, 10, 400);  // [U-538]
             else if (f == "vis.sheet") sk.vis.sheet = keep(v);  // [U-510] a picture on the hitbox: skills/<file>
             else if (f == "vis.frames") ok = num(sk.vis.frames, 1, 64);
             else if (f == "vis.fps") ok = num(sk.vis.fps, 1, 60);
@@ -563,6 +572,7 @@ std::string parse_text(const std::string& text, ChampionDef& out) {
             else if (f == "grapple_speed") ok = num(sk.grapple_speed, 100, 6'000);
             else if (f == "pin_range") ok = num(sk.pin_range, 0, 2'000);
             else if (f == "pin_ms") ok = num(sk.pin_ms, 0, 8'000);
+            else if (f == "cc_sweet_only") ok = num(sk.cc_sweet_only, 0, 1);  // [U-539]
             else if (f == "heat") ok = num(sk.heat, 0, 9);                // [U-523]
             else if (f == "sweet_heat") ok = num(sk.sweet_heat, 0, 9);
             else if (f == "burrow") { std::int32_t b = 0; ok = num(b, 0, 1); sk.burrow = b != 0; }  // [U-50]

@@ -247,6 +247,7 @@ struct SkillDef {
         // mode 0: loops at fps; 1: plays once over the skill's life; 2: loops and grows from 0 to its full size over the life
         std::string_view sheet{};
         std::uint8_t frames = 1, fps = 12, mode = 0;
+        std::uint16_t size_pct = 100;  // [U-538] how big it LOOKS (like a skin for the hitbox); the real hitbox stays; the developer view shows the real one
     } vis{};
     // [U-402] mouse control while the cast key is HELD: 1 = steer — the projectile turns towards the cursor (turn
     // speed steer_turn, Q14 per tick); 2 = draw — the wall follows the mouse path, raised when the key is released
@@ -276,7 +277,7 @@ struct SkillDef {
     std::uint8_t nkeys = 0;
     std::int32_t key_loop_ms = 0;  // > 0: the keys repeat with this period instead of following the life
     std::int16_t sweet_from = 0;   // SweetZone::Band: where it starts, % of the shape
-    std::array<std::int8_t, 24> poly{};  // Geo::Custom: forward, side pairs in % of radius (at most 12 corners)
+    std::array<std::int8_t, 48> poly{};  // Geo::Custom: forward, side pairs in % of radius (at most 24 corners; [U-536] they can be drawn with the mouse)
     std::uint8_t npoly = 0;
     std::uint16_t needs = 0;       // kNeed… bits
     // ---- [U-524]
@@ -288,6 +289,7 @@ struct SkillDef {
     std::int16_t pin_ms = 0;       // … then gets the skill's CC for this long. No wall close: no pin
     // ---- [U-523] heat of a fire skill: 0 = its usual look (orange fire); 1 … 9 = HeatLevel (mechanics + look)
     std::uint8_t heat = 0, sweet_heat = 0;
+    bool cc_sweet_only = false;    // [U-539] its crowd control and knock only on the sweet spot
     bool burrow = false;           // [U-50] Dash: under the ground: cannot be seen or hit on the way, passes walls and units
     std::int32_t lock_ms = 0;      // [U-347] casting it puts my other skills on cooldown this long …
     std::uint16_t lock_slots = 0;  // … only these (bit per key: 1 P, 2 Q, 4 W, 8 E, 16 R, 32 T, 64 Y, 128 F, 256 G; 0 = all others)
@@ -387,7 +389,10 @@ struct ChampionDef {
     std::int32_t str = 0, agi = 0, intel = 0, str_lvl = 0, agi_lvl = 0, int_lvl = 0;
     // [U-478] own talents (feature Talents) at levels 10 / 15 / 20 / 25, left / right; key Count = the default one
     std::array<std::array<SkillDef::Learned, 2>, 4> talents{};
-    std::int32_t model_size = 0;                        // [U-510][U-517] +model and hitbox size (100 = 1 %)
+    std::uint8_t auto_heat = 0;                         // [U-534] autoattack: 1 … 9 = HeatLevel (0 = the usual fire of its sub-element)
+    std::int32_t model_size = 0;                        // [U-510][U-517] +model and hitbox size together (100 = 1 %)
+    std::int16_t hitbox_pct = 100;                      // [U-536] the hitbox alone, %: the normal way to change a size
+    std::int16_t model_scale = 100;                     // [U-536] the picture alone, % (only seen; a special setting in the maker)
     SkillDef q_own, f_own, g_own;                       // [U-520] its OWN Q / F / G skill (kind None = none): only this champion can pick it
     bool replaces = false;                              // [U-519] an own file that replaces the built-in champion of the same name
     std::uint32_t colour = 0xffffff;

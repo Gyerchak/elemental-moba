@@ -46,6 +46,11 @@ void App::options(bool in_game) {
             if (button(ren_, ui_, x, y, 640, 26, std::format("{}: {}", tr("Systems (practice / hosting)"), tr(kRuleSetNames[std::clamp(set_.ruleset, 0, 2)])), false))
                 set_.ruleset = (set_.ruleset + 1) % int(RuleSet::Count), changed = true;  // [U-416]
             y += 30;
+            if (const char* const kSide[] = {"As the map says", "Always", "Never"};  // [U-532]
+                button(ren_, ui_, x, y, 640, 26, std::format("{}: {}", tr("My base at the bottom of the screen"), tr(kSide[std::clamp(set_.map_side, 0, 2)])))) {
+                set_.map_side = (set_.map_side + 1) % 3, changed = true;
+            }
+            y += 30;
             toggle(tr("Show other players' own emotes"), set_.show_other_emotes);  // [U-414]
             toggle(tr("Auto-buy: buy my setup's build in the shop"), set_.auto_buy);          // [U-323]
             toggle(tr("Auto-levelling: spend skill points by my setup's order"), set_.auto_level);  // [U-324]

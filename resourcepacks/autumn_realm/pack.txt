@@ -1,0 +1,2 @@
+Autumn Realm
+The whole map in autumn colours. Any file of the default pack can be replaced here: textures, sounds, music, models, animation scripts.

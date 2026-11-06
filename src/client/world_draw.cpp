@@ -460,7 +460,7 @@ void GameView::draw_units(NetClient& net, double now_s) {
         Rgba tc = u.alive ? team_colour(u.team) : Rgba{60, 60, 60, 200};
         if (anim == AnimSlot::Frozen) tc = mixc(tc, {200, 240, 255, 255}, 65);
         const Rgba fill = kind == UnitKind::Champion && u.champ >= 0 ? mixc(tc, hex(champions()[std::size_t(u.champ)].colour), 45) : tc;
-        float H = height_of(u) * float(u.size_pct) / 100.f;
+        float H = height_of(u) * float(u.model_pct) / 100.f;  // [U-536]
         float lift = anim == AnimSlot::FlySelf ? 60.f : 0.f;
         float air_tilt = 0;
         {  // [U-508] knocked up: a real arc over its whole time (up, down), a tumble, dust when it leaves and lands the ground
@@ -560,7 +560,7 @@ void GameView::draw_units(NetClient& net, double now_s) {
                 Sprites::tilt = air_tilt;
                 if (!set_.fx_animations && u.alive) t = 0, hold = false;  // [U-521] still pictures
                 Sprites::draw(r_, *sheet, an, t, sprite_dir(float(u.fx), float(u.fy), view_.flip), view_.sx(du.x), gy,
-                              z * float(u.size_pct) / 100.f * (critter ? 0.6f : 1.f), tint, hold);
+                              z * float(u.model_pct) / 100.f * (critter ? 0.6f : 1.f), tint, hold);  // [U-536]
                 Sprites::tilt = 0;
                 // [U-260] flames on a burning unit
                 if (u.alive && has_status(u, StatusKind::Burn))
@@ -870,7 +870,12 @@ void GameView::draw_companions(NetClient& net, double now_s) {
         }
     } keep{*this};
     for (const auto& c : comp_draw_) {
-        const float wx = float(c.x), wy = float(c.y);
+        // [U-543] snapshots come less often than frames: it glides between them instead of hopping, and it is not fooled by still frames
+        auto [sm, new_sm] = companion_smooth_.try_emplace(c.owner, std::pair<float, float>{float(c.x), float(c.y)});
+        const float far2 = (float(c.x) - sm->second.first) * (float(c.x) - sm->second.first) + (float(c.y) - sm->second.second) * (float(c.y) - sm->second.second);
+        const float follow = far2 > 900.f * 900.f ? 1.f : std::min(1.f, float(frame_ms_) / 70.f);  // (a jump: at once)
+        sm->second.first += (float(c.x) - sm->second.first) * follow, sm->second.second += (float(c.y) - sm->second.second) * follow;
+        const float wx = sm->second.first, wy = sm->second.second;
         const float sx = view_.sx(wx), gy = view_.sy(wy);
         if (sx < -200 || gy < -200 || sx > view_.sw + 200 || gy > view_.sh + 200) continue;
         const float bob = float(std::sin(now_s * 10)) * 3 * z;
@@ -889,8 +894,10 @@ void GameView::draw_companions(NetClient& net, double now_s) {
             auto [ly, fresh2] = companion_last_y_.try_emplace(c.owner, float(c.y));
             const float ddx = float(c.x) - lx->second, ddy = float(c.y) - ly->second;
             int& dir = companion_dir_[c.owner];
-            if (ddx * ddx + ddy * ddy > 0.25f) dir = sprite_dir(ddx, ddy, view_.flip), lx->second = float(c.x), ly->second = float(c.y);
-            Sprites::draw(r_, *sh, c.carrying || ddx * ddx + ddy * ddy > 0.25f ? "walk" : "idle", now_s, dir, sx, view_.sy_h(wy, h), z,
+            double& moved_at = companion_moved_[c.owner];
+            if (ddx * ddx + ddy * ddy > 18.f * 18.f) dir = sprite_dir(ddx, ddy, view_.flip), lx->second = float(c.x), ly->second = float(c.y);  // (a real step, not a wobble: no turning back and forth)
+            if (ddx != 0 || ddy != 0) moved_at = now_s;
+            Sprites::draw(r_, *sh, c.carrying || now_s - moved_at < 0.25 ? "walk" : "idle", now_s, dir, sx, view_.sy_h(wy, h), z,
                           {255, 255, 255, 255}, false);
             continue;
         }
@@ -1025,7 +1032,9 @@ void GameView::draw_hits(NetClient& net, double now_s) {
         const float dx = view_.sx(dst->x), dy = view_.sy_h(dst->y, 70);
         if (lh.h.is_auto && src && t < 0.18f) {  // autoattack slash
             const float sx2 = view_.sx(src->x), sy2 = view_.sy_h(src->y, 50);
-            for (int k = -1; k <= 1; ++k) line(r_, sx2 + float(k), sy2, dx + float(k), dy, {255, 255, 255, 220});
+            // [U-545] a line across the screen only in the developer view; in the game only a melee hit, right next to the target
+            if (set_.dev_mode || std::hypot(src->x - dst->x, src->y - dst->y) < 260.f)
+                for (int k = -1; k <= 1; ++k) line(r_, sx2 + float(k), sy2, dx + float(k), dy, {255, 255, 255, 220});
             fill_circle(r_, dx, dy, 10.f * (1 - t * 4), {255, 255, 255, 180}, 12);
         }
         const bool mine = lh.h.src == net.my_unit, on_me = lh.h.dst == net.my_unit;
@@ -1186,7 +1195,16 @@ void GameView::draw_world(NetClient& net, double now_s) {
     }
     draw_fx_marks(now_s);  // [U-459] scorch marks / impact rings of skills that ended
     // skills [U-131]: fluid body + exact edge
-    for (const auto& f : fx_draw_) {
+    for (const auto& real : fx_draw_) {
+        auto f = real;
+        if (!set_.dev_mode && f.vchamp >= 0 && std::size_t(f.vchamp) < champions().size()) {  // [U-538] how big it looks; the developer view shows the real size
+            const ChampionDef& cd = champions()[std::size_t(f.vchamp)];
+            const SkillDef* const list[] = {&cd.p, &cd.w, &cd.e, &cd.r, &cd.t, &cd.y, &cd.q_own, &cd.f_own, &cd.g_own};
+            if (const int look = list[std::min<int>(f.vslot, 8)]->vis.size_pct; look != 100) {
+                f.radius = decltype(f.radius)(f.radius * look / 100), f.width = decltype(f.width)(f.width * look / 100), f.length = decltype(f.length)(f.length * look / 100);
+                f.inner = decltype(f.inner)(f.inner * look / 100);
+            }
+        }
         const Shape s = fx_shape(FxKind(f.kind), f.x, f.y, f.radius, f.width, f.length, {f.dx, f.dy}, Flow(f.flow), f.seed, local_tick_, f.geo, f.inner);
         const SubElement sub = SubElement(f.sub);
         Rgba col = hex(element_colour(base_element(sub)));

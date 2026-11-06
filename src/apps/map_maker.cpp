@@ -18,6 +18,7 @@
 #include <vector>
 
 #include "client/locale.hpp"
+#include "apps/makers.hpp"
 #include "client/tool_shell.hpp"
 #include "core/surface_rules.hpp"
 #include "game/match/map_file.hpp"
@@ -33,8 +34,8 @@ namespace {
 constexpr int N = kGridSize;
 [[nodiscard]] constexpr std::size_t idx(int x, int y) { return std::size_t(y) * N + std::size_t(x); }
 
-constexpr const char* kSurfaceNames[] = {"Land", "Dryland", "Glacier", "Shallow water", "Sand", "Stone", "Wood", "Deep water", "Magma", "Metal", "Platinum", "Stone road", "Forest path"};
-constexpr Rgba kSurfaceCol[] = {{70, 124, 62}, {134, 118, 74}, {206, 228, 240}, {80, 150, 200}, {214, 196, 136}, {128, 128, 134}, {130, 90, 56}, {26, 62, 124}, {230, 90, 30}, {150, 156, 168}, {226, 226, 236}, {150, 140, 120}, {120, 100, 66}};
+constexpr const char* kSurfaceNames[] = {"Land", "Dryland", "Glacier", "Shallow water", "Sand", "Stone", "Wood", "Deep water", "Magma", "Metal", "Platinum", "Stone road", "Forest path", "Mud"};
+constexpr Rgba kSurfaceCol[] = {{70, 124, 62}, {134, 118, 74}, {206, 228, 240}, {80, 150, 200}, {214, 196, 136}, {128, 128, 134}, {130, 90, 56}, {26, 62, 124}, {230, 90, 30}, {150, 156, 168}, {226, 226, 236}, {150, 140, 120}, {120, 100, 66}, {92, 70, 48}};
 
 // ---- what the brush paints
 enum class Layer : std::uint8_t { Preset, Surface, Elevation, Walk, Wall, Tree, Bush, VisionFog, SoundFog, SkillFog, SeismicFog, HeatFog, Count };
@@ -44,6 +45,23 @@ constexpr const char* kWallNames[] = {"None", "Ice wall", "Stone wall", "Metal w
 constexpr const char* kTreeNames[] = {"None", "Tree", "Burned", "Destroyed"};
 constexpr const char* kBushNames[] = {"None", "Bush", "Burned"};
 constexpr const char* kFogNames[] = {"None", "Partly", "Fully", "Like a bush"};
+
+// [U-528] the symmetries of painting
+struct SymName { const char* name; const char* tip; };
+constexpr SymName kSymNames[] = {
+    {"Off", "Only where you paint"},
+    {"Mirror of the two teams", "The point mirror: both teams get the same side"},
+    {"Left - right", "An upright axis"},
+    {"Top - bottom", "A level axis"},
+    {"Diagonal, falling", "An axis from top left to bottom right"},
+    {"Diagonal, rising", "An axis from bottom left to top right"},
+    {"Four corners", "Left - right and top - bottom together"},
+    {"Both diagonals", "The two diagonal axes together"},
+    {"Four turns", "The same thing turned by 90 degrees, four times"},
+    {"All eight", "All axes together"},
+    {"Free axis", "An axis at any angle"},
+    {"Turning copies", "Any number of copies around the centre"},
+};
 
 struct Preset {
     const char* name;
@@ -65,6 +83,7 @@ const Preset kPresets[] = {
     {"Stone road", "", kSurfaceCol[11], [](Cell& c) { ground(c, Surface::StoneRoad); }},
     {"Forest path", "", kSurfaceCol[12], [](Cell& c) { ground(c, Surface::ForestPath); }},
     {"Shallow water", "Walkable; a source of water, earth and mud", kSurfaceCol[3], [](Cell& c) { ground(c, Surface::Water); }},
+    {"Mud", "Swamp: walkers are slowed, earth can be bent, half a source of water", kSurfaceCol[13], [](Cell& c) { ground(c, Surface::Mud); }},
     {"Deep water", "Not walkable; swimmers only where the game allows it", kSurfaceCol[7], [](Cell& c) { ground(c, Surface::DeepWater); }},
     {"Glacier", "Water without limit for waterbenders", kSurfaceCol[2], [](Cell& c) { ground(c, Surface::Glacier); }},
     {"Lava", "Burns; lights the area", kSurfaceCol[8], [](Cell& c) { ground(c, Surface::Magma); }},
@@ -112,6 +131,20 @@ class MapMaker {
 public:
     bool init(const std::string& open);
     void frame();
+    void run() {
+        std::string drop;
+        while (win.begin([&](const SDL_Event& e) {
+            if (e.type == SDL_EVENT_DROP_FILE && e.drop.data) drop = e.drop.data;
+        })) {
+            if (!drop.empty()) {
+                take_drop(drop);
+                drop.clear();
+            }
+            frame();
+            win.dirty = dirty_;
+            win.end();
+        }
+    }
     void take_drop(const std::string& path);
     void start_at(int tab) { tab_ = std::clamp(tab, 0, 4); }
     tool::Window win;
@@ -139,7 +172,16 @@ private:
     int preset_ = 0, value_ = 0;
     Tool tool_ = Tool::Brush;
     int size_ = 6;
-    bool round_ = true, mirror_on_ = true;
+    bool round_ = true;
+    // [U-528] symmetry of what is painted: more than the mirror of the two teams
+    int sym_mode_ = 1, sym_angle_ = 45, sym_copies_ = 6, sym_cx2_ = N - 1, sym_cy2_ = N - 1;  // the centre in half cells
+    void sym_images(int x, int y, std::vector<CellPt>& out) const;
+    void draw_sym_axes();
+    // [U-532] the view can be turned by quarters; the map's own orientation only changes with "make it the default"
+    int view_turn_ = 0;
+    std::vector<int> undo_turn_;
+    void turn_view(int quarters);
+    static void rotate_doc(MapDoc& d, int quarters);
     int scatter_ = 25;
     bool stroke_ = false;
     int sx_ = 0, sy_ = 0;
@@ -229,7 +271,7 @@ void MapMaker::new_map(int lanes) {
     d_.nexus_turrets = {{60, 458}, {53, 451}};
     file_id_.clear();
     from_builtin_ = false, dirty_ = false;
-    undo_.clear(), undo_doc_.clear();
+    undo_.clear(), undo_doc_.clear(), undo_turn_.clear(), view_turn_ = 0;
     lane_ = 0;
     tex_dirty_ = true;
     check_map();
@@ -243,7 +285,7 @@ void MapMaker::open_map(const std::string& value) {
             std::error_code ec;
             file_id_ = fs::exists(fs::path("custom_maps") / (d_.id + ".emap"), ec) || from_builtin_ ? d_.id : "";
             dirty_ = false;
-            undo_.clear(), undo_doc_.clear();
+            undo_.clear(), undo_doc_.clear(), undo_turn_.clear(), view_turn_ = 0;
             lane_ = 0;
             tex_dirty_ = true;
             status_ = trf("opened {}", d_.name);
@@ -253,7 +295,7 @@ void MapMaker::open_map(const std::string& value) {
 }
 
 bool MapMaker::init(const std::string& open) {
-    if (!win.open("Elemental MOBA - Map maker", 1600, 900)) return false;
+    if (!win.embedded() && !win.open("Elemental MOBA - Map maker", 1600, 900)) return false;
     load_custom_maps();
     px_.resize(std::size_t(N) * N);
     tex_ = SDL_CreateTexture(win.ren(), SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, N, N);
@@ -308,7 +350,106 @@ void MapMaker::paint_cell(int x, int y, std::uint32_t) {
     Cell c = cell(x, y);
     paint_op(c);
     d_.cells[idx(x, y)] = c.raw();
-    if (mirror_on_) d_.cells[idx(N - 1 - x, N - 1 - y)] = c.raw();
+    static thread_local std::vector<CellPt> images;
+    sym_images(x, y, images);
+    for (const auto& [ix, iy] : images)
+        if (Grid::in_bounds(ix, iy)) d_.cells[idx(ix, iy)] = c.raw();
+}
+
+// [U-528] where else a painted cell appears. Turning and free axes round to whole cells.
+void MapMaker::sym_images(int x, int y, std::vector<CellPt>& out) const {
+    out.clear();
+    if (sym_mode_ == 0) return;
+    if (sym_mode_ == 1) {  // the mirror of the two teams always has the map's own centre
+        out.push_back({N - 1 - x, N - 1 - y});
+        return;
+    }
+    const int cx2 = sym_cx2_, cy2 = sym_cy2_;
+    const int dx2 = 2 * x - cx2, dy2 = 2 * y - cy2;  // from the centre, in half cells
+    auto at = [&](int ax2, int ay2) { out.push_back({int(std::floor(double(ax2 + cx2) / 2)), int(std::floor(double(ay2 + cy2) / 2))}); };
+    switch (sym_mode_) {
+        case 2: at(-dx2, dy2); break;                                     // left - right
+        case 3: at(dx2, -dy2); break;                                     // top - bottom
+        case 4: at(dy2, dx2); break;                                      // diagonal \.
+        case 5: at(-dy2, -dx2); break;                                    // diagonal /
+        case 6: at(-dx2, dy2), at(dx2, -dy2), at(-dx2, -dy2); break;      // four corners
+        case 7: at(dy2, dx2), at(-dy2, -dx2), at(-dx2, -dy2); break;      // both diagonals
+        case 8: at(-dy2, dx2), at(-dx2, -dy2), at(dy2, -dx2); break;      // four turns of 90 degrees
+        case 9:                                                           // all eight
+            at(-dx2, dy2), at(dx2, -dy2), at(-dx2, -dy2), at(dy2, dx2), at(-dy2, -dx2), at(-dy2, dx2), at(dy2, -dx2);
+            break;
+        case 10: {  // a free axis through the centre, at any angle
+            const double a = double(sym_angle_) * 3.14159265358979 / 180, c = std::cos(2 * a), sn = std::sin(2 * a);
+            at(int(std::lround(double(dx2) * c + double(dy2) * sn)), int(std::lround(double(dx2) * sn - double(dy2) * c)));
+            break;
+        }
+        case 11:  // any number of turning copies
+            for (int k = 1; k < sym_copies_; ++k) {
+                const double a = 2 * 3.14159265358979 * double(k) / double(sym_copies_), c = std::cos(a), sn = std::sin(a);
+                at(int(std::lround(double(dx2) * c - double(dy2) * sn)), int(std::lround(double(dx2) * sn + double(dy2) * c)));
+            }
+            break;
+        default: break;
+    }
+}
+
+void MapMaker::draw_sym_axes() {
+    SDL_Renderer* r = win.ren();
+    const float cx = sym_mode_ <= 1 ? float(N) / 2 : float(sym_cx2_ + 1) / 2, cy = sym_mode_ <= 1 ? float(N) / 2 : float(sym_cy2_ + 1) / 2;
+    auto axis = [&](double deg) {
+        const float dx = float(std::cos(deg * 3.14159265358979 / 180)) * N * 2, dy = float(std::sin(deg * 3.14159265358979 / 180)) * N * 2;
+        line(r, sxf(cx - dx), syf(cy - dy), sxf(cx + dx), syf(cy + dy), {255, 255, 255, 90});
+    };
+    switch (sym_mode_) {
+        case 1: axis(135); break;
+        case 2: axis(90); break;
+        case 3: axis(0); break;
+        case 4: axis(45); break;
+        case 5: axis(135); break;
+        case 6: axis(0), axis(90); break;
+        case 7: axis(45), axis(135); break;
+        case 9: axis(0), axis(90), axis(45), axis(135); break;
+        case 10: axis(sym_angle_); break;
+        default: break;
+    }
+    if (sym_mode_ >= 2) circle(r, sxf(cx), syf(cy), 6, {255, 230, 120, 230}, 16);
+}
+
+void MapMaker::rotate_doc(MapDoc& d, int quarters) {
+    quarters = ((quarters % 4) + 4) % 4;
+    if (!quarters) return;
+    auto turn = [&](CellPt& p) {
+        if (p.first < 0) return;
+        for (int i = 0; i < quarters; ++i) p = {N - 1 - p.second, p.first};
+    };
+    for (CellPt* p : {&d.base, &d.fountain, &d.nexus, &d.pole, &d.portal, &d.spirit_island}) turn(*p);
+    for (auto& lane : d.lanes)
+        for (CellPt& p : lane) turn(p);
+    for (LaneStructs& l : d.lane_structs)
+        for (CellPt* p : {&l.t1, &l.t2, &l.t3, &l.inhib}) turn(*p);
+    for (auto* list : {&d.nexus_turrets, &d.camps, &d.aggro_camps, &d.buff_camps, &d.dark_spirits})
+        for (CellPt& p : *list) turn(p);
+    for (auto& [p, name] : d.epics) turn(p);
+    for (MapDoc::Spot& sp : d.spots) turn(sp.cell);
+    if (d.cells.empty()) return;
+    std::vector<std::uint32_t> out(d.cells.size());
+    for (int y = 0; y < N; ++y)
+        for (int x = 0; x < N; ++x) {
+            int nx = x, ny = y;
+            for (int i = 0; i < quarters; ++i) {
+                const int t = N - 1 - ny;
+                ny = nx, nx = t;
+            }
+            out[std::size_t(ny) * N + std::size_t(nx)] = d.cells[std::size_t(y) * N + std::size_t(x)];
+        }
+    d.cells = std::move(out);
+}
+
+void MapMaker::turn_view(int quarters) {
+    rotate_doc(d_, quarters);
+    view_turn_ = ((view_turn_ + quarters) % 4 + 4) % 4;
+    tex_dirty_ = true;
+    check_map();
 }
 
 void MapMaker::brush(int x, int y) {
@@ -361,7 +502,8 @@ void MapMaker::push_undo() {
     undo_.push_back(d_.cells);
     undo_doc_.push_back(d_);
     undo_doc_.back().cells.clear();  // (the cells are in undo_)
-    if (undo_.size() > 30) undo_.erase(undo_.begin()), undo_doc_.erase(undo_doc_.begin());
+    undo_turn_.push_back(view_turn_);
+    if (undo_.size() > 30) undo_.erase(undo_.begin()), undo_doc_.erase(undo_doc_.begin()), undo_turn_.erase(undo_turn_.begin());
     dirty_ = true;
 }
 
@@ -370,6 +512,8 @@ void MapMaker::do_undo() {
     d_ = std::move(undo_doc_.back());
     d_.cells = std::move(undo_.back());
     undo_.pop_back(), undo_doc_.pop_back();
+    rotate_doc(d_, view_turn_ - undo_turn_.back());  // [U-532] it was kept as it was seen then
+    undo_turn_.pop_back();
     tex_dirty_ = true;
     lane_ = std::clamp(lane_, 0, std::max(0, int(d_.lanes.size()) - 1));
     check_map();
@@ -600,7 +744,9 @@ void MapMaker::check_map() {
 void MapMaker::write_file(const std::string& id) {
     d_.id = id;
     if (d_.pack.empty() || (d_.pack.starts_with("map_") && !is_builtin_map_id(id) && !fs::exists(fs::path("resourcepacks") / d_.pack))) d_.pack = "map_" + id;
-    const std::string blob = doc_to_blob(d_);
+    MapDoc to_save = d_;
+    rotate_doc(to_save, -view_turn_);  // [U-532] only "make it the default" changes the map's own orientation
+    const std::string blob = doc_to_blob(to_save);
     MapDoc test;
     if (const std::string e = doc_from_blob(blob, test); !e.empty()) {
         status_ = trf("It cannot be saved: {}", tr(e));
@@ -755,9 +901,26 @@ void MapMaker::tab_paint(float x, float y0, float w) {
     if (slider(r, ui, 40, x, y, w, size_, 1, 80, tr("Brush size"))) {}
     y += 26;
     if (button(r, ui, x, y, w / 2 - 4, 24, round_ ? tr("Round brush") : tr("Square brush"))) round_ = !round_;
-    if (hover(ui, x + w / 2, y, w / 2, 26)) tip_ = tr("Whatever you paint also appears at the mirror point: both sides stay equal");
-    if (button(r, ui, x + w / 2, y, w / 2 - 4, 24, std::format("{}: {}", tr("Mirror the other side"), mirror_on_ ? tr("ON") : tr("OFF")), mirror_on_)) mirror_on_ = !mirror_on_;
+    if (hover(ui, x + w / 2, y, w / 2, 26)) tip_ = tr("Whatever you paint also appears at the other places of this symmetry. Objects always use the mirror of the two teams");
+    if (button(r, ui, x + w / 2, y, w / 2 - 4, 24, fit_text(std::format("{}: {}", tr("Symmetry"), tr(kSymNames[std::size_t(sym_mode_)].name)), w / 2 - 12), sym_mode_ != 0)) {
+        std::vector<Pick> items;
+        for (std::size_t i = 0; i < std::size(kSymNames); ++i) items.push_back({tr(kSymNames[i].name), std::to_string(i), tr(kSymNames[i].tip)});
+        open_picker(tr("Symmetry"), std::move(items), [this](const std::string& v) { sym_mode_ = std::atoi(v.c_str()); });
+    }
     y += 30;
+    if (sym_mode_ == 10) {
+        slider(r, ui, 142, x, y, w, sym_angle_, 0, 179, tr("Angle of the axis"));
+        y += 26;
+    }
+    if (sym_mode_ == 11) {
+        slider(r, ui, 143, x, y, w, sym_copies_, 2, 16, tr("How many copies"));
+        y += 26;
+    }
+    if (sym_mode_ >= 2) {
+        slider(r, ui, 144, x, y, w / 2 - 4, sym_cx2_, 0, 2 * N - 2, tr("Centre, left - right"));
+        slider(r, ui, 145, x + w / 2, y, w / 2 - 4, sym_cy2_, 0, 2 * N - 2, tr("Centre, top - bottom"));
+        y += 26;
+    }
     if (tool_ == Tool::Scatter) {
         slider(r, ui, 41, x, y, w, scatter_, 1, 100, tr("How many cells %"));
         y += 26;
@@ -977,6 +1140,9 @@ void MapMaker::tab_settings(float x, float y0, float w) {
     y += 40;
     text_field(r, ui, 2, x, y, w, d_.desc, tr("Description (shown when choosing the map)"));
     y += 38;
+    if (hover(ui, x, y, w, 26)) tip_ = tr("ON: the map is turned for the Earth side, so each team has its base at the bottom. OFF: everyone sees the map the same way. Players can choose in Options");
+    if (button(r, ui, x, y, w, 24, std::format("{}: {}", tr("Each team sees its own base at the bottom"), d_.turn_for_team ? tr("ON") : tr("OFF")), d_.turn_for_team)) d_.turn_for_team = !d_.turn_for_team, dirty_ = true;
+    y += 30;
     int ts = d_.team_size;
     if (slider(r, ui, 43, x, y, w, ts, 1, 10, tr("Players per team"))) d_.team_size = ts, dirty_ = true;
     y += 30;
@@ -1110,8 +1276,7 @@ void MapMaker::map_view() {
             if (sxf(float(i)) >= vx_ && sxf(float(i)) <= vx_ + vw_) line(r, sxf(float(i)), std::max(vy_, dst.y), sxf(float(i)), std::min(vy_ + vh_, dst.y + dst.h), {0, 0, 0, 50});
             if (syf(float(i)) >= vy_ && syf(float(i)) <= vy_ + vh_) line(r, std::max(vx_, dst.x), syf(float(i)), std::min(vx_ + vw_, dst.x + dst.w), syf(float(i)), {0, 0, 0, 50});
         }
-    // the mirror axis: the two sides
-    line(r, sxf(0), syf(float(N)), sxf(float(N)), syf(0), {255, 255, 255, 40});
+    draw_sym_axes();  // [U-528]
     draw_objects();
     const bool over = hover(ui, vx_, vy_, vw_, vh_) && !pick_done_ && !saving_;
     const int cx = int(std::floor(cxf(ui.mx))), cy = int(std::floor(cyf(ui.my)));
@@ -1142,9 +1307,10 @@ void MapMaker::map_view() {
         const float pr = float(sz) / 2 * zoom_;
         if (round_) circle(r, ui.mx, ui.my, std::max(2.f, pr), {255, 255, 255, 220}, 28);
         else rect(r, ui.mx - pr, ui.my - pr, pr * 2, pr * 2, {255, 255, 255, 220});
-        if (mirror_on_) {
-            const CellPt m = mirror({cx, cy});
-            circle(r, sxf(float(m.first)), syf(float(m.second)), std::max(2.f, pr), {255, 255, 255, 90}, 24);
+        {  // [U-528] where else it lands
+            std::vector<CellPt> images;
+            sym_images(cx, cy, images);
+            for (const auto& [ix, iy] : images) circle(r, sxf(float(ix)), syf(float(iy)), std::max(2.f, pr), {255, 255, 255, 110}, 24);
         }
         if (ui.clicked) {
             ui.clicked = false;
@@ -1221,6 +1387,21 @@ void MapMaker::map_view() {
         zoom_ = std::min(vw_, vh_) / float(N) * 0.96f;
     }
     text(r, vx_ + 10, vy_ + 10, tr("Wheel = zoom. Middle button or Space + drag = move."), {230, 230, 235});
+    {  // [U-532] the angle of the view
+        float bx = vx_ + vw_ - 96 - 4;
+        if (button(r, ui, bx - 88, vy_ + 8, 88, 24, tr("Turn right"))) turn_view(1);
+        bx -= 92;
+        if (button(r, ui, bx - 88, vy_ + 8, 88, 24, tr("Turn left"))) turn_view(-1);
+        bx -= 92;
+        if (view_turn_ != 0) {
+            if (hover(ui, bx - 290, vy_ + 8, 290, 24)) tip_ = tr("The map itself is turned this way: everyone starts with this view");
+            if (button(r, ui, bx - 290, vy_ + 8, 290, 24, std::format("{} ({} deg)", tr("Make this view the map's default"), view_turn_ * 90), true)) {
+                view_turn_ = 0;
+                undo_.clear(), undo_doc_.clear(), undo_turn_.clear();
+                dirty_ = true;
+            }
+        }
+    }
 }
 
 // ---------------------------------------------------------------- the bar on top
@@ -1260,15 +1441,20 @@ void MapMaker::toolbar() {
             if (file_id_.empty()) save_new(d_.name);
             else overwrite();
         }
-        const char* base = SDL_GetBasePath();
-        const std::string exe = (fs::path(base ? base : "") / "elemental_moba").string();
-        const char* args[] = {exe.c_str(), "--practice-map", file_id_.c_str(), nullptr};
-        if (SDL_Process* p = SDL_CreateProcess(args, false)) SDL_DestroyProcess(p);
-        else status_ = SDL_GetError();
+        if (win.embedded()) {  // [U-529] the same window goes straight into practice
+            win.exit.practice_map = file_id_;
+            win.leave();
+        } else {
+            const char* base = SDL_GetBasePath();
+            const std::string exe = (fs::path(base ? base : "") / "elemental_moba").string();
+            const char* args[] = {exe.c_str(), "--practice-map", file_id_.c_str(), nullptr};
+            if (SDL_Process* p = SDL_CreateProcess(args, false)) SDL_DestroyProcess(p);
+            else status_ = SDL_GetError();
+        }
     }
     x += 174;
     if (button(r, ui, x, 8, 80, 28, tr("Undo"), false, !undo_.empty())) do_undo();
-    if (button(r, ui, win.w - 150, 8, 140, 28, std::format("{}: {}", tr("Language"), loc::current()))) loc::load(tool::next_language(loc::current()));
+    if (button(r, ui, win.w - 120, 8, 110, 28, std::format("{}: {}", tr("Language"), loc::current()))) loc::load(tool::next_language(loc::current()));
     const char* const tabs[] = {"Terrain", "Objects", "Lanes", "Settings", "Check"};
     float tx = 14;
     for (int i = 0; i < 5; ++i) {
@@ -1348,7 +1534,9 @@ void MapMaker::frame() {
 
 }  // namespace
 
-int main(int argc, char** argv) {
+namespace em::makers {
+
+int map_main(int argc, char** argv) {
     tool::go_to_game_folder();
     std::string open;
     int start_tab = 0;
@@ -1369,15 +1557,19 @@ int main(int argc, char** argv) {
             return 1;
         }
         maker->start_at(start_tab);
-        std::string drop;
-        while (maker->win.begin([&](const SDL_Event& e) {
-            if (e.type == SDL_EVENT_DROP_FILE && e.drop.data) drop = e.drop.data;
-        })) {
-            if (!drop.empty()) maker->take_drop(drop), drop.clear();
-            maker->frame();
-            maker->win.end();
-        }
+        maker->run();
     }
     SDL_Quit();
     return 0;
 }
+
+// [U-529] inside the window of the game
+tool::ToolExit map_embedded(SDL_Window* win, SDL_Renderer* ren) {
+    auto maker = std::make_unique<MapMaker>();
+    maker->win.attach(win, ren);
+    if (!maker->init("")) return {};
+    maker->run();
+    return maker->win.exit;
+}
+
+}  // namespace em::makers

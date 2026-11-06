@@ -112,7 +112,7 @@ private:
     int fog_fade_t_ = -1;
     std::vector<std::uint32_t> map_px_, fog_px_;
     // [U-257] textured ground
-    static constexpr int kGroundTextures = 17;
+    static constexpr int kGroundTextures = 18;
     int ground_px_ = 8;  // [U-521] pixels per cell of the painted ground: follows the graphics quality (Low 2 … Highest 8)
     void set_ground_quality();
     [[nodiscard]] bool stats_open() const { return expand_stats_ || (SDL_GetModState() & SDL_KMOD_ALT); }  // [U-520] Alt expands it too
@@ -237,6 +237,8 @@ private:
     std::vector<net::NetFx> fx_draw_;                 // [U-389] this frame's effects at their delayed positions
     std::vector<net::NetCompanion> comp_draw_;
     std::vector<std::uint32_t> comp_prev_;  // [U-407] companions seen last frame (a new one plays its call)
+    std::unordered_map<std::uint32_t, std::pair<float, float>> companion_smooth_;  // [U-543]
+    std::unordered_map<std::uint32_t, double> companion_moved_;
     std::unordered_map<std::uint32_t, float> companion_last_x_, companion_last_y_;  // facing of the companion models
     std::unordered_map<std::uint32_t, int> companion_dir_;
     // [U-402] mouse control while a cast key is held

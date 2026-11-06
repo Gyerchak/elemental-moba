@@ -28,6 +28,8 @@ struct ServerConfig {
     std::string name = "elemental-moba server";
     std::string motd = "Welcome!";
     std::string password;                 // [U-374] empty = none
+    std::string bind_ip;                  // [U-537] the address it listens on (empty = all network cards of this PC)
+    std::string public_ip;                // [U-537] the address others use from outside (only shown and copied: it belongs to the router)
     bool allow_spectators = true;         // [X-20] players may join to watch
     bool record_replays = true;           // [X-19] replays/<date>_<map>.emr (small: commands only)
     std::string replay_file;              // [X-19] this server plays that replay to whoever joins

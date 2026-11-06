@@ -1,5 +1,6 @@
 // In-match view. See game_view.hpp.
 #include "client/game_view.hpp"
+#include "game/match/maps.hpp"
 #include "client/auto_play.hpp"
 
 #include <algorithm>
@@ -43,6 +44,7 @@ Rgba cell_colour(Cell c) {
         case Surface::Platinum: col = {225, 228, 235}; break;
         case Surface::StoneRoad: col = {160, 152, 140}; break;
         case Surface::ForestPath: col = {128, 112, 76}; break;
+        case Surface::Mud: col = {92, 70, 48}; break;  // [U-527]
         case Surface::Count: col = {255, 0, 255}; break;
     }
     if (c.tree() == Tree::Alive) col = {34, 90, 40};
@@ -96,7 +98,7 @@ GameView::~GameView() {
 const SDL_Surface* GameView::ground_texture(int which) {
     static constexpr const char* kNames[kGroundTextures] = {
         "grass", "dirt", "glacier", "shallow_water", "sand", "structure_stone", "wood", "deep_water", "lava", "", "", "stone_road",
-        "forest_path", "burned", "ash", "bush", "tree_canopy"};
+        "forest_path", "burned", "ash", "bush", "tree_canopy", "mud"};
     if (which < 0 || which >= kGroundTextures) return nullptr;
     if (!ground_tried_[std::size_t(which)]) {
         ground_tried_[std::size_t(which)] = true;
@@ -130,7 +132,7 @@ void GameView::paint_cell(int x, int y, Cell c) {
     auto look_of = [&](Cell k) {
         Look l;
         l.base = cell_colour(k);
-        l.which = int(k.surface());
+        l.which = k.surface() == Surface::Mud ? 17 : int(k.surface());  // [U-527]
         if (k.tree() == Tree::Burned || k.tree() == Tree::Destroyed) l.which = 13;
         else if (k.bush() == Bush::Burned) l.which = 14;
         else if (k.bush() == Bush::Alive) l.which = 15;
@@ -495,7 +497,7 @@ void GameView::save_practice_sizes(NetClient& net) {
         if (sk->width > 0) lines += std::format("{}.width = {}\n", letter, mult);
         if (sk->range > 0 && (sk->kind == SkillKind::Cone || sk->geo == Geo::Line || sk->geo == Geo::Arc || sk->geo == Geo::Cone)) lines += std::format("{}.range = {}\n", letter, mult);
     }
-    if (model_pct_) lines += std::format("model_size = {:+}\n", model_pct_);
+    if (model_pct_) lines += std::format("hitbox_size = {:+}\n", model_pct_);  // [U-536]
     if (lines.empty()) return hint(tr("nothing to save: Q and specials stay a test (shared skills)"));
     namespace fs = std::filesystem;
     std::error_code ec;
@@ -617,6 +619,7 @@ void GameView::handle_event(const SDL_Event& e, NetClient& net) {
                 for (std::size_t i = 0; i < size_pct_.size(); ++i)
                     if (size_pct_[i]) net.send_cmd({.kind = CmdKind::PracticeSize, .slot = std::uint8_t(i), .y = 1});
                 net.send_cmd({.kind = CmdKind::PracticeSize, .slot = 255, .y = 1});
+                net.send_cmd({.kind = CmdKind::PracticeSize, .slot = 254, .y = 1});
                 size_pct_ = {}, model_pct_ = 0;
                 hint(tr("practice sizes: back to normal"));
                 return;
@@ -630,9 +633,9 @@ void GameView::handle_event(const SDL_Event& e, NetClient& net) {
         if (net.practice && (sc == SDL_SCANCODE_MINUS || sc == SDL_SCANCODE_EQUALS || sc == SDL_SCANCODE_KP_MINUS || sc == SDL_SCANCODE_KP_PLUS)) {
             const int step = sc == SDL_SCANCODE_MINUS || sc == SDL_SCANCODE_KP_MINUS ? -5 : 5;
             if (ctrl) {
-                model_pct_ = std::clamp(model_pct_ + step, -50, 200);
+                model_pct_ = std::clamp(model_pct_ + step, -80, 400);  // [U-536] the hitbox alone: the model keeps its size and its animations
                 net.send_cmd({.kind = CmdKind::PracticeSize, .slot = 255, .x = step});
-                hint(trf("model size {:+} % (Ctrl+Shift+S saves, Ctrl+Shift+R resets)", model_pct_));
+                hint(trf("hitbox size {:+} % (Ctrl+Shift+S saves, Ctrl+Shift+R resets)", model_pct_));
             } else {
                 std::int16_t& g = size_pct_[std::size_t(size_slot_) % size_pct_.size()];
                 g = std::int16_t(std::clamp(g + step, -80, 400));
@@ -946,7 +949,7 @@ void GameView::frame(NetClient& net, double now_s, Ui& ui) {
     const std::int64_t now_ms = cur.now_ms + std::int64_t((now_s - cur.arrived) * 1000);
     local_tick_ = std::uint32_t(cur.tick + std::uint64_t(std::max(0.0, now_s - cur.arrived) * net.tick_hz));
     // camera [U-174] my base is always bottom-left; [U-175] tilted (game) or top-down (debug) view
-    view_.flip = net.my_team == 1;
+    view_.flip = net.my_team == 1 && (set_.map_side == 1 || (set_.map_side == 0 && cur_map().turn_for_team));  // [U-532]
     view_.gy = set_.tilted() ? 0.78f : 1.f;
     view_.hz = set_.tilted() ? 0.62f : 0.f;
     const DrawUnit* mine = nullptr;

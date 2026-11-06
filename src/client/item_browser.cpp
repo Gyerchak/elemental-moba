@@ -147,6 +147,80 @@ void draw_item_icon(SDL_Renderer* r, int item, float x, float y, float s) {
     rect(r, x, y, s, s, {200, 190, 150});
 }
 
+// ---------------------------------------------------------------- [U-547] what an item gives, as numbers, and what that is worth
+namespace {
+struct ItemStat { const char* name; std::int32_t ItemDef::*field; };
+constexpr ItemStat kItemStats[] = {
+    {"health", &ItemDef::health}, {"attack", &ItemDef::attack}, {"elemental power", &ItemDef::elemental_power}, {"defence", &ItemDef::defence},
+    {"elemental defence", &ItemDef::elemental_defence}, {"attack speed", &ItemDef::attack_speed}, {"move speed", &ItemDef::move_speed}, {"move speed %", &ItemDef::move_speed_pct},
+    {"elemental haste", &ItemDef::elemental_haste}, {"non-elemental haste", &ItemDef::non_elemental_haste}, {"cast speed", &ItemDef::cast_speed}, {"skill speed", &ItemDef::skill_speed},
+    {"skill width", &ItemDef::skill_width}, {"skill length", &ItemDef::skill_length}, {"skill range", &ItemDef::skill_range}, {"skill radius", &ItemDef::skill_radius},
+    {"elemental lethality", &ItemDef::elemental_lethality}, {"elemental penetration", &ItemDef::elemental_penetration}, {"tenacity", &ItemDef::tenacity},
+    {"crowd-control duration", &ItemDef::cc_amplify}, {"fire damage taken", &ItemDef::resist_fire}, {"water damage taken", &ItemDef::resist_water},
+    {"air damage taken", &ItemDef::resist_air}, {"earth damage taken", &ItemDef::resist_earth}, {"resistance to slows", &ItemDef::slow_resist},
+    {"damage to walls", &ItemDef::wall_damage}, {"lifesteal", &ItemDef::lifesteal}, {"omnivamp", &ItemDef::omnivamp}, {"spellvamp", &ItemDef::spellvamp},
+    {"crit chance", &ItemDef::crit_chance}, {"crit damage", &ItemDef::crit_damage}, {"on-hit damage", &ItemDef::on_hit_dmg}, {"skill damage (all)", &ItemDef::skill_amp},
+};
+struct StatAmount { std::string name; double points; };
+[[nodiscard]] std::vector<StatAmount> stats_of(const ItemDef& d) {
+    std::vector<StatAmount> out;
+    for (const ItemStat& st : kItemStats)
+        if (const std::int32_t v = d.*st.field; v > 0) out.push_back({st.name, v / 100.0});
+    for (const ItemDef::More& m : d.more)
+        if (m.key != StatKey::Count && m.value > 0) {
+            std::string n(kStatKeyNames[int(m.key)]);
+            std::ranges::replace(n, '_', ' ');
+            out.push_back({m.pct ? n + " %" : n, m.value / 100.0});
+        }
+    return out;
+}
+// What one point of a stat costs: the cheapest item that gives ONLY that stat sets the price, as in every game with an item shop.
+// A stat no such item gives is priced by what is left over in items that give it among stats with a known price.
+[[nodiscard]] double stat_price(const std::string& name) {
+    static std::vector<std::pair<std::string, double>> prices;
+    static std::size_t built_for = 0;
+    if (built_for != kItems.size()) {
+        built_for = kItems.size();
+        prices.clear();
+        auto find = [&](const std::string& n) { return std::ranges::find_if(prices, [&](const auto& p) { return p.first == n; }); };
+        for (const ItemDef& d : kItems) {
+            const auto st = stats_of(d);
+            if (st.size() != 1 || d.cost <= 0 || st[0].points <= 0) continue;
+            const double each = double(d.cost) / st[0].points;
+            if (auto it = find(st[0].name); it == prices.end()) prices.push_back({st[0].name, each});
+            else it->second = std::min(it->second, each);
+        }
+        for (int pass = 0; pass < 2; ++pass)
+            for (const ItemDef& d : kItems) {
+                const auto st = stats_of(d);
+                double known = 0;
+                const StatAmount* unknown = nullptr;
+                int missing = 0;
+                for (const StatAmount& a : st)
+                    if (auto it = find(a.name); it != prices.end()) known += it->second * a.points;
+                    else unknown = &a, ++missing;
+                if (missing == 1 && d.cost > known && unknown->points > 0) prices.push_back({unknown->name, (double(d.cost) - known) / unknown->points});
+            }
+    }
+    const auto it = std::ranges::find_if(prices, [&](const auto& p) { return p.first == name; });
+    return it != prices.end() ? it->second : 0.0;
+}
+[[nodiscard]] bool counts(const std::vector<std::string>& chosen, const std::string& name) { return chosen.empty() || std::ranges::find(chosen, name) != chosen.end(); }
+[[nodiscard]] double stat_amount(const ItemDef& d, const std::vector<std::string>& chosen) {
+    double sum = 0;
+    for (const StatAmount& a : stats_of(d))
+        if (counts(chosen, a.name)) sum += chosen.empty() ? a.points * stat_price(a.name) / 30.0 : a.points;  // (all stats together: on one scale)
+    return sum;
+}
+[[nodiscard]] double gold_efficiency(const ItemDef& d, const std::vector<std::string>& chosen) {  // % of the price the chosen stats are worth
+    if (d.cost <= 0) return 0;
+    double worth = 0;
+    for (const StatAmount& a : stats_of(d))
+        if (counts(chosen, a.name)) worth += a.points * stat_price(a.name);
+    return worth * 100.0 / double(d.cost);
+}
+}  // namespace
+
 int ItemBrowser::draw(SDL_Renderer* r, Ui& ui, float x, float y, float w, float h, std::string_view action,
                       const std::function<bool(int)>& can, int gold) {
     fill_rect(r, x, y, w, h, {12, 12, 20, 240});
@@ -165,9 +239,11 @@ int ItemBrowser::draw(SDL_Renderer* r, Ui& ui, float x, float y, float w, float 
         if (button(r, ui, x + 8 + float((t + 1) % 2) * 86, cy + float((t + 1) / 2) * 25, 84, 22, tr(tiers[t + 1]), tier == t)) tier = t;
     }
     // top: sorting (no "recommended" — on purpose [U-220])
-    const char* sorts[] = {"Name A–Z", "Price low–high", "Price high–low"};
-    for (int s = 0; s < 3; ++s)
-        if (button(r, ui, x + 190 + float(s) * 140, y + 8, 134, 22, tr(sorts[s]), sort == s)) sort = s;
+    const char* sorts[] = {"Name A–Z", "Price low–high", "Price high–low", "Most stats", "Gold efficiency"};
+    const float sort_w = std::min(134.f, (w - 190 - 150 - 170) / 5);
+    for (int s = 0; s < 5; ++s)
+        if (button(r, ui, x + 190 + float(s) * (sort_w + 4), y + 8, sort_w, 22, fit_text(tr(sorts[s]), sort_w - 8), sort == s)) sort = s;
+    if (button(r, ui, x + 190 + 5 * (sort_w + 4), y + 8, 166, 22, fit_text(sort_stats.empty() ? tr("Stats: all") : trf("Stats: {} chosen", sort_stats.size()), 158), choosing_stats)) choosing_stats = !choosing_stats;
     if (gold >= 0) text(r, x + w - 150, y + 14, std::format("{} {}", tr("gold"), gold), {255, 215, 80}, 1.5f);
     // grid
     std::vector<int> list;
@@ -178,18 +254,42 @@ int ItemBrowser::draw(SDL_Renderer* r, Ui& ui, float x, float y, float w, float 
     if (sort == 0) std::ranges::sort(list, {}, [](int i) { return kItems[std::size_t(i)].name; });
     if (sort == 1) std::ranges::sort(list, {}, [](int i) { return kItems[std::size_t(i)].cost; });
     if (sort == 2) std::ranges::sort(list, std::greater<>{}, [](int i) { return kItems[std::size_t(i)].cost; });
+    if (sort == 3) std::ranges::stable_sort(list, std::greater<>{}, [&](int i) { return stat_amount(kItems[std::size_t(i)], sort_stats); });
+    if (sort == 4) std::ranges::stable_sort(list, std::greater<>{}, [&](int i) { return gold_efficiency(kItems[std::size_t(i)], sort_stats); });
     const float gx = x + 190, gy = y + 40, tip_w = 340, gw = w - 200 - tip_w;
     const int cols = std::max(1, int(gw / 64));
     for (std::size_t k = 0; k < list.size(); ++k) {
         const int i = list[k];
-        const float ix = gx + float(int(k) % cols) * 64, iy = gy + float(int(k) / cols) * 76;
+        const float ix = gx + float(int(k) % cols) * 64, iy = gy + float(int(k) / cols) * (sort >= 3 ? 88 : 76);
         draw_item_icon(r, i, ix, iy, 52);
         const int price = bag ? plan_buy(*bag, i).price : kItems[std::size_t(i)].cost;  // [U-261] parts I carry count
         text(r, ix, iy + 55, std::format("{}", price), gold < 0 || gold >= price ? Rgba{255, 215, 80} : Rgba{150, 120, 80});
+        if (sort == 3) text(r, ix, iy + 67, std::format("{:.0f}", stat_amount(kItems[std::size_t(i)], sort_stats)), {170, 230, 255});  // [U-547]
+        if (sort == 4) text(r, ix, iy + 67, std::format("{:.0f} %", gold_efficiency(kItems[std::size_t(i)], sort_stats)), {170, 230, 255});
         if (selected == i) rect(r, ix - 2, iy - 2, 56, 56, {255, 255, 255});
         if (hover(ui, ix, iy, 52, 52) && ui.clicked) {
             selected = i;
             ui.clicked = false;
+        }
+    }
+    if (choosing_stats) {  // [U-547] the stats that count for both sorts
+        std::vector<std::string> names;
+        for (const ItemDef& d : kItems)
+            for (const StatAmount& a2 : stats_of(d))
+                if (std::ranges::find(names, a2.name) == names.end()) names.push_back(a2.name);
+        std::ranges::sort(names);
+        const float px = gx, py = gy, pw = gw, ph = h - 48;
+        fill_rect(r, px, py, pw, ph, {22, 24, 34, 250});
+        rect(r, px, py, pw, ph, {255, 190, 110, 255});
+        if (button(r, ui, px + 8, py + 8, 150, 24, tr("All of them"), sort_stats.empty())) sort_stats.clear();
+        const int ncol = std::max(1, int((pw - 16) / 200));
+        for (std::size_t k = 0; k < names.size(); ++k) {
+            const float bx = px + 8 + float(int(k) % ncol) * 200, by = py + 40 + float(int(k) / ncol) * 26;
+            const bool on = std::ranges::find(sort_stats, names[k]) != sort_stats.end();
+            if (button(r, ui, bx, by, 194, 24, fit_text(tr(names[k]), 186), on)) {
+                if (on) std::erase(sort_stats, names[k]);
+                else sort_stats.push_back(names[k]);
+            }
         }
     }
     // tooltip of the CLICKED item, price at the bottom [U-245]
@@ -200,6 +300,7 @@ int ItemBrowser::draw(SDL_Renderer* r, Ui& ui, float x, float y, float w, float 
         const ItemDef& d = kItems[std::size_t(selected)];
         draw_item_icon(r, selected, tx + 8, y + 48, 56);
         text(r, tx + 72, y + 52, tr(d.name), {255, 230, 150}, 1.5f);
+        text(r, tx + 72, y + 72, fit_text(trf("Gold efficiency: {:.0f} %", gold_efficiency(d, {})), tip_w - 80), {170, 230, 255});  // [U-547]
         float ly = y + 112;
         for (const std::string& l : item_lines(d)) {
             text(r, tx + 8, ly, fit_text(l, tip_w - 16), {225, 225, 235});

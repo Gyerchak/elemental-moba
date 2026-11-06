@@ -486,7 +486,7 @@ bool World::mud_at(std::int32_t x, std::int32_t y) const {
 bool World::rock_source_at(std::int32_t x, std::int32_t y) const {
     const int cx = x / kCellUnits, cy = y / kCellUnits;
     // [U-513] earth from mud (fully) and from under shallow water (it keeps its look of shallow water)
-    if (x >= 0 && y >= 0 && (mud_at(x, y) || (Grid::in_bounds(cx, cy) && grid.at(cx, cy).surface() == Surface::Water && grid.at(cx, cy).wall() == Wall::None)))
+    if (x >= 0 && y >= 0 && (mud_at(x, y) || (Grid::in_bounds(cx, cy) && (grid.at(cx, cy).surface() == Surface::Water || grid.at(cx, cy).surface() == Surface::Mud) && grid.at(cx, cy).wall() == Wall::None)))
         return true;
     return x >= 0 && y >= 0 && Grid::in_bounds(cx, cy) && grid.at(cx, cy).wall() == Wall::Stone && !protected_cell(cx, cy) &&
            cx >= 3 && cy >= 3 && cx < kGridSize - 3 && cy < kGridSize - 3;
@@ -613,12 +613,14 @@ void World::condense_steam(std::int32_t x, std::int32_t y, std::int32_t radius, 
 
 int World::big_water_near(const Unit& u, std::size_t* patch) const {
     const int r = elements::kIceWallSourceCells, ccx = u.ux() / kCellUnits, ccy = u.uy() / kCellUnits;
+    bool mud_ground = false;
     for (int y = ccy - r; y <= ccy + r; ++y)
         for (int x = ccx - r; x <= ccx + r; ++x) {
             if (!Grid::in_bounds(x, y)) continue;
             const Cell c = grid.at(x, y);
             const Surface s = c.surface();
             if (s == Surface::Water || s == Surface::DeepWater || s == Surface::Glacier || c.wall() == Wall::Ice) return 1;
+            mud_ground |= s == Surface::Mud;
         }
     const std::int64_t reach = std::int64_t(r) * kCellUnits;
     for (std::size_t i = 0; i < clouds.size(); ++i) {
@@ -629,7 +631,7 @@ int World::big_water_near(const Unit& u, std::size_t* patch) const {
             return 2;
         }
     }
-    return 0;
+    return mud_ground ? 3 : 0;  // [U-527] only the mud of the map: half a source, it is not used up
 }
 
 void World::use_water_source(const Unit& u) {
@@ -646,6 +648,7 @@ World::WaterSource World::water_source_at(std::int32_t x, std::int32_t y, std::s
         if (c.wall() == Wall::Ice) return WaterSource::IceWall;
         const Surface s = c.surface();
         if (s == Surface::Water || s == Surface::DeepWater || s == Surface::Glacier) return WaterSource::Lasting;
+        if (s == Surface::Mud) return WaterSource::Mud;  // [U-527]
     }
     for (std::size_t i = 0; i < clouds.size(); ++i) {
         const Cloud& p = clouds[i];

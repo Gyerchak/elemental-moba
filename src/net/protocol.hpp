@@ -17,7 +17,8 @@
 namespace em::net {
 
 inline constexpr std::size_t kLongStrMax = 16'000'000;  // [U-518] own champion files up to 64 KB, own maps up to 16 MB
-inline constexpr std::uint16_t kProtocol = 29;  // 29: versions by content, snapshots [U-525]
+inline constexpr std::uint16_t kProtocol = 30;  // 30: mud ground, heat of autoattacks [U-527][U-534]
+//inline constexpr std::uint16_t kProtocol = 29;  // 29: versions by content, snapshots [U-525]
 //inline constexpr std::uint16_t kProtocol = 28;  // 28: heat levels, new statuses [U-523][U-524]
 //inline constexpr std::uint16_t kProtocol = 27;  // 27: version id, version download [U-374][U-375]
 //inline constexpr std::uint16_t kProtocol = 26;  // 26: spectators, replays [X-19][X-20]
@@ -262,7 +263,7 @@ struct NetUnit {
     std::uint8_t mtype, body, alive;
     std::int32_t x, y;
     std::int16_t fx, fy;
-    std::uint16_t walk, size_pct, sight;
+    std::uint16_t walk, size_pct, sight, model_pct, pad_model;  // size_pct: the hitbox; [U-536] model_pct: the picture
     std::int32_t hp, hp_max, res, res_max;
     std::uint16_t level;
     std::uint32_t status;  // bit per StatusKind
@@ -297,7 +298,7 @@ struct NetFx {
 // [U-510] the corners of a Geo::Custom skill (few skills: sent apart, so every other effect stays small)
 struct NetFxPoly {
     std::uint32_t id;
-    std::int8_t pts[24];
+    std::int8_t pts[48];
     std::uint8_t n, pad[3];
 };
 

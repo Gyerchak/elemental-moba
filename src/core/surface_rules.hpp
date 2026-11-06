@@ -13,7 +13,7 @@ namespace em {
 [[nodiscard]] constexpr bool earth_bendable(Surface s) {
     switch (s) {
         case Surface::Land: case Surface::Dryland: case Surface::Sand: case Surface::Stone:
-        case Surface::Water: case Surface::StoneRoad: case Surface::ForestPath:
+        case Surface::Water: case Surface::StoneRoad: case Surface::ForestPath: case Surface::Mud:
             return true;
         default:
             return false;
@@ -30,7 +30,7 @@ namespace em {
 
 [[nodiscard]] constexpr const char* surface_name(Surface s) {
     constexpr const char* n[] = {"land", "dryland", "glacier", "shallow water", "sand", "stone", "wood", "deep water",
-                                 "magma", "metal", "platinum", "stone road", "forest path"};
+                                 "magma", "metal", "platinum", "stone road", "forest path", "mud"};
     static_assert(std::size(n) == std::size_t(Surface::Count));
     return n[std::size_t(s)];
 }

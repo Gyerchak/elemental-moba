@@ -15,6 +15,8 @@ void each_field(ServerConfig& c, F&& f) {
     f("name", c.name);
     f("motd", c.motd);
     f("password", c.password);
+    f("bind_ip", c.bind_ip);
+    f("public_ip", c.public_ip);
     f("version", c.version);
     f("port", c.port);
     f("tick_hz", c.tick_hz);
