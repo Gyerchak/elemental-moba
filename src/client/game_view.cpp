@@ -5,6 +5,7 @@
 #include "client/auto_play.hpp"
 
 #include <algorithm>
+#include <cstdio>
 #include <filesystem>
 #include <cstdlib>
 #include <cmath>
@@ -990,6 +991,8 @@ void GameView::frame(NetClient& net, double now_s, Ui& ui) {
     const SDL_MouseButtonFlags mb = SDL_GetMouseState(nullptr, nullptr);
     const bool both_held = set_.both_buttons_center && (mb & SDL_BUTTON_LMASK) && (mb & SDL_BUTTON_RMASK);
     if (SDL_getenv("EM_DIRECTOR")) dir_.open = true;  // (to check it without a person)
+    if (const char* cam = SDL_getenv("EM_CAM"))  // (x,y in cells: to look at a place without a person)
+        if (int cx = 0, cy = 0; std::sscanf(cam, "%d,%d", &cx, &cy) == 2) view_.cx = float(cx * kCellUnits), view_.cy = float(cy * kCellUnits), cam_started_ = true, dir_.seq_play = true;
     director_camera(net, now_ms);  // [U-549]
     if ((cam_lock_ || space_held || both_held) && mine && !dir_.follow && !dir_.seq_play) {
         view_.cx = mine->x;

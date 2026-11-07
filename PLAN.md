@@ -217,7 +217,7 @@ clang 22 and GCC 16 (`README.md` → Build / Play).
 - [x] Comet = 2 × full moon [U-377]; rock bending source-first (Taliyah W-like) [U-378]; wall cracks in 3 states [U-379].
 - [x] Wall segments 100 × 33/66/99, levels 1/2, lifting, segment HP 300 / ice 100 per skill + rank [U-380].
 - [x] Ally → ally lightning redirect [U-381]; no koi spirits in the jungle (Knowledge Seeker).
-- [ ] Walls in free shapes drawn by the player (now: line / ring); per-champion wall upgrades in kits.
+- [x] Walls in free shapes drawn by the player; wall numbers per skill in kits and the maker.
 
 
 - [x] Text chat (Enter) [X-23].

@@ -104,6 +104,12 @@
 - A pin throws the target into a wall close by (airborne on the way), then the effect starts; without a wall nearby it does nothing
 - Structures, bosses and debuff immune units are not moved by grapples or pins; a grapple that meets them pulls only you, if it is one that pulls you
 
+## Stone: walls that move, dents, rocks that collide
+
+- Stone Push on a stone or metal wall: when no lifted stone is in reach, the whole wall slides away from the bender
+- Sinkhole: the ground sinks 2 levels in the middle and 1 at the edge for 3 s: out of the middle only with a mobility skill
+- Thrown rocks collide: the bigger goes on, smaller and weaker, the other breaks
+
 ## Mud and the heat of fire
 
 - Mud lasts 15 s; it is a water source at 50 % strength and it counts as earth; fire or lava on it makes it normal ground at once

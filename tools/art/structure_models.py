@@ -16,7 +16,8 @@ import make_models as mm  # noqa: E402
 sys.argv = saved
 
 ROOT = Path(__file__).resolve().parents[2]
-# the same width of the picture and the same feet as the old models, so they stand where the hitbox is
+# (width of the rendered picture, feet, height, frame size); DISPLAY: how wide the frame is shown in the game
+DISPLAY = {"air": 17.0, "turret": 11.0, "inhibitor": 6.5, "nexus": 13.0}
 SIZES = {"air": (8.0, 0.8, 6.2, 448), "turret": (6.0, 0.85, 4.9, 384), "inhibitor": (3.6, 0.8, 2.5, 320), "nexus": (8.0, 0.78, 5.6, 448)}
 only = set(filter(None, (sys.argv[1] if len(sys.argv) > 1 else "").split(",")))
 for pic in sorted((ROOT / "art" / "raw" / "structure_front").glob("*.png")):
@@ -33,5 +34,5 @@ for pic in sorted((ROOT / "art" / "raw" / "structure_front").glob("*.png")):
     (work / "job.json").write_text(json.dumps(job))
     subprocess.run(["blender", "-b", "--factory-startup", "-P", str(ROOT / "tools/art/art_model_blender.py"), "--", str(work / "job.json")],
                    check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    mm.pack({"id": sid, "kind": "turret", "px": px, "ortho": ortho, "anchor": anchor, "dirs": 1, "anims": ["idle", "death"]})
+    mm.pack({"id": sid, "kind": "turret", "px": px, "ortho": DISPLAY[kind], "anchor": anchor, "dirs": 1, "anims": ["idle", "death"]})
     print("structure", sid, flush=True)

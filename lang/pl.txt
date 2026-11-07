@@ -3090,3 +3090,4 @@ No microphone found=Nie znaleziono mikrofonu
 Speaks:=Mówi:
 Sinkhole=Zapadlisko
 The ground sinks: the middle is too deep to walk out of without a mobility skill=Ziemia się zapada: ze środka nie wyjdziesz bez umiejętności ruchu
+Stone Push on a stone or metal wall: when no lifted stone is in reach, the whole wall slides away from the bender=Pchnięcie Kamienia na kamiennej lub metalowej ścianie: gdy nie ma w zasięgu uniesionego głazu, cała ściana odsuwa się od zaginacza

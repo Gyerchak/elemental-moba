@@ -30,8 +30,8 @@ std::vector<MapDef> make_maps() {
         .dark_spirits = {{26, 14}, {14, 26}},
         .epics = {{{170, 170}, "Lion Turtle"}, {{341, 341}, "Sun Dragons"}, {{299, 299}, "Face Stealer"}},
         .epic_islands = true,
-        .decor = {{{215, 395}, "air_temple"}},
         .minions = {.melee = 3, .ranged = 3, .siege_every = 3, .first_ms = 65'000, .period_ms = 30'000},
+        .decor = {{{215, 395}, "air_temple"}},
     });
     // ---- [U-421][U-455] the Foggy Swamp: 3 v 3, two lanes (top / bottom) around the swamp — shallow water, vines,
     // groves and the great banyan tree whose roots ring the centre pit, where the Swamp Monster waits. A place of

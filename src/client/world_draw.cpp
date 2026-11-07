@@ -414,9 +414,9 @@ void GameView::draw_units(NetClient& net, double now_s) {
         switch (UnitKind(u.kind)) {
             case UnitKind::Champion: return 70.f;
             case UnitKind::Minion: return 44.f;
-            case UnitKind::Turret: return 190.f;
+            case UnitKind::Turret: return 330.f;  // [U-541] the art models are taller
             case UnitKind::Inhibitor: return 70.f;
-            case UnitKind::Nexus: return 150.f;
+            case UnitKind::Nexus: return 300.f;
             case UnitKind::Monster: return u.body == 4 ? 46.f : 60.f;
             case UnitKind::Boss: return 80.f;
         }
@@ -1323,7 +1323,7 @@ void GameView::draw_world(NetClient& net, double now_s) {
         if (f.feeds) text(r_, view_.sx(float(f.x)) - 12, view_.sy(float(f.y)) - 4, std::format("x{}", f.feeds + 1), {255, 255, 255}, 2);
         if (k == FxKind::Lantern) fill_circle(r_, view_.sx(float(f.x)), view_.sy_h(float(f.y), 140), 10 * z + 3, {255, 220, 120, 255});
         if (view_.hz > 0 && (k == FxKind::Bolt || k == FxKind::Auto || k == FxKind::TowerShot || k == FxKind::Boulder)) {
-            float h = k == FxKind::TowerShot ? 110.f : 40.f;
+            float h = k == FxKind::TowerShot ? 240.f : 40.f;
             if (k == FxKind::Boulder) {  // [U-399] the boulder is pulled out of the ground (0.4 s), with broken earth around
                 auto [it, fresh] = fx_born_.try_emplace(f.id, now_s);
                 const float up = std::min(1.f, float(now_s - it->second) / 0.4f);
