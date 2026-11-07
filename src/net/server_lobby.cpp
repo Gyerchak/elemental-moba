@@ -42,6 +42,17 @@ void Server::receive(int pid, Reader& r) {
         case Msg::Pick: on_pick(p, r); break;
         case Msg::Ban: on_ban(p, r); break;
         case Msg::Chat: on_chat(p, r); break;
+        case Msg::VoiceUp: {  // [X-23] goes to my team only; the server does not keep it
+            const std::string bytes = r.str();
+            if (r.bad() || bytes.empty() || bytes.size() > kVoiceFrameMax || p.spectator || replaying_) break;
+            Writer w;
+            w.put(Msg::VoiceDown);
+            w.put<std::uint8_t>(p.slot.id);
+            w.str(bytes);
+            for (Player& o : players_)
+                if (o.connected && o.joined && &o != &p && !o.spectator && o.slot.team == p.slot.team) send(o.peer, w, false);
+            break;
+        }
         case Msg::SkinUpload: on_skin(p, r); break;
         case Msg::EmoteUpload: on_emote(p, r); break;  // [U-414]
         case Msg::LobbyConfig: {  // [U-422] the owner chooses the map + rule set (before the match; not in queue mode)
@@ -96,8 +107,10 @@ void Server::receive(int pid, Reader& r) {
             break;
         case Msg::Command: {
             if (!world_ || !p.unit) break;
-            const Cmd c = r.get<Cmd>();
+            Cmd c = r.get<Cmd>();
             if (r.bad()) break;
+            c.lag_ms = 0;  // [X-03] what a client says here does not count: the server measures it
+            if (c.kind == CmdKind::Cast && p.peer) c.lag_ms = std::uint8_t(std::min<std::uint32_t>(p.peer->roundTripTime / 2, 100));
             if (!cfg_.practice && (c.kind == CmdKind::CheatGold || c.kind == CmdKind::CheatLevel || c.kind == CmdKind::CheatNoCooldowns || c.kind == CmdKind::PracticeSize))
                 break;  // [X-24]
             replay_note(0, p.unit, c);  // [X-19]

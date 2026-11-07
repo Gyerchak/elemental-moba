@@ -1,6 +1,7 @@
 // In-match view. See game_view.hpp.
 #include "client/game_view.hpp"
 #include "game/match/maps.hpp"
+#include "game/mobs/mob_looks.hpp"
 #include "client/auto_play.hpp"
 
 #include <algorithm>
@@ -47,6 +48,7 @@ Rgba cell_colour(Cell c) {
         case Surface::Mud: col = {92, 70, 48}; break;  // [U-527]
         case Surface::Count: col = {255, 0, 255}; break;
     }
+    if (const int down = c.elevation() - c.effective_elevation(); down > 0) col = mixc(col, {18, 14, 10}, 28 * down);  // [U-352] a dent is dark, a raised rock is not
     if (c.tree() == Tree::Alive) col = {34, 90, 40};
     else if (c.tree() == Tree::Burned) col = {58, 46, 38};
     if (c.bush() == Bush::Alive) col = mixc(col, {60, 140, 45}, 70);
@@ -869,6 +871,8 @@ void GameView::frame(NetClient& net, double now_s, Ui& ui) {
             }
         }
         std::error_code ec;
+        for (const auto& e : std::filesystem::directory_iterator("resourcepacks/default/models_hd", ec))  // [U-541] mobs and buildings that only have this one
+            if (const std::string n = e.path().filename().string(); std::ranges::find(champion_dirs, n) == champion_dirs.end()) dirs.push_back("models_hd/" + n);
         for (const auto& e : std::filesystem::directory_iterator("resourcepacks/default/models", ec))  // mobs, structures, companions, trees …
             if (const std::string n = e.path().filename().string(); std::ranges::find(champion_dirs, n) == champion_dirs.end()) dirs.push_back("models/" + n);
         sprites_.preload(dirs);
@@ -922,6 +926,22 @@ void GameView::frame(NetClient& net, double now_s, Ui& ui) {
             } else if (ib != fb->pos.end()) {
                 x = float(ib->second.first), y = float(ib->second.second);
             }
+        }
+        // [X-02] my own champion is not shown in the past: it stands where the server says now, carried on by its speed for half the ping and a little
+        // anticipation of a fresh order; corrections melt in over a few frames, big jumps (blink, knock, death) at once
+        if (u.id == net.my_unit && set_.predict_move && !net.spectator && u.alive && fa && fb) {
+            float nx = float(u.x), ny = float(u.y);
+            const auto ia = fa->pos.find(u.id), ib = fb->pos.find(u.id);
+            if (ia != fa->pos.end() && ib != fb->pos.end() && fb->arrived > fa->arrived) {
+                const double dt = fb->arrived - fa->arrived;
+                const float vx = float(double(ib->second.first - ia->second.first) / dt), vy = float(double(ib->second.second - ia->second.second) / dt);
+                const float ahead = float(std::min(0.12, std::max(0.0, now_s - cur.arrived) + net.ping_ms / 2000.0));
+                nx += vx * ahead, ny += vy * ahead;
+            }
+            if (!pred_on_ || std::hypot(nx - pred_x_, ny - pred_y_) > 260.f) pred_x_ = nx, pred_y_ = ny, pred_on_ = true;
+            const float follow = std::min(1.f, float(frame_ms_) / 45.f);
+            pred_x_ += (nx - pred_x_) * follow, pred_y_ += (ny - pred_y_) * follow;
+            x = pred_x_, y = pred_y_;
         }
         draw_.push_back({u, x, y});
     }
@@ -1037,6 +1057,22 @@ void GameView::frame(NetClient& net, double now_s, Ui& ui) {
         mouse_on_hud_ = false;
     }
     draw_director(net, now_ms, ui);  // [U-549]
+    {  // [X-23] voice: hold the key to talk, hear my team, see who speaks
+        const bool talk = set_.voice_on && !chat_open_ && !net.spectator && !net.practice && SDL_GetKeyboardState(nullptr)[set_.keys[std::size_t(Action::PushToTalk)]];
+        for (const std::string& pk : voice_.update(talk)) net.send_voice(pk);
+        for (const auto& [who, bytes] : net.voice_in)
+            if (set_.voice_on) voice_.play(who, bytes);
+        net.voice_in.clear();
+        if (voice_.talking()) text(r_, view_.sw / 2 - 40, 44, tr("Talking..."), {120, 240, 140}, 1.5f);
+        else if (talk && voice_.mic_failed()) text(r_, view_.sw / 2 - 120, 44, tr("No microphone found"), {255, 160, 120}, 1.5f);
+        float vy = 66;
+        const double t_now = double(SDL_GetTicks()) / 1000.0;
+        for (const auto& s : net.lobby)
+            if (t_now - voice_.last_heard(s.id) < 0.4) {
+                text(r_, view_.sw / 2 - 40, vy, std::format("{} {}", tr("Speaks:"), s.name), {200, 230, 255});
+                vy += 16;
+            }
+    }
 
     // mouse orders (after the HUD had its chance to eat the click)
     if (mouse_on_hud_) ui.clicked = ui.rclicked = false;
@@ -1653,7 +1689,7 @@ void GameView::play_sounds(NetClient& net) {
         }
         if (own) at(own_name, float(f.x), float(f.y), float(kHearLoud));
         else if (res_.sound(name)) at(name, float(f.x), float(f.y), float(kHearLoud));
-        else if (k != FxKind::Steam) at(k == FxKind::Auto || k == FxKind::TowerShot ? "auto_ranged" : "cast_" + el, float(f.x), float(f.y), float(kHearLoud));
+        else if (k != FxKind::Steam) at(k == FxKind::TowerShot ? "mobs/turret_attack" : k == FxKind::Auto ? "auto_ranged" : "cast_" + el, float(f.x), float(f.y), float(kHearLoud));
     }
     // [U-259] my own events: level up, buying / selling, gold, refused orders
     const auto& mine_s = net.cur.me;
@@ -1688,12 +1724,24 @@ void GameView::play_sounds(NetClient& net) {
         if (h.born == net.cur.arrived)
             for (const DrawUnit& d : draw_)
                 if (d.u.id == h.h.dst) at(h.h.is_auto ? "hit_auto" : "hit_" + std::string(element_name(base_element(SubElement(h.h.sub)))), d.x, d.y, float(kHearLoud));
+    for (const LocalHit& h : net.hits)  // [U-541] who struck: a monster or minion has its own voice (minions quieter: there are many)
+        if (h.born == net.cur.arrived && h.h.is_auto)
+            for (const DrawUnit& d : draw_)
+                if (d.u.id == h.h.src && (d.u.kind == std::uint8_t(UnitKind::Minion) || d.u.kind == std::uint8_t(UnitKind::Monster) || d.u.kind == std::uint8_t(UnitKind::Boss)))
+                    at("mobs/" + model_id(d.u) + "_attack", d.x, d.y, float(kHearLoud) * (d.u.kind == std::uint8_t(UnitKind::Minion) ? 0.45f : 1.f));
     for (const DrawUnit& d : draw_) {  // deaths
         auto [it, fresh] = alive_seen_.try_emplace(d.u.id, d.u.alive != 0);
         const bool structure = d.u.kind >= std::uint8_t(UnitKind::Turret) && d.u.kind <= std::uint8_t(UnitKind::Nexus);
-        if (!fresh && it->second && !d.u.alive)
-            at(structure ? "world/structure_down" : d.u.kind == std::uint8_t(UnitKind::Champion) ? "death_champion" : "death", d.x, d.y,
-               structure ? 99'999.f : float(kHearLoud));
+        if (!fresh && it->second && !d.u.alive) {
+            const bool champ = d.u.kind == std::uint8_t(UnitKind::Champion);
+            const std::string own = champ ? std::string() : "mobs/" + model_id(d.u) + "_death";  // [U-541]
+            at(!own.empty() && res_.sound(own) ? own : structure ? "world/structure_down" : champ ? "death_champion" : "death", d.x, d.y, structure ? 99'999.f : float(kHearLoud));
+            if (!champ) {  // its own burst
+                const std::uint32_t c = mob_colour(model_id(d.u));
+                const Rgba col = c ? hex(c) : team_colour(d.u.team);
+                particles_.burst(Element::None, SubElement::Physical, d.x, d.y, structure ? 220.f : d.u.kind == std::uint8_t(UnitKind::Boss) ? 180.f : 40.f, col, structure || d.u.kind == std::uint8_t(UnitKind::Boss) ? 3.f : 1.f);
+            }
+        }
         it->second = d.u.alive != 0;
     }
 }

@@ -817,6 +817,7 @@ void World::command(std::uint32_t id, const Cmd& c) {
             path_to(u, c.x, c.y);
             break;
         case CmdKind::Cast: {
+            u.cast_lag_ms = c.lag_ms;  // [X-03]
             const Slot s = Slot(std::min<int>(c.slot, int(Slot::Count) - 1));
             std::string why;
             if (!can_cast_now(u, s, &why, c.sx, c.sy)) {

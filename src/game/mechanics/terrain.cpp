@@ -365,7 +365,65 @@ void World::lava_melts_walls() {
     }
 }
 
+// [?-41] Stone Push on a raised wall: the whole wall (everything raised together with that piece) slides away from the bender, step by step.
+// Stone and metal only. Units are pushed out as by any rising wall; it stops where the ground does not allow it.
+bool World::push_wall(Unit& u, std::int32_t tx, std::int32_t ty, std::int32_t range) {
+    std::uint32_t best = 0;
+    std::int64_t bd = 160LL * 160;
+    for (const auto& [id, sg] : segs) {
+        if (sg.kind != std::uint8_t(Wall::Stone) && sg.kind != std::uint8_t(Wall::Metal)) continue;
+        if (dist2(sg.x, sg.y, u.ux(), u.uy()) > std::int64_t(range) * range) continue;
+        if (const std::int64_t dd = dist2(sg.x, sg.y, tx, ty); dd < bd || (dd == bd && id < best)) bd = dd, best = id;
+    }
+    if (!best) return false;
+    const WallSeg& first = segs[best];
+    WallMove m;
+    for (const auto& [id, sg] : segs)
+        if (sg.until_ms == first.until_ms && sg.team == first.team && sg.kind == first.kind) m.segs.push_back(id);
+    std::ranges::sort(m.segs);
+    const Dir away = dir_of(std::int64_t(first.x) - u.ux(), std::int64_t(first.y) - u.uy());
+    m.dx = away.x * 40 / kOne, m.dy = away.y * 40 / kOne;
+    m.steps = 8, m.next_ms = now_ms;
+    wall_moves_.push_back(std::move(m));
+    return true;
+}
+
+void World::step_wall_moves() {
+    for (WallMove& m : wall_moves_) {
+        if (m.next_ms > now_ms || m.steps <= 0) continue;
+        m.next_ms = now_ms + 70, --m.steps;
+        std::vector<std::uint32_t> moved;
+        const std::uint32_t before = next_seg_;
+        for (const std::uint32_t id : m.segs) {
+            const auto it = segs.find(id);
+            if (it == segs.end()) continue;  // (it fell on the way)
+            const WallSeg was = it->second;
+            cell_public_ = true;
+            for (const std::uint32_t k : was.cells) {  // the old place comes back at once
+                const int x = int(k % kGridSize), y = int(k / kGridSize);
+                walls.erase(k);
+                const auto t = std::ranges::find_if(cell_timers, [&](const CellTimer& tm) { return tm.x == x && tm.y == y; });
+                if (t != cell_timers.end()) {
+                    set_cell(x, y, Cell(t->raw));
+                    *t = cell_timers.back();
+                    cell_timers.pop_back();
+                }
+            }
+            cell_public_ = false;
+            segs.erase(it);
+            WallSpec ws;
+            ws.hp = was.hp, ws.level = was.level, ws.thick = was.thick;
+            raise_segment(was.x + m.dx, was.y + m.dy, was.along, Wall(was.kind), std::int32_t(std::max<std::int64_t>(100, was.until_ms - now_ms)), was.team, false, ws);
+        }
+        for (std::uint32_t id = before; id < next_seg_; ++id)
+            if (segs.contains(id)) moved.push_back(id);
+        m.segs = std::move(moved);
+    }
+    std::erase_if(wall_moves_, [](const WallMove& m) { return m.steps <= 0 || m.segs.empty(); });
+}
+
 void World::step_terrain() {
+    step_wall_moves();  // [?-41]
     for (Cloud& c : clouds)  // [U-513] a puddle dries into the ground: it leaves mud (on earth; not when it was taken as a source)
         if (c.kind == CloudKind::Puddle && !c.used && c.until_ms <= now_ms) {
             const int cx = c.x / kCellUnits, cy = c.y / kCellUnits;

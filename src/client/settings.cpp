@@ -41,6 +41,7 @@ constexpr ActionInfo kInfo[kActions] = {
     {"item1", "Item 1", SDL_SCANCODE_1}, {"item2", "Item 2", SDL_SCANCODE_2}, {"item3", "Item 3", SDL_SCANCODE_3},
     {"item4", "Item 4", SDL_SCANCODE_4}, {"item5", "Item 5", SDL_SCANCODE_5}, {"item6", "Item 6", SDL_SCANCODE_6},
     {"item7", "Item 7", SDL_SCANCODE_7}, {"item8", "Item 8", SDL_SCANCODE_8}, {"item9", "Item 9", SDL_SCANCODE_9},
+    {"push_to_talk", "Voice chat: hold to talk", SDL_SCANCODE_K},
 };
 
 std::vector<std::string> split(const std::string& s, char sep) {
@@ -157,6 +158,8 @@ bool Settings::load(const std::string& path) {
         else if (k == "fx_skills") fx_skills = std::clamp(to_int(v, 3), 0, 3);
         else if (k == "fx_own_pictures") fx_own_pictures = v == "1";
         else if (k == "fx_animations") fx_animations = v == "1";
+        else if (k == "predict_move") predict_move = v == "1";
+        else if (k == "voice_on") voice_on = v == "1";
         else if (k == "map_side") map_side = std::clamp(std::atoi(v.c_str()), 0, 2);
         else if (k == "host_bind") host_bind = v;
         else if (k == "host_public") host_public = v;
@@ -300,7 +303,7 @@ void Settings::save(const std::string& path) const {
     for (int s = 0; s < kSkillSlots; ++s) out << "quick_cast_" << s << '=' << quick_cast[std::size_t(s)] << '\n';
     out << "auto_attack=" << auto_attack << "\nchamps_only_toggle=" << champs_only_toggle
         << "\nboth_buttons_center=" << both_buttons_center << "\nshow_attack_range=" << show_attack_range << "\nattack_move_cursor=" << attack_move_cursor << "\ncompanion=" << companion << "\nruleset=" << ruleset << "\nmap=" << map << "\nshow_other_emotes=" << show_other_emotes
-        << "\nmap_side=" << map_side << "\nhost_bind=" << host_bind << "\nhost_public=" << host_public
+        << "\npredict_move=" << predict_move << "\nvoice_on=" << voice_on << "\nmap_side=" << map_side << "\nhost_bind=" << host_bind << "\nhost_public=" << host_public
         << "\nauto_buy=" << auto_buy << "\nauto_level=" << auto_level << '\n';
     for (const auto& e : own_emotes) out << "own_emote=" << e << '\n';
     for (int i = 0; i < kActions; ++i) out << "key_" << kInfo[i].id << '=' << SDL_GetScancodeName(keys[std::size_t(i)]) << '\n';

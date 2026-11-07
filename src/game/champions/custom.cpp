@@ -571,6 +571,7 @@ std::string parse_text(const std::string& text, ChampionDef& out) {
             else if (f == "grapple") ok = num(sk.grapple, 0, 3);
             else if (f == "grapple_speed") ok = num(sk.grapple_speed, 100, 6'000);
             else if (f == "pin_range") ok = num(sk.pin_range, 0, 2'000);
+            else if (f == "dent") ok = num(sk.dent, 0, 2);  // [U-352]
             else if (f == "pin_ms") ok = num(sk.pin_ms, 0, 8'000);
             else if (f == "cc_sweet_only") ok = num(sk.cc_sweet_only, 0, 1);  // [U-539]
             else if (f == "heat") ok = num(sk.heat, 0, 9);                // [U-523]

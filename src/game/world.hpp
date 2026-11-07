@@ -62,6 +62,7 @@ struct PingEvent {
     std::int64_t ms = 0;
 };
 struct Cmd {
+    std::uint8_t lag_ms = 0;     // [X-03] half of the player's ping (≤ 100), filled in by the server: a thrown skill starts that far along
     CmdKind kind = CmdKind::Stop;
     std::uint8_t slot = 0;       // Slot for Cast / LevelUp, item slot for Sell / UseItem
     std::int16_t item = -1;      // Buy
@@ -227,6 +228,7 @@ struct Unit {
     std::int32_t slide_x = 0, slide_y = 0, prev_x = 0, prev_y = 0;  // [U-52] sliding on ice (sub per tick)
     std::array<std::int16_t, 12> practice_size{};  // [U-517] practice tool: +% of each skill's size
     std::int32_t practice_model = 0;               // [U-517] practice tool: +model size (100 = 1 %)
+    std::uint8_t cast_lag_ms = 0;                  // [X-03]
     bool casts = false;                            // [U-546] a minion, monster or structure with skills
     std::int64_t next_cast_scan_ms = 0;
     std::int32_t practice_hitbox = 0;              // [U-536] practice tool: the hitbox alone (1 = 1 %)
@@ -688,6 +690,10 @@ public:
     std::vector<Companion> companions;          // [U-407]
     void step_companions();
     void call_companion(Unit& u);  // [U-364] Lion Turtle stacks per team (permanent)
+    struct WallMove { std::vector<std::uint32_t> segs; std::int32_t dx = 0, dy = 0; int steps = 0; std::int64_t next_ms = 0; };
+    std::vector<WallMove> wall_moves_;           // [?-41]
+    bool push_wall(Unit& u, std::int32_t tx, std::int32_t ty, std::int32_t range);
+    void step_wall_moves();
     void apply_unit_tweak(Unit& u);             // [U-546]
     void unit_cast_skills(Unit& u);             // [U-546]
     void apply_monster_growth(Unit& m);         // [U-365] stats for its respawn count

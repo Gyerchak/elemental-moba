@@ -322,3 +322,7 @@ Status column: `accepted · Claude idea` (Hubert can still `change` / `drop` any
 | [X-280] | Item sorting | Most stats and gold efficiency, of all stats or the chosen ones; a stat's price comes from the cheapest item that gives only it. [U-547] |
 | [X-281] | Lobby stage | My champion in the middle, allies at the sides and behind. [U-548] |
 | [X-282] | Director | F9: camera (zoom, angle, height, turn, position, follow), what is shown; in replays also time (speed, jump, timeline; backwards restarts and runs fast) and camera key sequences (save, load, loop). F10: video through ffmpeg. Reset to normal. [U-549] |
+| [X-283] | Prediction and lag | My champion is drawn at the server's newest position carried on by half the ping (setting), corrections melt in, big jumps at once. Thrown skills start ahead by half the ping (at most 100 ms, measured by the server, kept in replays, not through walls). [X-02][X-03] |
+| [X-284] | Voice | Push to talk (K): 16 kHz IMA ADPCM, 40 ms packets, unreliable; the server passes it to the team and keeps nothing; the microphone opens at the first press only. [X-23] |
+| [X-285] | Stone | Stone Push slides a whole stone or metal wall when no lifted stone is in reach; Sinkhole (SkillDef dent); thrown rocks clash. [?-41][U-352] |
+| [X-286] | Places and mobs | decor in MapDef (Air Nomad temples); buildings per nation (tools/art/structure_models.py), sounds/mobs/, mob_looks.hpp: colour, glow, burst. [U-350][U-541] |

@@ -244,6 +244,16 @@ def rotate(v, weight, joint, ax=0.0, ay=0.0):
     return p + j
 
 
+def rigid_pose(v0, height, anim, t):
+    """[U-541] a building: it stands still; when destroyed it sinks and leans"""
+    v = v0.copy()
+    if anim == "death":
+        q = t * t * (3 - 2 * t)
+        v = rotate(v, np.ones(len(v)), (0, 0, 0), ax=-math.radians(14) * q)
+        v[:, 2] = np.maximum(v[:, 2] * (1 - 0.78 * q) - 0.02 * height * q, 0.0)
+    return v
+
+
 def pose(v0, w, j, height, anim, t):
     """a pose; forward = −Y, so a positive x rotation lifts a hanging limb forward"""
     v = v0.copy()
@@ -381,15 +391,15 @@ def main():
     for anim, n in job["frames"].items():
         for f in range(n):
             t = f / max(1, n - 1) if anim == "death" else f / n
-            co_ = pose(v0, w, j, height, anim, t)
+            co_ = rigid_pose(v0, height, anim, t) if job.get("rigid") else pose(v0, w, j, height, anim, t)
             me.vertices.foreach_set("co", co_.astype(np.float32).reshape(-1))
             me.update()
-            for d in range(8):
+            for d in ([2] if job.get("rigid") else range(8)):  # (a building always shows its front)
                 # the picture has no real side view: "sideways" is drawn as a 3/4 view (the front stays visible)
                 ang = (90 - d * 45 + 180) % 360 - 180
                 turned = {0: 0, 45: 30, 90: 60, 135: 125, 180: 180}[abs(ang)]
                 root.rotation_euler.z = math.radians(turned if ang >= 0 else -turned)
-                sc.render.filepath = os.path.join(out, f"{anim}_{d}_{f}.png")
+                sc.render.filepath = os.path.join(out, f"{anim}_{0 if job.get('rigid') else d}_{f}.png")
                 bpy.ops.render.render(write_still=True)
     open(os.path.join(out, "done"), "w").write("ok")
 

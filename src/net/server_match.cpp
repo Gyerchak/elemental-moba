@@ -1,5 +1,6 @@
 // [X-01][X-10][U-179][U-211] Match side of the server: start, snapshots (only numbers and results —
 // the client draws everything), terrain diffs, final statistics and the way back to the lobby.
+#include "game/mobs/mob_looks.hpp"
 #include "core/modifiers.hpp"
 #include "net/server.hpp"
 #include "game/match/maps.hpp"
@@ -290,6 +291,14 @@ void Server::send_snapshot(Player& p) {
                     if (list[q] == e.def || (list[q]->name == e.def->name && !e.def->name.empty())) n.vchamp = std::int16_t(ow->champ), n.vslot = q;
             }
         }
+        if ((e.kind == FxKind::Auto || e.kind == FxKind::TowerShot) && !e.def)  // [U-541] what a monster, minion or tower throws has its own colour and trail
+            if (const Unit* ow = W.find(e.owner); ow && ow->kind != UnitKind::Champion) {
+                std::string id = ow->kind == UnitKind::Minion && ow->mtype == MinionType::Siege ? std::string("minion_siege") : ow->name;
+                for (char& c : id) c = c == ' ' ? '_' : char(std::tolower(static_cast<unsigned char>(c)));
+                const std::uint32_t own = mob_colour(id);
+                n.vcol = own ? own : ow->team == Team::FireNation ? 0xff7a30u : 0x60c070u;
+                n.vtrail = 4, n.vglow = 70;
+            }
         fs.push_back(n);
     }
     w.put<std::uint16_t>(std::uint16_t(fs.size()));

@@ -126,6 +126,8 @@ constexpr SpecialRow kSpecialRows[] = {
     // [U-50] under the ground, [U-49] an ice pillar
     {Element::Earth, {.name = "Burrow", .kind = K::Dash, .sub = S::Earth, .range = 550, .width = 80, .speed = 900, .cast_ms = 150, .cd_ms = 22'000, .cost = 40,
                       .desc = "Travel under the ground: cannot be seen or hit on the way, passes walls", .needs = kNeedEarth, .burrow = true}},
+    {Element::Earth, {.name = "Sinkhole", .kind = K::Pillar, .sub = S::Earth, .range = 650, .radius = 130, .cast_ms = 300, .cd_ms = 24'000, .cost = 45, .dur_ms = 3'000,
+                      .desc = "The ground sinks: the middle is too deep to walk out of without a mobility skill", .dent = 2}},
     {Element::Water, {.name = "Ice Pillar", .kind = K::Pillar, .sub = S::Ice, .range = 600, .radius = 110, .cast_ms = 250, .cd_ms = 20'000, .cost = 40, .dur_ms = 4'000,
                       .desc = "Only on glacier or ice: raises the ground under the target", .needs = kNeedIce}},
     // [U-524] arms of water, cables, pins

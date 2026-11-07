@@ -60,6 +60,23 @@ void World::effect_interactions(Effect& e, std::size_t i) {
             add_cloud(CloudKind::Smoke, (e.ux() + o.ux()) / 2, (e.uy() + o.uy()) / 2, 60, 1'500);
             continue;
         }
+        // [U-352] thrown rocks collide, like the fire clash: the bigger stone goes on, smaller and weaker, the other breaks
+        const auto thrown_rock = [](const Effect& x) { return (x.kind == FxKind::Boulder && (x.vx != 0 || x.vy != 0)) || (x.kind == FxKind::Bolt && (x.sub == SubElement::Earth || x.sub == SubElement::Metal)); };
+        if (e.owner != o.owner && thrown_rock(e) && thrown_rock(o)) {
+            const std::int64_t size_me = std::int64_t(e.radius) * e.radius + e.damage, size_o = std::int64_t(o.radius) * o.radius + o.damage;
+            Effect& strong = size_me >= size_o ? e : o;
+            Effect& weak = size_me >= size_o ? o : e;
+            const std::int32_t left = elements::clash_left_pct(std::max(size_me, size_o), std::min(size_me, size_o));
+            weak.dead = true;
+            if (left <= 0) strong.dead = true;
+            else {
+                strong.radius = std::max(8, strong.radius * left / 100);
+                strong.width = std::max(16, strong.width * left / 100);
+                strong.damage = strong.damage * left / 100;
+            }
+            add_cloud(CloudKind::Smoke, (e.ux() + o.ux()) / 2, (e.uy() + o.uy()) / 2, 50, 900);
+            continue;
+        }
         if (o.team != e.team) {
             if (!o_moving || !(e.kind == FxKind::Bolt || e.kind == FxKind::Wave)) continue;
             const BlockResult br = skill_blocks(my, {.sub = o.sub});

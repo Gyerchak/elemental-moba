@@ -17,7 +17,8 @@
 namespace em::net {
 
 inline constexpr std::size_t kLongStrMax = 16'000'000;  // [U-518] own champion files up to 64 KB, own maps up to 16 MB
-inline constexpr std::uint16_t kProtocol = 30;  // 30: mud ground, heat of autoattacks [U-527][U-534]
+inline constexpr std::uint16_t kProtocol = 31;  // 31: voice chat, lag compensation, Sinkhole, wall push [X-23][X-03]
+//inline constexpr std::uint16_t kProtocol = 30;  // 30: mud ground, heat of autoattacks [U-527][U-534]
 //inline constexpr std::uint16_t kProtocol = 29;  // 29: versions by content, snapshots [U-525]
 //inline constexpr std::uint16_t kProtocol = 28;  // 28: heat levels, new statuses [U-523][U-524]
 //inline constexpr std::uint16_t kProtocol = 27;  // 27: version id, version download [U-374][U-375]
@@ -56,7 +57,10 @@ enum class Msg : std::uint8_t {
     Timeline,      // [U-371] numbers of every champion over the match, for the graphs
     VersionFiles,  // [U-374] the server's game version: its name, id, how many files …
     VersionFile,   // [U-525] … then each file: relative path, bytes
+    VoiceUp,       // [X-23] client → server: 40 ms of my voice (ADPCM)
+    VoiceDown,     // [X-23] server → my team: who, those bytes
 };
+inline constexpr std::size_t kVoiceFrameMax = 1'000;
 
 // [U-414] own emotes: up to 4 per player, a PNG ≤ 96 KB (≤ 256 × 256) + an optional WAV ≤ 256 KB; emote slots 6…9
 inline constexpr int kOwnEmotes = 4, kOwnEmoteSlot0 = 6;

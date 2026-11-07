@@ -216,6 +216,14 @@ void World::cast_skill(Unit& u, Slot slot, std::int32_t tx, std::int32_t ty, std
             e.vy = dir.y * speed_sub / kOne;
             e.travel_left = std::int32_t(r.range * kSub);
             e.end_ms = now_ms + 10'000;
+            if (u.cast_lag_ms) {  // [X-03] what the player saw left this long ago: it starts that far along, not through a wall
+                const std::int32_t ticks = std::int32_t(cfg.tick_hz) * u.cast_lag_ms / 1'000;
+                for (std::int32_t t = 0; t < ticks && e.travel_left > 0; ++t) {
+                    const int nx = (e.x + e.vx) / kSub / kCellUnits, ny = (e.y + e.vy) / kSub / kCellUnits;
+                    if (!Grid::in_bounds(nx, ny) || grid.at(nx, ny).wall() != Wall::None) break;
+                    e.x += e.vx, e.y += e.vy, e.travel_left -= std::max(1, std::abs(e.vx) + std::abs(e.vy));
+                }
+            }
             spawn_fx(e);
             break;
         }
@@ -337,7 +345,20 @@ void World::cast_skill(Unit& u, Slot slot, std::int32_t tx, std::int32_t ty, std
             break;
         }
         case SkillKind::Pillar: {  // [U-45]
-            raise_pillar(px, py, std::int32_t(r.radius), dur_ms, u.team);
+            if (d.dent) {  // [U-352] a dent: the same as a raised rock, the other way; the middle is the deepest
+                const int rc = std::int32_t(r.radius) / kCellUnits, ccx = px / kCellUnits, ccy = py / kCellUnits;
+                cell_team_ = u.team;
+                for (int yy = ccy - rc; yy <= ccy + rc; ++yy)
+                    for (int xx = ccx - rc; xx <= ccx + rc; ++xx) {
+                        const int d2 = (xx - ccx) * (xx - ccx) + (yy - ccy) * (yy - ccy);
+                        if (d2 > rc * rc || !Grid::in_bounds(xx, yy) || protected_cell(xx, yy)) continue;
+                        const int depth = d.dent >= 2 && d2 * 4 <= rc * rc * 3 ? 2 : 1;
+                        raise_ground(xx, yy, -depth, now_ms + dur_ms);
+                    }
+                cell_team_ = Team::Neutral;
+            } else {
+                raise_pillar(px, py, std::int32_t(r.radius), dur_ms, u.team);
+            }
             e.kind = FxKind::Burst;
             e.x = px * kSub;
             e.y = py * kSub;
@@ -515,8 +536,9 @@ void World::cast_skill(Unit& u, Slot slot, std::int32_t tx, std::int32_t ty, std
                 if (chosen && d2 > 120LL * 120) continue;
                 if (best < 0 || d2 < best) best = d2, rock = &f;
             }
+            if (!rock && push_wall(u, tx, ty, std::int32_t(d.range))) break;  // [?-41] no stone, but a whole wall: it slides away from the bender
             if (!rock) {
-                refuse(u, std::format("{}: no lifted stone in reach", d.name));
+                refuse(u, std::format("{}: no lifted stone or wall in reach", d.name));
                 u.ab[std::size_t(slot)].cd_end_ms = now_ms + 1'000;
                 break;
             }

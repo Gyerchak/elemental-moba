@@ -3082,3 +3082,11 @@ A skill it casts by itself=Umiejętność rzucana samodzielnie
 Listen on (empty \= all)=Nasłuchuj na (puste = wszystkie)
 {} ({} deg)={} ({} st.)
 Damage {} per hit, every {:.1f} s \= {:.0f} per second, cost {}. Hits {} of 5 test dummies now=Obrażenia {} na trafienie, co {:.1f} s = {:.0f} na sekundę, koszt {}. Trafia teraz {} z 5 manekinów
+My champion moves at once (the server corrects it)=Mój bohater rusza od razu (serwer to koryguje)
+Voice chat with my team (hold K to talk)=Czat głosowy z drużyną (przytrzymaj K, aby mówić)
+Voice chat: hold to talk=Czat głosowy: przytrzymaj, aby mówić
+Talking...=Mówisz...
+No microphone found=Nie znaleziono mikrofonu
+Speaks:=Mówi:
+Sinkhole=Zapadlisko
+The ground sinks: the middle is too deep to walk out of without a mobility skill=Ziemia się zapada: ze środka nie wyjdziesz bez umiejętności ruchu

@@ -146,6 +146,8 @@ public:
     bool spectator = false;                  // [X-20] the next join only watches
     int spec_team = 0, replay_speed = 100;   // whose vision, replay speed % (0 = pause)
     void send_spectate();
+    void send_voice(const std::string& bytes);  // [X-23]
+    std::vector<std::pair<std::uint8_t, std::string>> voice_in;  // [X-23] (lobby id, bytes) to play
     std::vector<LocalAnnounce> announces;    // [U-263] newest last (the whole match: the announcements window)
     struct WallAnim {  // [U-341]
         net::NetWallBreak b;

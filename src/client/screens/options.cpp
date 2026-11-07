@@ -51,6 +51,8 @@ void App::options(bool in_game) {
                 set_.map_side = (set_.map_side + 1) % 3, changed = true;
             }
             y += 30;
+            toggle(tr("My champion moves at once (the server corrects it)"), set_.predict_move);  // [X-02]
+            toggle(tr("Voice chat with my team (hold K to talk)"), set_.voice_on);  // [X-23]
             toggle(tr("Show other players' own emotes"), set_.show_other_emotes);  // [U-414]
             toggle(tr("Auto-buy: buy my setup's build in the shop"), set_.auto_buy);          // [U-323]
             toggle(tr("Auto-levelling: spend skill points by my setup's order"), set_.auto_level);  // [U-324]

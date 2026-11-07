@@ -294,6 +294,68 @@ def status_sounds(n):
     save(w / "embers.wav", finish(crackle(n(0.6), 18, 5) * env(n(0.6), 0.02, 4), 0.25))
 
 
+# [U-541] every monster, minion and structure has its own attack and death: sounds/mobs/<id>_attack.wav, <id>_death.wav (a pack can replace them)
+MOB_VOICES = {  # id: (voice, pitch, how long the death is)
+    "wandering_spirit": ("spirit", 620, 0.9), "spirit_wolf": ("howl", 340, 1.0), "cursed_spirit": ("wail", 280, 1.1), "dark_spirit": ("wail", 170, 1.3),
+    "face_stealer": ("wail", 120, 1.5), "angry_beast": ("growl", 85, 1.0), "platypus_bear": ("growl", 120, 1.0), "knowledge_seeker": ("spirit", 420, 0.9),
+    "swamp_monster": ("bog", 70, 1.4), "lion_turtle": ("roar", 48, 2.0), "sun_dragons": ("roar", 95, 1.8), "bandit": ("man", 130, 0.6), "bandit_archer": ("man", 150, 0.6),
+    "minion_melee": ("man", 190, 0.45), "minion_ranged": ("man", 230, 0.45), "minion_siege": ("man", 110, 0.6), "minion_super": ("growl", 95, 0.8),
+}
+
+
+def mob_voice(kind, f0, s, seed):
+    r = np.random.default_rng(seed)
+    n = int(s * RATE)
+    t = np.arange(n) / RATE
+    fall = np.linspace(1.0, 0.72, n)
+    ph = 2 * np.pi * np.cumsum(f0 * fall * (1 + 0.012 * np.sin(2 * np.pi * 5.5 * t))) / RATE
+    pulse = sum(np.sin(ph * k) / k for k in range(1, 12))  # a throat
+    air = r.standard_normal(n)
+    if kind == "man":  # a short shout: two vowels of a throat
+        return bp(pulse, 350, 1000) + 0.6 * bp(pulse, 1100, 2600) + 0.08 * bp(air, 1500, 4000)
+    if kind == "growl":  # a rough throat that shakes
+        rough = 1 + 0.7 * np.sin(2 * np.pi * (26 + 8 * r.random()) * t)
+        return (lp(pulse, 900) * rough + 0.35 * lp(air, 700) * rough)
+    if kind == "roar":  # a big chest: low, wide, with air
+        rough = 1 + 0.5 * np.sin(2 * np.pi * 17 * t)
+        return lp(pulse, 1200) * rough + 0.5 * bp(air, 200, 1400) * rough + 0.4 * lp(np.sin(ph / 2), 200)
+    if kind == "bog":  # wet and low
+        bubbles = crackle(n, 30, seed) * 0.5
+        return lp(pulse, 500) * (1 + 0.6 * np.sin(2 * np.pi * 9 * t)) + 0.5 * lp(air, 300) + bubbles
+    if kind == "howl":  # rises, then falls
+        up = np.interp(t, [0, s * 0.3, s], [0.8, 1.25, 0.8])
+        return bp(np.sin(2 * np.pi * np.cumsum(f0 * up) / RATE) + 0.4 * np.sin(4 * np.pi * np.cumsum(f0 * up) / RATE), 200, 2400) + 0.08 * hp(air, 2000)
+    if kind == "wail":  # two voices rubbing against each other
+        a2 = np.sin(ph) + 0.8 * np.sin(ph * 1.06) + 0.4 * np.sin(ph * 2.01)
+        return a2 * (1 + 0.3 * np.sin(2 * np.pi * 7 * t)) + 0.15 * bp(air, 800, 3500)
+    # spirit: a soft bell with breath
+    a2 = sum(np.sin(ph * k * (1 + (fall - 1) * -1)) / k for k in (1, 2.01, 3.02))
+    return a2 + 0.12 * hp(air, 3000)
+
+
+def clip(x, attack, decay):
+    return x * env(len(x), attack, decay)
+
+
+def mob_sounds():
+    d = SND / "mobs"
+    for i, (mid, (kind, f0, s)) in enumerate(MOB_VOICES.items()):
+        atk = clip(mob_voice(kind, f0 * 1.15, min(0.4, s * 0.5), 100 + i), 0.008, 7)
+        whoosh = bp(rng.standard_normal(len(atk)), 700, 3000) * env(len(atk), 0.02, 14) * 0.25  # the swing
+        save(d / f"{mid}_attack.wav", finish(room(atk + whoosh, 0.15), 0.42 if mid.startswith("minion") else 0.6))
+        death = clip(mob_voice(kind, f0, s, 200 + i), 0.015, 2.6 / s)
+        thud = lp(rng.standard_normal(len(death)), 240) * np.exp(-((np.arange(len(death)) / RATE - s * 0.7).clip(0)) * 14) * (np.arange(len(death)) / RATE > s * 0.7) * 0.6
+        save(d / f"{mid}_death.wav", finish(room(death + thud, 0.25), 0.5 if mid.startswith("minion") else 0.75))
+    # the structures: a stone bolt, a shrine's breaking
+    n = lambda s: int(s * RATE)
+    save(d / "turret_attack.wav", finish(room(tone(n(0.3), 900, 180) * env(n(0.3), 0.002, 11) * 0.7 + bp(noise(n(0.3), 1), 1500, 6000) * env(n(0.3), 0.001, 22) * 0.5, 0.2), 0.55))
+    for sid, f in (("turret", 70), ("inhibitor", 130), ("nexus", 42)):
+        ln = 1.8 if sid != "nexus" else 3.2
+        rumble = lp(noise(n(ln), 2), 320) * env(n(ln), 0.01, 3.0 / ln)
+        crash = crackle(n(ln), 45, f) * env(n(ln), 0.01, 4.0 / ln)
+        save(d / f"{sid}_death.wav", finish(room(rumble + crash * 0.8 + tone(n(ln), f, f * 0.6) * env(n(ln), 0.01, 2.5 / ln), 0.35), 0.9))
+
+
 def effects():
     for shape in SHAPE:
         for el in ELEMENT:
@@ -355,6 +417,10 @@ if __name__ == "__main__":
         which = sys.argv[sys.argv.index("--voices") + 1] if len(sys.argv) > sys.argv.index("--voices") + 1 else "all"
         voices(None if which == "all" else which)
         sys.exit(0)
+    if "--mobs-only" in sys.argv:
+        mob_sounds()
+        sys.exit(0)
+    mob_sounds()
     effects()
     if "--effects-only" not in sys.argv:  # the voices take a while (piper-tts)
         voices()

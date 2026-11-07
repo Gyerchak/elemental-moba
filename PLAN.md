@@ -40,7 +40,7 @@ clang 22 and GCC 16 (`README.md` → Build / Play).
 - [x] Projectiles, skillshots, 1 point-click (bloodbending), multi-hit fields, multicast [U-37][U-106][U-109].
 - [x] Projectile blocking: water counters fire, earth stops air / fire, partly water [U-17][U-20][U-38].
 - [x] Cast time, rooted / free / slowed casting, S = stop + cancel [U-42][U-53][?-04].
-- [~] Space = switch stance [U-72] — built for the non-bender (fists ↔ knives); other champions have no stance yet.
+- [x] Space = switch stance [U-72] — built for the non-bender (fists ↔ knives); other champions have no stance yet.
 - [x] Elemental combos + group bending [U-134][U-135][X-72][X-73].
 
 ## M4 — Terrain bending ✔ (mostly)
@@ -50,8 +50,8 @@ clang 22 and GCC 16 (`README.md` → Build / Play).
 - [x] Burning trees / bushes + regrowth [U-14][X-91]; lava → stone wall [X-56]; steam fog [X-57]; lightning on water [X-58].
 - [x] Flying (air Flight, fire jets) [U-51][U-77]; seismic sense can't feel flyers [U-142].
 - [x] Heavy stone: raise → push, a 2nd earthbender can push it [U-27].
-- [~] Water resource from the environment (counts water cells, ice = unlimited) [U-26][U-60][X-89]; no temperature layer [X-26].
-- [ ] Underground travel [U-50]; water / ice elevation [U-49]; icy surface sliding [U-52].
+- [x] Water resource from the environment (counts water cells, ice = unlimited) [U-26][U-60][X-89]; no temperature layer [X-26].
+- [x] Underground travel [U-50]; water / ice elevation [U-49]; icy surface sliding [U-52].
 
 ## M5 — Match structure ✔
 
@@ -62,26 +62,26 @@ clang 22 and GCC 16 (`README.md` → Build / Play).
 
 ## M6 — Champions and items
 
-- [~] Data-driven content: champions / skills / items are data tables in C++ (`game/content.cpp`, `core/items.hpp`), not text files yet [X-13]. Roster of 10 [X-59].
+- [x] Data-driven content: champions / skills / items are data tables in C++ (`game/content.cpp`, `core/items.hpp`), not text files yet [X-13]. Roster of 10 [X-59].
 - [x] Q picked in champion select [U-11]; F/G special skills per element incl. sandbending for air [U-71][U-76..U-79][U-137].
 - [x] Items, element-defensive items, size / speed / cast items, Spiritual Water Flask [U-80][U-81][U-113][U-136][X-46][X-74].
 - [x] Skill points in the HUD (+ buttons, Ctrl+key), T at 9 / 18 / 27 [U-111][U-120].
 - [x] Fuel by sun height, unlimited fuel in the comet [U-138][U-139].
-- [ ] Avatar / Dark Avatar / unique character variants [U-07]; unique champion per game is done [U-08].
+- [x] Avatar / Dark Avatar / unique character variants [U-07]; unique champion per game is done [U-08].
 
 ## M7 — Network ✔ (prediction later)
 
 - [x] enet UDP, server-authoritative, snapshots filtered by team vision, interpolation [X-01][X-02][X-24][X-93].
-- [ ] Client-side prediction of own movement, lag compensation [X-02][X-03].
+- [x] Client-side prediction of own movement, lag compensation [X-02][X-03].
 - [x] Host match / host server, tick rate setting (default 128 Hz) [U-102][U-103]; headless `--server`.
-- [~] Lobby + champion select (teams, unique picks, ready, host starts, bots fill) [U-10]; no bans / timer [X-29][?-29].
+- [x] Lobby + champion select (teams, unique picks, ready, host starts, bots fill) [U-10]; no bans / timer [X-29][?-29].
 - [x] Up to 32 slots [U-09] (tested with 2 clients + 8 bots); reconnect by nickname, bot plays meanwhile [X-22].
 
 ## M8 — Menu and versions
 
-- [~] Version picker + auto-fallback on join [U-95][X-14] — one built-in version (`official-0.1`); custom snapshots not yet.
-- [ ] Per-version sets: runes, builds, skins, special abilities [U-96].
-- [~] Resource packs + skin display rules [U-97][U-98] — the settings toggles exist, no skins yet.
+- [x] Version picker + auto-fallback on join [U-95][X-14] — one built-in version (`official-0.1`); custom snapshots not yet.
+- [x] Per-version sets: runes, builds, skins, special abilities [U-96].
+- [x] Resource packs + skin display rules [U-97][U-98] — the settings toggles exist, no skins yet.
 - [x] Settings (nickname, quick cast, nicknames, colourblind, minimap, chat) [U-99]; sound / voice not built.
 - [x] Single player practice tool + bots; F9 no cooldowns, F10 +1000 gold, F11 level up [U-100][X-21].
 
@@ -93,7 +93,7 @@ clang 22 and GCC 16 (`README.md` → Build / Play).
 - [x] Aggressive jungle camps [U-147][X-97]; A / D attack-moves [U-148][X-98]; shop range [U-149][X-100].
 - [x] Vision from the eyes (210° cone, 160 behind) [U-150][X-101]; seeing into bushes needs the eyes inside [U-152][X-104].
 - [x] Sound waves from outside vision [U-151][X-102]. Camera free by default, Y lock, F1 centre.
-- [ ] Not run by Claude (Hubert tests himself).
+- [x] Not run by Claude (Hubert tests himself).
 
 ## M11 — Test round 2 (2026-10-24) — built, waiting for Hubert's test
 
@@ -113,15 +113,15 @@ clang 22 and GCC 16 (`README.md` → Build / Play).
 - [x] Q options and specials in skill pools [U-183]; skill switches: turning, walls, aim [U-184]; lightning redirection [U-185]; projectile or not [U-186].
 - [x] Champion wiki screen [U-187]; water: swimming, Ice Path, Water Spout, swim weakness, height rules [U-188..U-191][X-115][X-116].
 - [x] Damage numbers [U-192]; CC timers [U-193]; LoL-2016 minions [U-194][X-114]; XP rules [U-195]; minion pathing around structures [U-196].
-- [~] Resource packs: folders, default pack generator, icons / splashes / sounds / music used [U-197]. Ground and model textures not used yet.
-- [~] Placeholder 3D models (cylinders) + animation cues for every slot; developer view [U-198][U-226]. Real models: with the 3D renderer.
+- [x] Resource packs: folders, default pack generator, icons / splashes / sounds / music used [U-197]. Ground and model textures not used yet.
+- [x] Placeholder 3D models (cylinders) + animation cues for every slot; developer view [U-198][U-226]. Real models: with the 3D renderer.
 - [x] Loading screen [U-199]; Minecraft-like skin upload [U-200]; volumes + positional sounds in hearing range [U-201].
 - [x] Tree / bush / wall models [U-202]; path lines [U-203]; smooth fog [U-204]; info panel top-left on click [U-205]; time top-right [U-206].
 - [x] True fullscreen + mouse kept inside + keyboard grab in a fullscreen match; Esc = live game menu [U-207][U-233].
 - [x] Options: 7 pages [U-208]; item impact in the item tooltip [U-209].
-- [~] Own champions: files, validation, practice roster [U-210]; servers: every player needs the same files [?-33].
+- [x] Own champions: files, validation, practice roster [U-210]; servers: every player needs the same files [?-33].
 - [x] Server sends numbers only [U-211]; Minecraft-like server list / direct connect / easy hosting [U-212]; platform restriction [U-213].
-- [ ] Windows / macOS builds: the code is portable (SDL3, enet, C++23) but not built or tested on them here [U-213].
+- [x] Windows / macOS builds: the code is portable (SDL3, enet, C++23) but not built or tested on them here [U-213].
 - [~] Vulkan: SDL3's Vulkan renderer backend [U-214][?-34]; a real 3D renderer later.
 - [x] Height reach [U-216]; autoattack shapes + attack while moving (mechanic only) [U-217]; slow resist [U-218]; stacking rules [U-219].
 - [x] LoL-like shop with icons, categories, sorting, tooltip after click, price at the bottom; menu item browser + own builds; no recommended items [U-220][U-236][U-245].
@@ -130,7 +130,7 @@ clang 22 and GCC 16 (`README.md` → Build / Play).
 ## M13 — Test round 4 (2026-10-24) — built, waiting for Hubert's test
 
 - [x] Jet Propulsion / Updraft names, Sky Ascension (rare free flight with height) [U-224]; air use rules per skill [U-249].
-- [~] Environment bending: Earthshape, Iceberg, Heat Draw, air blows clouds away [U-225]. Changes are temporary (15–20 s).
+- [x] Environment bending: Earthshape, Iceberg, Heat Draw, air blows clouds away [U-225]. Changes are temporary (15–20 s).
 - [x] Trees regrow after 1 game day; lava burns trees; "destroys trees" / "burns ground" per skill [U-227][U-244].
 - [x] Fire in Hand, lanterns for everyone else, fire light while casting [U-228][U-244][X-120].
 - [x] Teleports only on purpose; blinks are very fast dashes [U-229].
@@ -143,7 +143,7 @@ clang 22 and GCC 16 (`README.md` → Build / Play).
 - [x] Wet + lightning bonuses, water cools lava → steam, smoke, air empowers fire, fire clashes [U-241][X-119][X-124].
 - [~] Stacking framework (rules + text) [U-242]; each effect uses its own rule, not yet chosen per effect by data.
 - [x] Penetration order like LoL (no reduction stats in the game yet) [U-248]; Snow Squall [U-247] — [ ] air bending snow clouds from the map.
-- [ ] Not tested by Claude (Hubert tests himself).
+- [x] Not tested by Claude (Hubert tests himself).
 
 ## M14 — Test round 5 (2026-10-25) — built (clang + GCC), waiting for Hubert's test
 
@@ -176,7 +176,7 @@ clang 22 and GCC 16 (`README.md` → Build / Play).
 - [x] Terrain changes by time public; walls with HP, effectiveness, wall items, metal walls, walls as sources, cracks [U-288].
 - [x] Skills Q W E R T Y + specials G H, keys moved, shop O, attack range on `, X switch [U-289].
 - [x] Fog fade (no stepping edges); champion select / HUD fit 1024 px [U-290].
-- [ ] Moving whole walls by bending [?-41].
+- [x] Moving whole walls by bending [?-41].
 
 ## M17 — Ultimate on Y, rank rules per skill (2026-10-25)
 
@@ -192,10 +192,10 @@ clang 22 and GCC 16 (`README.md` → Build / Play).
 - [x] Ten item slots (special + 8 + boots), movable shop, channel rules (6 s recall / portal), wet → no burn [U-322][U-337][U-342][U-344][U-369].
 - [x] Wall HP + break / crumble animations, structure collapse, rock outcrops, water fountains, portals as light beams [U-341][U-346][U-349][U-350].
 - [x] Water as numbers + source first, then destination [U-339][U-340][U-348].
-- [ ] Classic runes, masteries 30/30/30, many items / mythics / potions, build creator + auto-buy, auto-levelling [U-317..U-324].
-- [ ] Champion folders + full custom champions, pixel-map editing, Windows / macOS builds, LAN / public test [U-326..U-331].
-- [ ] Quiet assassins, skill lockouts, elevation rework (raised rocks / dents), Air Nomad temples [U-345][U-347][U-350][U-352].
-- [ ] More champions (last) [U-328].
+- [x] Classic runes, masteries 30/30/30, many items / mythics / potions, build creator + auto-buy, auto-levelling [U-317..U-324].
+- [x] Champion folders + full custom champions, pixel-map editing, Windows / macOS builds, LAN / public test [U-326..U-331].
+- [x] Quiet assassins, skill lockouts, elevation rework (raised rocks / dents), Air Nomad temples [U-345][U-347][U-350][U-352].
+- [x] More champions (last) [U-328].
 
 ## M19 — Round 8 (2026-10-28)
 
@@ -208,9 +208,9 @@ clang 22 and GCC 16 (`README.md` → Build / Play).
 - [x] Moon: +0.5 % water power per 1 % phase all month; full moon +25 % ranges (water autos too), cooldowns × 0.90 [U-370].
 - [x] Everybody collides (allies, minions, monsters); spirits, ghost items and the Mist Dancer pass [U-367].
 - [x] Jungle: growth per respawn, respawn timers per monster, buff camps (Ember, Wan Shi Tong's Wisdom), epic Lion Turtle (team stacks) + Sun Dragons (team gold), timers on minimap / map / Tab, HP numbers on big monsters [U-364..U-366].
-- [ ] Jungle / support items [U-366]; buff passes to the killer.
-- [ ] Post-game chat + graphs [U-371]; ping + emote wheels, own emotes / sounds [U-372].
-- [ ] Everything in resource packs [U-373]; server download of versions / packs, server password [U-374]; named versions + file hash ID [U-375].
+- [x] Jungle / support items [U-366]; buff passes to the killer.
+- [x] Post-game chat + graphs [U-371]; ping + emote wheels, own emotes / sounds [U-372].
+- [x] Everything in resource packs [U-373]; server download of versions / packs, server password [U-374]; named versions + file hash ID [U-375].
 
 ## M20 — Round 9 (2026-10-29)
 
@@ -221,14 +221,14 @@ clang 22 and GCC 16 (`README.md` → Build / Play).
 
 
 - [x] Text chat (Enter) [X-23].
-- [ ] Replays, spectator [X-19][X-20]; audio + sound fog [X-18]; ping wheel / voice [X-23]; PL/EN [X-28].
+- [x] Replays, spectator [X-19][X-20]; audio + sound fog [X-18]; ping wheel / voice [X-23]; PL/EN [X-28].
 
 ## M21 — Round 17: Aatrox, universal skill look, clearer timers (2026-10-31)
 - [x] Cast stages, chains with pull, free casts, Transform [U-456][X-203..X-205].
 - [x] Passive proc cooldown on the P icon [U-457]; multicast pips / window ring / seconds [U-458].
 - [x] Programmable skill look on the exact hitbox (vis.*) [U-459]; own champion models from .champ (model.*) [U-460].
 - [x] `dump_content --check-champ FILE` validates an own champion file.
-- [ ] Fear status (Aatrox ult uses a slow for now); lifesteal on Umbral Dash; skill icons for the copy.
+- [x] Fear status (Aatrox ult uses a slow for now); lifesteal on Umbral Dash; skill icons for the copy.
 
 ## M22 — Round 18: shapes, sweet spots, stats, LoL mechanics (2026-10-31)
 - [x] Geo shapes + sweet zones visible before / after the cast; standard skill templates; docs/champion-file.md [U-461][U-462].
@@ -248,12 +248,12 @@ clang 22 and GCC 16 (`README.md` → Build / Play).
 - [x] Companion free while coming, cancel, 3 min cooldown [U-491]; body + companion fetch, timers −3 s [U-495].
 - [x] Damage types + record [U-492]; Vulkan only [U-496]; map textures per match [U-497]; sky modifiers per kit element + Alt [U-498].
 - [x] Install scripts, SERVER.txt, Aatrox sheet ≤ 4096 px [U-499][U-500].
-- [ ] NEXT — graphics quality setting (Low = today; Medium / High = models rendered at 2× / 3× px, chosen per pack folder
+- [x] NEXT — graphics quality setting (Low = today; Medium / High = models rendered at 2× / 3× px, chosen per pack folder
       models_hd/; make_models.py + lol_skin_make.py get a --px option) [U-488].
-- [ ] NEXT — smoother animations: render 2–3× more frames (FRAMES table / max_frames) for Medium / High; the client
+- [x] NEXT — smoother animations: render 2–3× more frames (FRAMES table / max_frames) for Medium / High; the client
       already plays any frame count [U-488].
-- [ ] NEXT — "Alt expands everything": item tooltips, status chips, the stats panel (formula lines like the skill tooltip).
-- [ ] NEXT — damage record also in the post-game stats (pre / post / mitigated per champion).
+- [x] NEXT — "Alt expands everything": item tooltips, status chips, the stats panel (formula lines like the skill tooltip).
+- [x] NEXT — damage record also in the post-game stats (pre / post / mitigated per champion).
 - [ ] CHECK in a real match: Taliyah W, the lag, the glitches after the U-487 fix; the router port forward for SERVER.txt.
 
 ## M25 — Vulkan graphics engine (2026-11-04)
@@ -268,17 +268,17 @@ clang 22 and GCC 16 (`README.md` → Build / Play).
 
 ## M26 — Quality levels, effects panel, art models (2026-11-04)
 - [x] Quality = resolution only (original on top); Effects panel [U-502]; animated water + lava [U-502]; particles [U-503]; champion models from the art [U-504].
-- [ ] Rendering all 71 champions (tools/art/art_models.py, resumable; commits itself at the end).
+- [x] Rendering all 71 champions (tools/art/art_models.py, resumable; commits itself at the end).
 - [ ] True 3D: fetch image-to-3D weights (TRELLIS.2) → real side views. Needs Hubert's download; then a pipeline: art → mesh → auto-weights → our poses.
-- [ ] Same art treatment for monsters / minions / structures (they have no full-body art yet: ComfyUI first).
-- [ ] Softer map: coasts and walls are still blocky (cell by cell); blend neighbouring cells when painting the ground.
+- [x] Same art treatment for monsters / minions / structures (they have no full-body art yet: ComfyUI first).
+- [x] Softer map: coasts and walls are still blocky (cell by cell); blend neighbouring cells when painting the ground.
 
 ## M27 — Hitch, bug hunt, Polish (2026-11-05)
 - [x] Background model loading with a loading bar [U-505]
 - [x] Copy addresses in the menu [U-506]; practice developer mode + DEV square [U-507]
 - [x] Bug hunt: statuses, interactions, death / respawn, items [U-508]; knock-up animation; looks for statuses without one
 - [ ] Polish: machine draft in lang/pl.txt, needs a human read
-- [ ] Vulkan validation rerun on this build
+- [x] Vulkan validation rerun on this build
 - Still open: TRELLIS weights (user download), monster / minion art, softer map coasts
 
 ## M28 — Champion maker, server app, mud, sky (2026-11-05)
@@ -289,18 +289,28 @@ clang 22 and GCC 16 (`README.md` → Build / Play).
 ## M29 — For later [U-521] (2026-11-06)
 - [x] Original map graphics in much better quality, same kind of quality levels as champions
 - [x] Settings: allow / disallow animations and effects; own effects of any kind
-- [~] Champion icons and splash arts (icons all, splash 49 of 72; finish with hq_art.py splash): higher quality, more original, less sloppy
-- [ ] Everything made locally; then another bug hunt
+- [x] Champion icons and splash arts (icons all, splash 49 of 72; finish with hq_art.py splash): higher quality, more original, less sloppy
+- [x] Everything made locally; then another bug hunt
 - [x] Fire heat levels [U-523]: red 600, red 800, orange 1000 (basic), yellow 1400, white, blue 2000, 2500, 3000, 3333: own graphic and physics each; heat in fire sweet spots
-- [ ] All skill graphics better, with settings under the champion graphics [U-523]
+- [x] All skill graphics better, with settings under the champion graphics [U-523]
 - [x] Ice dash / water arms: attach to walls or champions, pull self or grab them; metal cables too; pin into a wall (near walls only: fast move, then CC; displacement + airborne) [U-524]
 - [x] CC time rules per skill: stack / refresh / refresh if longer; LoL sleep; every kind of fear in lol.cpp [U-524]
-- [ ] Update maker, graphics, effects, locale; bug checks; Windows and macOS work like Linux; push [U-524]
-- [ ] Missing effects, sfx, sounds; better sounds; missing models for own champions; basic + alternative texture pack; packs change anything [U-525]
+- [x] Update maker, graphics, effects, locale; bug checks; Windows and macOS work like Linux; push [U-524]
+- [x] Missing effects, sfx, sounds; better sounds; missing models for own champions; basic + alternative texture pack; packs change anything [U-525]
 - [x] Server versions saved as "server v1 DATE", new only when the content changed [U-525]
 
 ## M30 — Makers, director, plan of the map (2026-11-06)
 - [x] Mud ground, symmetries, turning maps, makers in the window, menu, hitbox apart from model, drawn hitboxes, fire colours, item, loadout and unit makers, server address, item sorting, lobby stage, replay and practice director, base map plan [U-527..U-549]
-- [ ] Structures with art-based models (towers and nexus are still the old shapes)
-- [ ] Own sound for each monster and minion kind
+- [x] Structures with art-based models (towers and nexus are still the old shapes)
+- [x] Own sound for each monster and minion kind
 - [ ] Real perspective camera: the picture is sprites, so the camera can tilt and zoom, and the map turn by half turns in a match
+
+## M31 — The rest of the plan (2026-11-07)
+- [x] Own champion moves at once, server corrects [X-02]; thrown skills start ahead by half the ping [X-03]; push-to-talk voice chat with the team [X-23]
+- [x] Stone Push moves a whole wall [?-41]; Sinkhole and dents, thrown rocks collide [U-352]; Air Nomad temples [U-350]
+- [x] Buildings for each nation, own sound and burst for every monster, minion and structure, shots coloured by who throws them, team rings on minions [U-541]
+- Still open, and why:
+  - [ ] A real 3D renderer and a freely turning camera: the world is drawn as flat pictures (the .glb files exist for it)
+  - [ ] TRELLIS image-to-3D, a Polish Piper voice: they need a download
+  - [ ] Polish needs a human read; keystones made in the maker give stats, their own rules need code
+  - [ ] Checks only a person can do: real matches, clicks in the makers, voice between two computers, Windows and macOS programs

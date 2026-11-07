@@ -202,6 +202,13 @@ void NetClient::send_own_emote(std::uint8_t idx, const std::vector<std::uint8_t>
     send_raw(w, true);
 }
 
+void NetClient::send_voice(const std::string& bytes) {  // [X-23]
+    Writer w;
+    w.put(Msg::VoiceUp);
+    w.str(bytes);
+    send_raw(w, false);
+}
+
 void NetClient::send_spectate() {  // [X-20]
     Writer w;
     w.put(Msg::Spectate);
@@ -474,6 +481,12 @@ void NetClient::handle(const std::uint8_t* data, std::size_t n, double now_s) {
             break;
         }
         case Msg::Feed: feed.push_back({r.str(), now_s}); break;
+        case Msg::VoiceDown: {  // [X-23]
+            const std::uint8_t who = r.get<std::uint8_t>();
+            std::string bytes = r.str();
+            if (!r.bad() && voice_in.size() < 64) voice_in.emplace_back(who, std::move(bytes));
+            break;
+        }
         case Msg::ChatLine: {
             ChatLine c;
             c.channel = r.get<Chat>();

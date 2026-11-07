@@ -52,9 +52,10 @@ constexpr Seg kForestPaths[] = {
     {{150, 483}, {174, 442}}, {{174, 442}, {150, 410}}, {{150, 410}, {115, 396}}, {{150, 410}, {190, 360}}, {{190, 360}, {205, 306}},
     {{190, 360}, {270, 400}}, {{270, 400}, {230, 430}}, {{230, 430}, {230, 483}}, {{270, 400}, {252, 420}}, {{174, 442}, {230, 430}},
 };
+constexpr P kTemple{215, 395};  // [U-350] (the Earth side has its mirror); the model: maps.cpp decor
 // rock outcrops at the corners of the paths: places to hide behind, not a maze
 struct Rock { P at; double core; };
-constexpr Rock kRocks[] = {{{95, 225}, 3.0}, {{168, 262}, 2.4}, {{55, 310}, 2.6}, {{130, 345}, 3.2}, {{178, 322}, 2.0}, {{118, 430}, 2.6}, {{205, 395}, 3.0}, {{262, 450}, 2.4}, {{190, 462}, 2.2}, {{305, 430}, 2.8}};
+constexpr Rock kRocks[] = {{{95, 225}, 3.0}, {{168, 262}, 2.4}, {{55, 310}, 2.6}, {{130, 345}, 3.2}, {{178, 322}, 2.0}, {{118, 430}, 2.6}, {{262, 450}, 2.4}, {{190, 462}, 2.2}, {{305, 430}, 2.8}};
 constexpr double kPathHalfWidth = 2.6, kRoadHalfWidth = 3;
 
 double dist(P a, P b) { return std::hypot(a.x - b.x, a.y - b.y); }
@@ -199,6 +200,16 @@ Cell make_cell(int cx, int cy) {
         c.set_surface(Surface::Glacier);
     }
 
+    // 8. [U-350] an Air Nomad temple on its plaza: a place in the jungle; it stops walkers and sight, skills fly over it
+    if (const double temple_d = dist(p, kTemple); temple_d < 13) {
+        c.set_surface(Surface::Stone);
+        c.set_tree(Tree::None), c.set_bush(Bush::None), c.set_wall(Wall::None);
+        c.set_elevation(0);
+    }
+    if (dist(p, kTemple) < 5.5) {
+        c.set_walk(Walk::Blocked);
+        c.set_vision_fog(SenseBlock::Full);
+    }
     // Derived fields.
     if (c.surface() == Surface::DeepWater) c.set_walk(Walk::Blocked);  // [?-08]
     if (c.tree() == Tree::Alive) {

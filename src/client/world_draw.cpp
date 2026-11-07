@@ -9,6 +9,7 @@
 #include "client/anim.hpp"
 #include "client/modifiers.hpp"
 #include "client/game_view.hpp"
+#include "game/mobs/mob_looks.hpp"
 #include "client/locale.hpp"
 #include "game/match/layout.hpp"
 #include "game/match/maps.hpp"
@@ -127,6 +128,11 @@ void GameView::terrain_until(NetClient& net, float screen_y) {
         const int y = view_.flip ? terr_y1_ - terr_k_ : terr_y0_ + terr_k_;  // back to front on screen
         if (view_.sy(float(y * kCellUnits + 16)) > screen_y) return;
         draw_terrain_row(net, y);
+        for (const auto& [at, model] : cur_map().decor)  // [U-350] a building of the map, in its row
+            for (const CellPt p : {at, mirror(at)})
+                if (p.second == y)
+                    if (const SpriteSheet* sh = sprites_.get(std::string(model)))
+                        Sprites::draw(r_, *sh, "idle", 0, 0, view_.sx(float(p.first * kCellUnits + 16)), view_.sy(float(p.second * kCellUnits + 16)), view_.zoom, {255, 255, 255, 255}, false);
         if (const auto it = seg_rows_.find(y); it != seg_rows_.end())  // [U-443] the segments centred on this row
             for (std::size_t i : it->second) draw_segment(net.cur.segs[i]);
     }
@@ -506,7 +512,21 @@ void GameView::draw_units(NetClient& net, double now_s) {
                 const std::string& skin = set_.prefs(champions()[std::size_t(u.champ)].name).skin;
                 if (!skin.empty()) sheet = sprites_.get_dir("champions/" + Resources::champion_id(u.champ) + "/skins/" + skin + "/model");
             }
-            if (!sheet) sheet = sprites_.get(model_id(u));
+            if (!sheet) {  // [U-541] the buildings have a look for each nation
+                const std::string mid = model_id(u);
+                if (kind == UnitKind::Turret || kind == UnitKind::Inhibitor || kind == UnitKind::Nexus) sheet = sprites_.get(mid + (u.team == 1 ? "_earth" : "_fire"));
+                if (!sheet) sheet = sprites_.get(mid);
+            }
+            // [U-541] minions show their team on the ground; spirits and the great monsters have their own light
+            if (kind == UnitKind::Minion && u.alive) ground_ring(r_, view_, du.x, du.y, 34.f, with_alpha(team_colour(u.team), 170), 24);
+            if ((kind == UnitKind::Monster || kind == UnitKind::Boss) && u.alive && set_.fx_lights) {
+                const std::string mid = model_id(u);
+                if (mob_glows(mid)) {
+                    const float pulse = 0.85f + 0.15f * float(std::sin(now_s * 2.4 + double(u.id)));
+                    const float gr = (kind == UnitKind::Boss ? 190.f : 80.f) * pulse;
+                    soft_disc(r_, view_.sx(du.x), view_.sy(du.y), view_.rx(gr), view_.ry(gr), with_alpha(hex(mob_colour(mid)), kind == UnitKind::Boss ? 90 : 60), true);
+                }
+            }
         }
         if (view_.hz > 0) {
             // footprint = the real hitbox on the ground: a grey shadow at the chosen opacity [U-176]

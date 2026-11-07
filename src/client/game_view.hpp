@@ -17,6 +17,7 @@
 #include "client/postfx.hpp"
 #include "client/particles.hpp"
 #include "client/item_browser.hpp"
+#include "client/voice.hpp"
 #include "client/net_client.hpp"
 #include "client/own_emotes.hpp"
 #include "client/anim.hpp"
@@ -265,6 +266,9 @@ private:
     std::vector<net::NetFx> fx_draw_;                 // [U-389] this frame's effects at their delayed positions
     std::vector<net::NetCompanion> comp_draw_;
     std::vector<std::uint32_t> comp_prev_;  // [U-407] companions seen last frame (a new one plays its call)
+    Voice voice_;                    // [X-23]
+    float pred_x_ = 0, pred_y_ = 0;  // [X-02]
+    bool pred_on_ = false;
     std::unordered_map<std::uint32_t, std::pair<float, float>> companion_smooth_;  // [U-543]
     std::unordered_map<std::uint32_t, double> companion_moved_;
     std::unordered_map<std::uint32_t, float> companion_last_x_, companion_last_y_;  // facing of the companion models

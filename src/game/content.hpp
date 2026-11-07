@@ -289,6 +289,7 @@ struct SkillDef {
     std::int16_t pin_ms = 0;       // … then gets the skill's CC for this long. No wall close: no pin
     // ---- [U-523] heat of a fire skill: 0 = its usual look (orange fire); 1 … 9 = HeatLevel (mechanics + look)
     std::uint8_t heat = 0, sweet_heat = 0;
+    std::uint8_t dent = 0;         // [U-352] Pillar: the ground goes DOWN this many levels instead (2: only mobility gets out of the middle)
     bool cc_sweet_only = false;    // [U-539] its crowd control and knock only on the sweet spot
     bool burrow = false;           // [U-50] Dash: under the ground: cannot be seen or hit on the way, passes walls and units
     std::int32_t lock_ms = 0;      // [U-347] casting it puts my other skills on cooldown this long …

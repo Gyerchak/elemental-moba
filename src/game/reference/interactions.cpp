@@ -122,6 +122,11 @@ std::vector<std::string> interaction_lines() {
     l("A pin throws the target into a wall close by (airborne on the way), then the effect starts; without a wall nearby it does nothing");
     l("Structures, bosses and debuff immune units are not moved by grapples or pins; a grapple that meets them pulls only you, if it is one that pulls you");
 
+    h("Stone: walls that move, dents, rocks that collide");
+    l("Stone Push on a stone or metal wall: when no lifted stone is in reach, the whole wall slides away from the bender");
+    l("Sinkhole: the ground sinks 2 levels in the middle and 1 at the edge for 3 s: out of the middle only with a mobility skill");
+    l("Thrown rocks collide: the bigger goes on, smaller and weaker, the other breaks");
+
     h("Mud and the heat of fire");
     l(std::format("Mud lasts {} s; it is a water source at {} % strength and it counts as earth; fire or lava on it makes it normal ground at once",
                   elements::kMudMs / 1000, elements::kMudWaterPct));

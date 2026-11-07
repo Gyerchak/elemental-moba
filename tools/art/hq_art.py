@@ -195,6 +195,24 @@ def main():
             if not dst.exists():
                 make(RAW / "front" / f"{cid}.png", f"one single figure, full body, front view, standing straight, arms slightly out, {look}, plain flat white background, even lighting, no text, hand painted fantasy game art", 768, 1024, 6000 + i)
                 shutil.copy(RAW / "front" / f"{cid}.png", dst)
+    if "structures" in what:  # [U-541] the buildings of the two nations (tools/art/structure_models.py makes the models)
+        looks = {"fire": "red and gold fire nation style, dark iron, burning brazier on top", "earth": "green and bronze earth kingdom style, carved stone, glowing green crystal on top"}
+        shapes = {"turret": "one tall narrow defence tower, square base, tapering shaft, a lookout with a pointed roof",
+                  "inhibitor": "one small wide shrine with a low roof and a big glowing crystal in the middle, on a round stone plinth",
+                  "nexus": "one great temple tower of three stepped levels, wide base, a huge glowing heart stone at the top"}
+        for i, (sid, shape) in enumerate(shapes.items()):
+            for j, (team, look) in enumerate(looks.items()):
+                dst = ROOT / "art" / "raw" / "structure_front" / f"{sid}_{team}.png"
+                if not dst.exists():
+                    make(RAW / "structures" / f"{sid}_{team}.png", f"{shape}, {look}, a single building seen straight from the front, whole building visible, standing on nothing, plain flat white background, even lighting, no ground, no shadow, no text, hand painted fantasy game art, rich detail", 768, 1024, 6500 + i * 10 + j)
+                    dst.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy(RAW / "structures" / f"{sid}_{team}.png", dst)
+    if "temple" in what:  # [U-350] an Air Nomad temple, a place on the base map
+        dst = ROOT / "art" / "raw" / "structure_front" / "air_temple.png"
+        if not dst.exists():
+            make(RAW / "structures" / "air_temple.png", "one air nomad temple, tall slender towers with blue pointed roofs and golden tops around a white stone hall, arches, a single building seen straight from the front, whole building visible, standing on nothing, plain flat white background, even lighting, no ground, no shadow, no text, hand painted fantasy game art, rich detail", 768, 1024, 6600)
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy(RAW / "structures" / "air_temple.png", dst)
     if "icons" in what:
         for i, (cid, (el, name, desc)) in enumerate(champs.items()):
             make(RAW / "icons" / f"{cid}.png", f"close portrait bust of {who(cid, el, name)}, strong rim light, dark painted background, {STYLE}", 768, 768, 8000 + i)
